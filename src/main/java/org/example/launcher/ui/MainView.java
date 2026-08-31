@@ -155,6 +155,8 @@ public class MainView {
     private Label accountNameLabel;
     private Label accountTypeLabel;
     private GameProfile selectedProfile;
+    private boolean suppressSelectionListener = false;
+    private java.util.Timer elyRefreshTimer;
 
     private List<MinecraftVersion> allVersions = List.of();
     private VersionManifest currentManifest;
@@ -243,6 +245,7 @@ public class MainView {
         });
         accountCombo.getSelectionModel().selectedItemProperty().addListener(
                 (obs, old, val) -> {
+                    if (suppressSelectionListener) return;
                     if (val != null) {
                         selectedProfile = val;
                         saveLastSelectedAccount(val.name());
@@ -563,6 +566,7 @@ public class MainView {
 
     public void loadVersions() {
         refreshAccounts();
+        startElyByRefreshTimer();
         showLoading();
 
         Task<VersionManifest> task = new Task<>() {
@@ -576,6 +580,99 @@ public class MainView {
         var thread = new Thread(task, "version-fetch");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private void startElyByRefreshTimer() {
+        if (elyRefreshTimer != null) {
+            elyRefreshTimer.cancel();
+        }
+        elyRefreshTimer = new java.util.Timer("ely-refresh-timer", true);
+        elyRefreshTimer.scheduleAtFixedRate(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                checkAllElyByProfiles();
+            }
+        }, 0, 30000);
+    }
+
+    private void checkAllElyByProfiles() {
+        try {
+            var profiles = profileService.loadProfiles();
+            boolean changed = false;
+            String[] nameChange = null;
+            var updated = new java.util.ArrayList<GameProfile>();
+
+            for (GameProfile p : profiles) {
+                if (p.isElyBy() && p.uuid().isPresent()) {
+                    GameProfile refreshed = elyAuthService.refreshProfile(p);
+                    boolean nameChanged = !refreshed.name().equals(p.name());
+                    if (nameChanged) {
+                        System.out.println("[ELY] === NICK CHANGED === old='" + p.name()
+                                + "' new='" + refreshed.name() + "'");
+                        nameChange = new String[]{p.name(), refreshed.name()};
+                    }
+                    if (nameChanged || !java.util.Objects.equals(
+                            refreshed.skinUrl().orElse(null),
+                            p.skinUrl().orElse(null))) {
+                        changed = true;
+                    }
+                    updated.add(refreshed);
+                } else {
+                    updated.add(p);
+                }
+            }
+
+            if (changed) {
+                profileService.saveProfiles(updated);
+                final String[] finalNameChange = nameChange;
+                javafx.application.Platform.runLater(() -> {
+                    var items = accountCombo.getItems();
+                    String selectedUuid = selectedProfile != null
+                            ? selectedProfile.uuid().orElse(null) : null;
+
+                    for (int i = 0; i < items.size(); i++) {
+                        GameProfile old = items.get(i);
+                        for (GameProfile up : updated) {
+                            if (old.uuid().isPresent() && up.uuid().isPresent()
+                                    && old.uuid().get().equals(up.uuid().get())
+                                    && !old.name().equals(up.name())) {
+                                System.out.println("[ELY] combo item " + i + ": "
+                                        + old.name() + " -> " + up.name());
+                                items.set(i, up);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (selectedUuid != null) {
+                        for (int i = 0; i < items.size(); i++) {
+                            GameProfile p = items.get(i);
+                            if (p.uuid().isPresent()
+                                    && p.uuid().get().equals(selectedUuid)) {
+                                suppressSelectionListener = true;
+                                accountCombo.getSelectionModel().clearSelection();
+                                accountCombo.getSelectionModel().select(i);
+                                selectedProfile = p;
+                                accountCombo.setValue(p);
+                                suppressSelectionListener = false;
+                                System.out.println("[ELY] re-selected: " + p.name());
+                                break;
+                            }
+                        }
+                    }
+
+                    if (selectedProfile != null) {
+                        updateAvatar(selectedProfile);
+                    }
+                    if (finalNameChange != null) {
+                        statusLabel.setText("Nick changed: "
+                                + finalNameChange[0] + " -> " + finalNameChange[1]);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            System.out.println("[ELY] timer exception: " + e);
+        }
     }
 
     private void showLoading() {
@@ -979,17 +1076,24 @@ public class MainView {
         }
     }
 
+    private final java.util.concurrent.atomic.AtomicLong avatarRequestId =
+            new java.util.concurrent.atomic.AtomicLong();
+
     private void updateAvatar(GameProfile profile) {
+        long requestId = avatarRequestId.incrementAndGet();
         if (profile == null || profile.skinUrl().isEmpty()) {
             avatarView.setVisible(false);
             return;
         }
         skinService.loadAvatarAsync(profile, 32)
                 .thenAccept(optImg -> javafx.application.Platform.runLater(() -> {
+                    if (requestId != avatarRequestId.get()) {
+                        return;
+                    }
                     if (optImg.isPresent()) {
                         avatarView.setImage(optImg.get());
                         avatarView.setVisible(true);
-                    } else {
+                    } else if (avatarView.getImage() == null) {
                         avatarView.setVisible(false);
                     }
                 }));
@@ -1002,36 +1106,51 @@ public class MainView {
     private void refreshAccounts() {
         try {
             var profiles = profileService.loadProfiles();
-            accountCombo.getItems().setAll(profiles);
+            suppressSelectionListener = true;
+            try {
+                accountCombo.getItems().setAll(profiles);
 
-            String savedName = null;
-            if (preferences != null) {
-                savedName = preferences.getLastSelectedAccount().orElse(null);
-            }
+                String selectedUuid = selectedProfile != null
+                        ? selectedProfile.uuid().orElse(null) : null;
+                String savedName = null;
+                if (preferences != null && selectedUuid == null) {
+                    savedName = preferences.getLastSelectedAccount().orElse(null);
+                }
 
-            if (savedName != null) {
-                for (GameProfile p : profiles) {
-                    if (p.name().equals(savedName)) {
-                        accountCombo.getSelectionModel().select(p);
-                        selectedProfile = p;
-                        return;
+                GameProfile toSelect = null;
+                if (selectedUuid != null) {
+                    for (GameProfile p : profiles) {
+                        if (p.uuid().isPresent() && p.uuid().get().equals(selectedUuid)) {
+                            toSelect = p;
+                            break;
+                        }
                     }
                 }
-            }
-            if (selectedProfile != null) {
-                for (GameProfile p : profiles) {
-                    if (p.name().equals(selectedProfile.name())) {
-                        accountCombo.getSelectionModel().select(p);
-                        return;
+                if (toSelect == null && savedName != null) {
+                    for (GameProfile p : profiles) {
+                        if (p.name().equals(savedName)) {
+                            toSelect = p;
+                            break;
+                        }
                     }
                 }
-            }
-            if (!profiles.isEmpty()) {
-                accountCombo.getSelectionModel().select(0);
-                selectedProfile = profiles.get(0);
+                if (toSelect == null && !profiles.isEmpty()) {
+                    toSelect = profiles.get(0);
+                }
+
+                if (toSelect != null) {
+                    accountCombo.getSelectionModel().clearSelection();
+                    accountCombo.getSelectionModel().select(toSelect);
+                    selectedProfile = toSelect;
+                }
+            } finally {
+                suppressSelectionListener = false;
             }
         } catch (java.io.IOException e) {
-            // Non-fatal
+            suppressSelectionListener = false;
+        }
+        if (selectedProfile != null) {
+            updateAvatar(selectedProfile);
         }
     }
 
@@ -1076,7 +1195,9 @@ public class MainView {
             GameProfile profile = authTask.getValue();
             try {
                 var profiles = new java.util.ArrayList<>(profileService.loadProfiles());
-                profiles.removeIf(p -> p.name().equals(profile.name()));
+                profiles.removeIf(p -> (profile.uuid().isPresent() && p.uuid().isPresent()
+                        && p.uuid().get().equals(profile.uuid().get()))
+                        || p.name().equals(profile.name()));
                 profiles.add(profile);
                 profileService.saveProfiles(profiles);
             } catch (java.io.IOException ex) {
@@ -1084,10 +1205,13 @@ public class MainView {
             }
             refreshAccounts();
             for (GameProfile p : accountCombo.getItems()) {
-                if (p.name().equals(profile.name())) {
+                if (profile.uuid().isPresent() && p.uuid().isPresent()
+                        && p.uuid().get().equals(profile.uuid().get())) {
+                    suppressSelectionListener = true;
                     accountCombo.getSelectionModel().select(p);
                     selectedProfile = p;
                     saveLastSelectedAccount(profile.name());
+                    suppressSelectionListener = false;
                     break;
                 }
             }
@@ -1173,20 +1297,42 @@ public class MainView {
         };
         refreshTask.setOnSucceeded(e -> {
             GameProfile refreshed = refreshTask.getValue();
-            selectedProfile = refreshed;
 
-            try {
-                var profiles = new java.util.ArrayList<>(profileService.loadProfiles());
-                profiles.removeIf(p -> p.uuid().equals(refreshed.uuid())
-                        || p.name().equals(refreshed.name()));
-                profiles.add(refreshed);
-                profileService.saveProfiles(profiles);
-            } catch (java.io.IOException ex) {
-                // Non-fatal
+            String oldName = profile.name();
+            String newName = refreshed.name();
+            boolean nameChanged = !oldName.equals(newName);
+
+            if (nameChanged) {
+                try {
+                    var profiles = new java.util.ArrayList<>(profileService.loadProfiles());
+                    profiles.removeIf(p -> p.uuid().equals(refreshed.uuid())
+                            || p.name().equals(oldName));
+                    profiles.add(refreshed);
+                    profileService.saveProfiles(profiles);
+                    refreshAccounts();
+                    for (GameProfile p : accountCombo.getItems()) {
+                        if (p.uuid().isPresent()
+                                && p.uuid().get().equals(refreshed.uuid().orElse(""))) {
+                            suppressSelectionListener = true;
+                            accountCombo.getSelectionModel().select(p);
+                            selectedProfile = p;
+                            suppressSelectionListener = false;
+                            break;
+                        }
+                    }
+                    updateAvatar(refreshed);
+                    saveLastSelectedAccount(newName);
+                } catch (java.io.IOException ex) {
+                    // Non-fatal
+                }
             }
 
-            updateAvatar(refreshed);
-            statusLabel.setText("Launching " + selected.id() + "...");
+            if (nameChanged) {
+                statusLabel.setText("Nick changed: " + oldName + " -> " + newName
+                        + ". Launching " + selected.id() + "...");
+            } else {
+                statusLabel.setText("Launching " + selected.id() + "...");
+            }
             doLaunch(selected, gameDir, refreshed, false);
         });
         refreshTask.setOnFailed(e -> {

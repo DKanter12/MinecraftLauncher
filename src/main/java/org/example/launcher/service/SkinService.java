@@ -72,6 +72,11 @@ public class SkinService {
 
     /**
      * Synchronously loads (or retrieves from cache) the face avatar.
+     * <p>
+     * The cache is read via {@code ImageIO.read} (synchronous, validated):
+     * a corrupt or truncated cached file is detected, deleted, and the
+     * skin is re-downloaded. This self-heals broken avatars instead of
+     * requiring a re-login.
      */
     public Image loadAvatar(String skinUrl, int size) throws IOException {
         String hash = urlToHash(skinUrl);
@@ -79,10 +84,17 @@ public class SkinService {
         Path cachedFile = cacheDir.resolve(hash + "_" + size + ".png");
 
         if (Files.isRegularFile(cachedFile)) {
-            return new Image(cachedFile.toUri().toString());
+            BufferedImage cached = ImageIO.read(cachedFile.toFile());
+            if (cached != null) {
+                return bufferedImageToJavaFX(cached);
+            }
+            Files.deleteIfExists(cachedFile);
         }
 
         BufferedImage skin = downloadSkin(skinUrl);
+        if (skin == null) {
+            throw new IOException("Invalid skin image data: " + skinUrl);
+        }
         BufferedImage face = extractFace(skin, size);
 
         Files.createDirectories(cacheDir);

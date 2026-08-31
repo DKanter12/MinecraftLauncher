@@ -25,7 +25,7 @@ import org.example.launcher.model.GameProfile;
  * <ol>
  *   <li>POST to {@code https://authserver.ely.by/auth/authenticate} with
  *       username + password → returns accessToken, clientToken, selectedProfile</li>
- *   <li>GET {@code https://sessionserver.ely.by/session/minecraft/profile/{uuid}}
+ *   <li>GET {@code https://authserver.ely.by/session/profile/{uuid}}
  *       → returns profile with textures property (base64-encoded skin URL + model)</li>
  * </ol>
  */
@@ -34,7 +34,7 @@ public class ElyAuthService {
     private static final String AUTH_URL =
             "https://authserver.ely.by/auth/authenticate";
     private static final String SESSION_URL =
-            "https://sessionserver.ely.by/session/minecraft/profile/";
+            "https://authserver.ely.by/session/profile/";
 
     private final Gson gson;
     private final HttpClient httpClient;
@@ -105,13 +105,20 @@ public class ElyAuthService {
         SkinData skin = fetchSkinData(uuid);
 
         return GameProfile.elyBy(playerName, uuid, accessToken,
+                returnedClientToken != null ? returnedClientToken : clientToken,
                 skin.url, skin.model, skin.propertiesJson);
     }
 
     /**
-     * Re-fetches profile data (name, skin) from Ely.by for an existing
-     * account. This picks up name/skin changes without requiring
-     * re-authentication.
+     * Refreshes the authorized session for an existing Ely.by account:
+     * <ol>
+     *   <li>{@code POST /auth/refresh} with the stored accessToken +
+     *       clientToken → new accessToken + current profile name</li>
+     *   <li>{@code GET /session/profile/{uuid}} → current skin data</li>
+     * </ol>
+     * The account identity is the UUID; the nick is treated as a display
+     * field that can change at any time. As long as the launcher refreshes
+     * regularly, the stored accessToken stays alive indefinitely.
      *
      * @param profile the existing Ely.by profile
      * @return updated GameProfile, or the original if refresh fails
@@ -122,10 +129,53 @@ public class ElyAuthService {
         }
         try {
             String uuid = profile.uuid().get();
-            SkinData skin = fetchSkinData(uuid);
 
-            // Re-parse the profile response to get the current name
+            String accessToken = profile.accessToken().orElse(null);
+            String clientToken = profile.clientToken().orElse(null);
+
+            if (accessToken != null && clientToken != null) {
+                try {
+                    JsonObject requestBody = new JsonObject();
+                    requestBody.addProperty("accessToken", accessToken);
+                    requestBody.addProperty("clientToken", clientToken);
+
+                    HttpRequest request = HttpRequest.newBuilder(
+                            URI.create(AUTH_URL.replace("/authenticate", "/refresh")))
+                            .timeout(Duration.ofSeconds(15))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestBody)))
+                            .build();
+
+                    HttpResponse<String> response = httpClient.send(request,
+                            HttpResponse.BodyHandlers.ofString());
+
+                    if (response.statusCode() == 200) {
+                        JsonObject root = JsonParser.parseString(response.body())
+                                .getAsJsonObject();
+                        accessToken = getStr(root, "accessToken");
+                        String returnedClientToken = getStr(root, "clientToken");
+                        if (returnedClientToken != null) {
+                            clientToken = returnedClientToken;
+                        }
+                        if (root.has("selectedProfile")
+                                && root.get("selectedProfile").isJsonObject()) {
+                            JsonObject selected = root.getAsJsonObject("selectedProfile");
+                            String authName = getStr(selected, "name");
+                            if (authName != null && !authName.isBlank()) {
+                                System.out.println("[ELY] auth refresh: current name='" + authName + "'");
+                            }
+                        }
+                    } else {
+                        System.out.println("[ELY] auth refresh failed: " + response.statusCode()
+                                + " — session may have expired, re-login required");
+                    }
+                } catch (Exception e) {
+                    System.out.println("[ELY] auth refresh error: " + e.getMessage());
+                }
+            }
+
             String trimmedUuid = uuid.replace("-", "");
+
             HttpRequest request = HttpRequest.newBuilder(
                     URI.create(SESSION_URL + trimmedUuid))
                     .timeout(Duration.ofSeconds(15))
@@ -135,19 +185,45 @@ public class ElyAuthService {
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString());
 
-            String currentName = profile.name();
-            if (response.statusCode() == 200) {
-                JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
-                String fetchedName = getStr(root, "name");
-                if (fetchedName != null && !fetchedName.isBlank()) {
-                    currentName = fetchedName;
+            if (response.statusCode() != 200) {
+                System.out.println("[ELY] session returned status " + response.statusCode() + " for uuid=" + trimmedUuid);
+                return profile;
+            }
+
+            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+
+            String currentName = getStr(root, "name");
+            System.out.println("[ELY] session name='" + currentName + "' | saved name='" + profile.name() + "'");
+            if (currentName == null || currentName.isBlank()) {
+                currentName = profile.name();
+            }
+
+            String propertiesJson = null;
+            String skinUrl = null;
+            String skinModel = null;
+
+            if (root.has("properties") && root.get("properties").isJsonArray()) {
+                propertiesJson = gson.toJson(root.get("properties"));
+                for (JsonElement elem : root.getAsJsonArray("properties")) {
+                    if (!elem.isJsonObject()) continue;
+                    JsonObject prop = elem.getAsJsonObject();
+                    if ("textures".equals(getStr(prop, "name"))) {
+                        String encodedValue = getStr(prop, "value");
+                        if (encodedValue != null) {
+                            SkinData decoded = decodeTextures(encodedValue);
+                            skinUrl = decoded.url;
+                            skinModel = decoded.model;
+                        }
+                    }
                 }
             }
 
             return GameProfile.elyBy(currentName, uuid,
-                    profile.accessToken().orElse(null),
-                    skin.url, skin.model, skin.propertiesJson);
+                    accessToken != null ? accessToken : profile.accessToken().orElse(null),
+                    clientToken != null ? clientToken : profile.clientToken().orElse(null),
+                    skinUrl, skinModel, propertiesJson);
         } catch (Exception e) {
+            System.out.println("[ELY] refresh exception: " + e);
             return profile;
         }
     }

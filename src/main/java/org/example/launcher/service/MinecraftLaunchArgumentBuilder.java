@@ -219,7 +219,7 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
         List<String> result = new ArrayList<>(jvmArgs);
         result.add("-Dminecraft.api.auth.host=https://authserver.ely.by/auth");
         result.add("-Dminecraft.api.account.host=https://api.ely.by");
-        result.add("-Dminecraft.api.session.host=https://sessionserver.ely.by/session/minecraft");
+        result.add("-Dminecraft.api.session.host=https://authserver.ely.by/session");
         result.add("-Dminecraft.api.services.host=https://api.ely.by");
         return result;
     }

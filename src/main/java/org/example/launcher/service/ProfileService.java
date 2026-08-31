@@ -116,7 +116,8 @@ public class ProfileService {
 
                 if ("ely_by".equalsIgnoreCase(type)) {
                     result.add(org.example.launcher.model.GameProfile.elyBy(
-                            name, uuid, token, skinUrl, skinModel, profileProps));
+                            name, uuid, token, getStrOrNull(p, "clientToken"),
+                            skinUrl, skinModel, profileProps));
                 } else {
                     boolean online = "Mojang".equalsIgnoreCase(type)
                             || "microsoft".equalsIgnoreCase(type);
@@ -141,6 +142,7 @@ public class ProfileService {
             entry.addProperty("name", p.name());
             if (p.uuid().isPresent()) entry.addProperty("uuid", p.uuid().get());
             if (p.accessToken().isPresent()) entry.addProperty("accessToken", p.accessToken().get());
+            if (p.clientToken().isPresent()) entry.addProperty("clientToken", p.clientToken().get());
 
             String type;
             if (p.isElyBy()) {
