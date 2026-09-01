@@ -67,49 +67,30 @@
     -fx-border-color: #313244;
 }
 
-/* Filter buttons */
+/* Filter buttons (text chips) */
 
 .filter-button {
-    -fx-background-color: transparent;
+    -fx-background-color: #313244;
     -fx-background-radius: 6;
-    -fx-border-color: transparent;
+    -fx-border-color: #45475a;
     -fx-border-radius: 6;
-    -fx-padding: 7 10 7 10;
+    -fx-border-width: 1;
+    -fx-padding: 6 12 6 12;
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 13px;
     -fx-cursor: hand;
-    -fx-content-display: GRAPHIC_ONLY;
+    -fx-content-display: LEFT;
 }
 
 .filter-button:hover {
-    -fx-background-color: #313244;
+    -fx-background-color: #3b3d52;
 }
 
 .filter-button-active {
-    -fx-background-color: #313244;
+    -fx-background-color: #45475a;
     -fx-border-color: #89b4fa;
-    -fx-border-width: 0 0 0 3 0 0 0 0;
-}
-
-.filter-button-label {
-    -fx-text-fill: #cdd6f4;
-    -fx-font-size: 13px;
-}
-
-.filter-button-active .filter-button-label {
     -fx-text-fill: #89b4fa;
     -fx-font-weight: bold;
-}
-
-.filter-button-count {
-    -fx-text-fill: #585b70;
-    -fx-font-size: 12px;
-    -fx-background-color: #313244;
-    -fx-background-radius: 8;
-    -fx-padding: 1 7 1 7;
-}
-
-.filter-button-active .filter-button-count {
-    -fx-text-fill: #a6adc8;
-    -fx-background-color: #45475a;
 }
 
 /* Search field */
@@ -237,23 +218,6 @@
     -fx-font-size: 13px;
 }
 
-.type-badge {
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 4;
-    -fx-padding: 2 10 2 10;
-    -fx-background-insets: 0;
-}
-
-.stable-badge {
-    -fx-background-color: #4caf50;
-}
-
-.unstable-badge {
-    -fx-background-color: #f38ba8;
-}
-
 /* Play button */
 
 .play-button {
@@ -275,6 +239,31 @@
 }
 
 .play-button:disabled {
+    -fx-background-color: #45475a;
+    -fx-text-fill: #585b70;
+}
+
+/* Compact play button (version browser action bar) */
+
+.play-button-compact {
+    -fx-background-color: #a6e3a1;
+    -fx-text-fill: #1e1e2e;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-background-radius: 6;
+    -fx-padding: 6 20 6 20;
+    -fx-cursor: hand;
+}
+
+.play-button-compact:hover {
+    -fx-background-color: #94d689;
+}
+
+.play-button-compact:pressed {
+    -fx-background-color: #82c477;
+}
+
+.play-button-compact:disabled {
     -fx-background-color: #45475a;
     -fx-text-fill: #585b70;
 }
@@ -437,4 +426,138 @@
 .account-type-offline {
     -fx-text-fill: #a6adc8;
     -fx-font-size: 10px;
+}
+
+/* ======================= Modded Profiles ======================= */
+
+.profile-list {
+    -fx-background-color: #313244;
+    -fx-background-radius: 6;
+    -fx-border-color: #45475a;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+}
+
+.profile-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #cdd6f4;
+    -fx-padding: 4 6 4 6;
+}
+
+.profile-list .list-cell:filled:selected {
+    -fx-background-color: #45475a;
+    -fx-background-radius: 4;
+}
+
+.profile-name {
+    -fx-text-fill: #cdd6f4;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.profile-summary {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 10px;
+}
+
+.profile-jvm-args {
+    -fx-control-inner-background: #313244;
+    -fx-text-fill: #cdd6f4;
+    -fx-font-family: Consolas;
+    -fx-font-size: 12px;
+    -fx-background-radius: 6;
+    -fx-border-color: #45475a;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+}
+
+/* ===================== Version type / loader badges ===================== */
+/* All badges share one outlined chip style; only the accent color
+   differs (vanilla version types and mod loader families alike). */
+
+.loader-badge-vanilla,
+.loader-badge-fabric,
+.loader-badge-forge,
+.loader-badge-neoforge,
+.loader-badge-quilt,
+.type-badge-release,
+.type-badge-snapshot,
+.type-badge-old-beta,
+.type-badge-old-alpha {
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-padding: 1 5 1 5;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-border-width: 1;
+}
+
+.loader-badge-vanilla {
+    -fx-text-fill: #a6e3a1;
+    -fx-background-color: #1e2e22;
+    -fx-border-color: #a6e3a1;
+}
+
+.loader-badge-fabric {
+    -fx-text-fill: #f9e2af;
+    -fx-background-color: #322d24;
+    -fx-border-color: #f9e2af;
+}
+
+.loader-badge-forge {
+    -fx-text-fill: #f38ba8;
+    -fx-background-color: #33272e;
+    -fx-border-color: #f38ba8;
+}
+
+.loader-badge-neoforge {
+    -fx-text-fill: #fab387;
+    -fx-background-color: #342c25;
+    -fx-border-color: #fab387;
+}
+
+.loader-badge-quilt {
+    -fx-text-fill: #cba6f7;
+    -fx-background-color: #2c2938;
+    -fx-border-color: #cba6f7;
+}
+
+.type-badge-release {
+    -fx-text-fill: #a6e3a1;
+    -fx-background-color: #1e2e22;
+    -fx-border-color: #a6e3a1;
+}
+
+.type-badge-snapshot {
+    -fx-text-fill: #89b4fa;
+    -fx-background-color: #1e2b3a;
+    -fx-border-color: #89b4fa;
+}
+
+.type-badge-old-beta {
+    -fx-text-fill: #fab387;
+    -fx-background-color: #342c25;
+    -fx-border-color: #fab387;
+}
+
+.type-badge-old-alpha {
+    -fx-text-fill: #a6adc8;
+    -fx-background-color: #2b2b35;
+    -fx-border-color: #a6adc8;
+}
+
+.version-type-hint {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 10px;
+    -fx-padding: 0 4 0 4;
+    -fx-background-color: #313244;
+    -fx-background-radius: 4;
+}
+
+.version-type-hint {
+    -fx-text-fill: #a6adc8;
+    -fx-font-size: 10px;
+    -fx-padding: 0 4 0 4;
+    -fx-background-color: #313244;
+    -fx-background-radius: 4;
 }

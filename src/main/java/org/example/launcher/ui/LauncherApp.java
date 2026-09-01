@@ -31,6 +31,13 @@ import org.example.launcher.service.SkinService;
 import org.example.launcher.service.SystemJavaDetector;
 import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
+import org.example.launcher.service.ModdedProfileService;
+import org.example.launcher.service.modloader.ModLoaderMetadataMerger;
+import org.example.launcher.service.modloader.ModLoaderRegistry;
+import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.service.modloader.ModdedProfileVerificationService;
+import org.example.launcher.service.modloader.ModdedVersionService;
+import org.example.launcher.version.ModLoaderFamilyType;
 import org.example.launcher.version.VersionTypeRegistry;
 
 /**
@@ -56,9 +63,19 @@ public class LauncherApp extends Application {
         Platform.setImplicitExit(false);
 
         VersionTypeRegistry typeRegistry = new VersionTypeRegistry();
+        // Loader families as version types: installed modded versions
+        // appear in the unified version browser with their own filters
+        for (ModLoaderType loaderType : ModLoaderType.values()) {
+            if (loaderType != ModLoaderType.VANILLA) {
+                typeRegistry.register(ModLoaderFamilyType.of(loaderType));
+            }
+        }
 
-        VersionService versionService = new MojangVersionService();
-        VersionMetadataService metadataService = new MojangVersionMetadataService();
+        MojangVersionService mojangVersionService = new MojangVersionService();
+        VersionService versionService = mojangVersionService;
+        MojangVersionMetadataService mojangMetadataService =
+                new MojangVersionMetadataService();
+        VersionMetadataService metadataService = mojangMetadataService;
 
         AssetIndexService assetIndexService = new MojangAssetIndexService();
         FileDownloader fileDownloader = new HttpFileDownloader();
@@ -80,11 +97,11 @@ public class LauncherApp extends Application {
         MinecraftLaunchArgumentBuilder argumentBuilder = new MinecraftLaunchArgumentBuilder();
         argumentBuilder.setAuthlibInjectorManager(authlibInjectorManager);
 
-        MinecraftLaunchService launchService = new MinecraftLauncher(
+        MinecraftLauncher launcher = new MinecraftLauncher(
                 argumentBuilder,
                 javaResolutionService,
                 checksumVerifier);
-
+        MinecraftLaunchService launchService = launcher;
         ProfileService profileService = new ProfileService(
                 GameDirectory.defaultDirectory().profilesFile());
 
@@ -95,10 +112,30 @@ public class LauncherApp extends Application {
 
         SkinService skinService = new SkinService(GameDirectory.defaultDirectory());
 
+        // Mod loader support (Fabric, Forge, NeoForge, Quilt)
+        ModLoaderMetadataMerger merger = new ModLoaderMetadataMerger(
+                mojangMetadataService);
+        ModLoaderRegistry modLoaderRegistry = ModLoaderRegistry.createDefault(
+                java.net.http.HttpClient.newHttpClient(),
+                fileDownloader, javaResolutionService, merger, installationService);
+        ModdedVersionService moddedVersionService = new ModdedVersionService(
+                mojangVersionService, mojangMetadataService, merger);
+
+        // Game instances (vanilla + modded, each with its own directory)
+        ModdedProfileService moddedProfileService =
+                new ModdedProfileService(defaultGameDir);
+        ModdedProfileVerificationService profileVerificationService =
+                new ModdedProfileVerificationService(
+                        moddedVersionService, mojangVersionService,
+                        mojangMetadataService, modLoaderRegistry,
+                        launcher, javaResolutionService, installationService);
+
         MainView view = new MainView(
                 versionService, metadataService, installationService,
                 launchService, javaResolutionService, javaRuntimeInstaller,
-                profileService, typeRegistry, preferences, elyAuthService, skinService);
+                profileService, typeRegistry, preferences, elyAuthService, skinService,
+                modLoaderRegistry, moddedVersionService,
+                moddedProfileService, profileVerificationService);
 
         Scene scene = new Scene(view.getView(), 1180, 680);
         var css = getClass().getResource("/styles.css");

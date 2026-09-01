@@ -214,7 +214,12 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                     if (libPath != null) {
                         String base = libUrl.endsWith("/") ? libUrl : libUrl + "/";
                         String fullUrl = base + libPath;
-                        artifact = new DownloadInfo(fullUrl, null, 0, libPath);
+                        // Fabric/Quilt-style libraries carry sha1/size at the
+                        // top level alongside "url" — pick them up for
+                        // hash-verified downloads
+                        String sha1 = getStrOrNull(libObj, "sha1");
+                        long size = getLong(libObj, "size", 0);
+                        artifact = new DownloadInfo(fullUrl, sha1, size, libPath);
                     }
                 }
             }

@@ -1,5 +1,8 @@
 package org.example.launcher.service;
 
+import java.nio.file.Path;
+import java.util.List;
+
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.model.GameProfile;
 import org.example.launcher.model.LaunchResult;
@@ -22,7 +25,8 @@ import org.example.launcher.model.VersionMetadata;
 public interface MinecraftLaunchService {
 
     /**
-     * Launches the given Minecraft version.
+     * Launches the given Minecraft version, running the game inside
+     * the storage root.
      *
      * @param metadata the version metadata
      * @param gameDir  the game directory layout
@@ -32,4 +36,27 @@ public interface MinecraftLaunchService {
     LaunchResult launch(VersionMetadata metadata,
                         GameDirectory gameDir,
                         GameProfile profile);
+
+    /**
+     * Launches the given Minecraft version inside a separate runtime
+     * directory (modded profiles): shared files are resolved from
+     * {@code gameDir}, while the process runs in
+     * {@code runtimeDirectory} where the profile's {@code mods/},
+     * {@code config/}, {@code saves/} etc. live.
+     *
+     * @param metadata         the version metadata
+     * @param gameDir          the storage game directory layout
+     * @param profile          the player profile
+     * @param runtimeDirectory the directory the game runs in
+     * @param extraJvmArgs     profile-specific JVM arguments (may be
+     *                         empty)
+     * @return launch result (success or failure with details)
+     */
+    default LaunchResult launch(VersionMetadata metadata,
+                                GameDirectory gameDir,
+                                GameProfile profile,
+                                Path runtimeDirectory,
+                                List<String> extraJvmArgs) {
+        return launch(metadata, gameDir, profile);
+    }
 }

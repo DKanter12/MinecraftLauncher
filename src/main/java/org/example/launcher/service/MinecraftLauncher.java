@@ -51,8 +51,17 @@ public class MinecraftLauncher implements MinecraftLaunchService {
 
     @Override
     public LaunchResult launch(VersionMetadata metadata,
-                               GameDirectory gameDir,
-                               GameProfile profile) {
+                                GameDirectory gameDir,
+                                GameProfile profile) {
+        return launch(metadata, gameDir, profile, null, List.of());
+    }
+
+    @Override
+    public LaunchResult launch(VersionMetadata metadata,
+                                GameDirectory gameDir,
+                                GameProfile profile,
+                                Path runtimeDirectory,
+                                List<String> extraJvmArgs) {
 
         // 1. Verify files
         List<String> missing = verifyFiles(metadata, gameDir);
@@ -79,8 +88,11 @@ public class MinecraftLauncher implements MinecraftLaunchService {
                     "Failed to extract native libraries: " + e.getMessage());
         }
 
-        // 4. Build arguments
-        LaunchArguments args = argumentBuilder.build(metadata, gameDir, profile, javaRuntime);
+        // 4. Build arguments (runtime dir + extra JVM args for modded
+        //    profiles; defaults for vanilla launches)
+        LaunchArguments args = argumentBuilder.build(
+                metadata, gameDir, profile, javaRuntime,
+                runtimeDirectory, extraJvmArgs);
 
         // 5. Start process
         try {

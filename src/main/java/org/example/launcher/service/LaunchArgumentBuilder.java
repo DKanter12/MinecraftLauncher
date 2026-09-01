@@ -1,5 +1,8 @@
 package org.example.launcher.service;
 
+import java.nio.file.Path;
+import java.util.List;
+
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.model.GameProfile;
 import org.example.launcher.model.JavaRuntime;
@@ -20,7 +23,8 @@ import org.example.launcher.model.VersionMetadata;
 public interface LaunchArgumentBuilder {
 
     /**
-     * Builds launch arguments for the given context.
+     * Builds launch arguments for the given context, running the game
+     * inside the storage root itself.
      *
      * @param metadata  the version metadata
      * @param gameDir   the game directory layout
@@ -32,4 +36,37 @@ public interface LaunchArgumentBuilder {
                           GameDirectory gameDir,
                           GameProfile profile,
                           JavaRuntime javaRuntime);
+
+    /**
+     * Builds launch arguments with a separate runtime directory and
+     * additional JVM arguments.
+     * <p>
+     * Used for modded profiles: shared files (client JAR, libraries,
+     * assets, natives) are resolved from {@code gameDir} (the storage
+     * root), while the game process runs inside
+     * {@code runtimeDirectory} — the profile's own directory holding
+     * its {@code mods/}, {@code config/}, {@code saves/} etc. The
+     * {@code ${game_directory}} placeholder and the process working
+     * directory point at the runtime directory; profile-specific JVM
+     * arguments (e.g. {@code -Xmx4G}) are appended.
+     *
+     * @param metadata        the version metadata
+     * @param gameDir         the storage game directory layout
+     * @param profile         the player profile
+     * @param javaRuntime     the resolved Java runtime
+     * @param runtimeDirectory the directory the game runs in (mods,
+     *                        saves, config live here)
+     * @param extraJvmArgs    profile-specific JVM arguments (may be
+     *                        empty)
+     * @return fully resolved launch arguments
+     */
+    default LaunchArguments build(VersionMetadata metadata,
+                                  GameDirectory gameDir,
+                                  GameProfile profile,
+                                  JavaRuntime javaRuntime,
+                                  Path runtimeDirectory,
+                                  List<String> extraJvmArgs) {
+        // Default: ignore the extended context (backwards compatibility)
+        return build(metadata, gameDir, profile, javaRuntime);
+    }
 }

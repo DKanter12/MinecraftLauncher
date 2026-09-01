@@ -122,6 +122,104 @@ class MinecraftLaunchArgumentBuilderTest {
     // ==================================================================
 
     @Test
+    @DisplayName("builds Forge-style module path with ${classpath_separator} replaced")
+    void buildsForgeStyleModulePath(@TempDir Path dir) throws IOException {
+        // Mirrors Forge 1.20.1's profile JSON: the module path (-p) is
+        // assembled from ${library_directory} entries joined by
+        // ${classpath_separator} instead of using ${classpath}
+        String forgeJson = """
+                {
+                  "id": "1.20.1-forge-47.4.10",
+                  "type": "release",
+                  "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+                  "assets": "5",
+                  "libraries": [],
+                  "downloads": {
+                    "client": { "sha1": "c1", "size": 999, "url": "https://example.com/client.jar" }
+                  },
+                  "arguments": {
+                    "game": ["--launchTarget", "forgeclient", "--username", "${auth_name}"],
+                    "jvm": [
+                      "-Djava.library.path=${natives_directory}",
+                      "-p",
+                      "${library_directory}/cpw/mods/bootstraplauncher/1.1.2/bootstraplauncher-1.1.2.jar${classpath_separator}${library_directory}/cpw/mods/securejarhandler/2.1.10/securejarhandler-2.1.10.jar${classpath_separator}${library_directory}/cpw/mods/JarJarFileSystems/0.3.19/JarJarFileSystems-0.3.19.jar",
+                      "--add-modules", "ALL-DEFAULT",
+                      "-DignoreList=bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client.jar",
+                      "-cp", "${classpath}"
+                    ]
+                  }
+                }
+                """;
+        VersionMetadata meta = metadataService.parseMetadata(forgeJson,
+                "1.20.1-forge-47.4.10");
+        GameDirectory gameDir = new GameDirectory(dir);
+        GameProfile profile = GameProfile.offline("Steve");
+
+        LaunchArguments args = builder.build(meta, gameDir, profile, sampleRuntime);
+
+        List<String> jvm = args.jvmArguments();
+
+        // No unreplaced placeholders anywhere
+        assertFalse(jvm.stream().anyMatch(s -> s.contains("${")),
+                "No unreplaced placeholders should remain in JVM args: " + jvm);
+
+        // The module path must be split by the platform path separator
+        int pIdx = jvm.indexOf("-p");
+        assertTrue(pIdx >= 0 && pIdx + 1 < jvm.size(),
+                "Expected -p followed by a value");
+        String modulePath = jvm.get(pIdx + 1);
+        String separator = java.io.File.pathSeparator;
+
+        assertTrue(modulePath.contains(separator),
+                "Module path should contain the platform path separator: " + modulePath);
+        String[] modules = modulePath.split(java.util.regex.Pattern.quote(separator));
+        assertEquals(3, modules.length,
+                "Module path should contain 3 jars: " + modulePath);
+        assertTrue(modules[0].endsWith("bootstraplauncher-1.1.2.jar"));
+        assertTrue(modules[1].endsWith("securejarhandler-2.1.10.jar"));
+        assertTrue(modules[2].endsWith("JarJarFileSystems-0.3.19.jar"));
+
+        // Each entry must live inside the libraries directory
+        String librariesDir = gameDir.librariesDir().toString();
+        for (String m : modules) {
+            assertTrue(m.startsWith(librariesDir),
+                    "Module should be inside libraries dir: " + m);
+        }
+    }
+
+    @Test
+    @DisplayName("builds with separate runtime directory and extra JVM args (modded profile)")
+    void buildsWithRuntimeDirectoryAndExtraJvmArgs(@TempDir Path dir) throws IOException {
+        VersionMetadata meta = metadataService.parseMetadata(MODERN_JSON, "1.21");
+        GameDirectory storage = new GameDirectory(dir);
+        GameProfile profile = GameProfile.offline("Steve");
+        Path runtimeDir = dir.resolve("profiles").resolve("MyPack");
+
+        LaunchArguments args = builder.build(meta, storage, profile, sampleRuntime,
+                runtimeDir, List.of("-Xmx4G", "-Dsodium.hideAAA"));
+
+        // The game runs inside the profile's own directory
+        assertEquals(runtimeDir, args.workingDirectory());
+
+        // --gameDir points at the runtime directory, not the storage root
+        List<String> game = args.gameArguments();
+        int gameDirIdx = game.indexOf("--gameDir");
+        assertTrue(gameDirIdx >= 0, "game args should contain --gameDir: " + game);
+        assertEquals(runtimeDir.toString(), game.get(gameDirIdx + 1));
+
+        // Extra JVM args are appended after the base ones
+        List<String> jvm = args.jvmArguments();
+        assertTrue(jvm.contains("-Xmx4G"));
+        assertTrue(jvm.contains("-Dsodium.hideAAA"));
+        assertTrue(jvm.indexOf("-Dminecraft.launcher.brand=custom")
+                < jvm.indexOf("-Xmx4G"));
+
+        // Classpath still resolves from the shared storage root
+        assertTrue(args.classpath().contains("logging-1.1.1.jar"));
+        assertTrue(args.classpath().contains("1.21.jar"));
+    }
+
+    @Test
     @DisplayName("builds modern version with all placeholders replaced")
     void buildsModernVersion(@TempDir Path dir) throws IOException {
         VersionMetadata meta = metadataService.parseMetadata(MODERN_JSON, "1.21");

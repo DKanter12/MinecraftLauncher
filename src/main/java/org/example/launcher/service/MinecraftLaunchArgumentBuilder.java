@@ -47,12 +47,24 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
     @Override
     public LaunchArguments build(VersionMetadata metadata,
-                                 GameDirectory gameDir,
-                                 GameProfile profile,
-                                 JavaRuntime javaRuntime) {
+                                  GameDirectory gameDir,
+                                  GameProfile profile,
+                                  JavaRuntime javaRuntime) {
+        return build(metadata, gameDir, profile, javaRuntime,
+                gameDir.root(), List.of());
+    }
+
+    @Override
+    public LaunchArguments build(VersionMetadata metadata,
+                                  GameDirectory gameDir,
+                                  GameProfile profile,
+                                  JavaRuntime javaRuntime,
+                                  Path runtimeDirectory,
+                                  List<String> extraJvmArgs) {
 
         String classpath = buildClasspath(metadata, gameDir);
-        Map<String, String> placeholders = buildPlaceholders(metadata, gameDir, profile);
+        Map<String, String> placeholders = buildPlaceholders(
+                metadata, gameDir, profile, runtimeDirectory);
         placeholders.put("${classpath}", classpath);
 
         List<String> jvmArgs;
@@ -64,6 +76,15 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
         } else {
             jvmArgs = buildLegacyJvmArgs(metadata, gameDir, classpath);
             gameArgs = buildLegacyGameArgs(metadata, placeholders);
+        }
+
+        // Profile-specific JVM arguments (e.g. -Xmx4G)
+        if (extraJvmArgs != null && !extraJvmArgs.isEmpty()) {
+            List<String> withExtra = new ArrayList<>(
+                    jvmArgs.size() + extraJvmArgs.size());
+            withExtra.addAll(jvmArgs);
+            withExtra.addAll(extraJvmArgs);
+            jvmArgs = withExtra;
         }
 
         if (profile.isElyBy() && authlibInjectorManager != null) {
@@ -79,13 +100,15 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
         String mainClass = metadata.mainClass().orElse("net.minecraft.client.main.Main");
 
+        Path workingDir = runtimeDirectory != null ? runtimeDirectory : gameDir.root();
+
         return new LaunchArguments(
                 javaRuntime.javaExecutable(),
                 jvmArgs,
                 classpath,
                 mainClass,
                 gameArgs,
-                gameDir.root());
+                workingDir);
     }
 
     // ------------------------------------------------------------------
@@ -93,7 +116,8 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     // ------------------------------------------------------------------
 
     private Map<String, String> buildPlaceholders(VersionMetadata meta, GameDirectory gameDir,
-                                                  GameProfile profile) {
+                                                   GameProfile profile,
+                                                   Path runtimeDirectory) {
         Map<String, String> map = new HashMap<>();
 
         String playerName = profile.name();
@@ -113,13 +137,19 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
         String userProperties = profile.profileProperties().orElse("{}");
 
+        // The game runs inside the runtime directory (per-profile for
+        // modded profiles); shared storage paths (assets, libraries,
+        // natives) keep pointing at the storage root
+        String gameDirValue = runtimeDirectory != null
+                ? runtimeDirectory.toString() : gameDir.root().toString();
+
         map.put("${auth_player_name}", playerName);
         map.put("${auth_name}", playerName);
         map.put("${auth_uuid}", uuid);
         map.put("${auth_access_token}", token);
         map.put("${auth_session}", sessionToken);
-        map.put("${game_directory}", gameDir.root().toString());
-        map.put("${gameDir}", gameDir.root().toString());
+        map.put("${game_directory}", gameDirValue);
+        map.put("${gameDir}", gameDirValue);
         map.put("${assets_root}", gameDir.assetsDir().toString());
         map.put("${assets_directory}", gameDir.assetsDir().toString());
         map.put("${assets_index_name}", assetIndexName);
@@ -131,6 +161,10 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
         map.put("${user_type}", userType);
         map.put("${game_assets}", gameDir.virtualAssetsDir(assetIndexName).toString());
         map.put("${library_directory}", gameDir.librariesDir().toString());
+        // Forge/NeoForge build their module path (-p) from
+        // ${library_directory}/…jar${classpath_separator}… — the
+        // separator must resolve to the platform path separator
+        map.put("${classpath_separator}", File.pathSeparator);
         map.put("${launcher_name}", "opencode-launcher");
         map.put("${launcher_version}", "1.0");
 

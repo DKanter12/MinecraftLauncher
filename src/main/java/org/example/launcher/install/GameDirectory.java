@@ -156,6 +156,40 @@ public final class GameDirectory {
         return root.resolve("launcher_preferences.json");
     }
 
+    // --- Instances (per-instance game directories) ---
+
+    /**
+     * Root directory holding the game directories of all instances,
+     * e.g. {@code gameDir/profiles/}.
+     */
+    public Path moddedProfilesRoot() {
+        return root.resolve("profiles");
+    }
+
+    /**
+     * Game directory of a single instance, e.g.
+     * {@code gameDir/profiles/{instanceId}}. Holds the instance's
+     * {@code mods/}, {@code config/}, {@code resourcepacks/},
+     * {@code shaderpacks/}, {@code saves/} and {@code logs/}.
+     */
+    public Path moddedProfileDir(String profileId) {
+        return moddedProfilesRoot().resolve(profileId);
+    }
+
+    /** Persistence file for the instance registry. */
+    public Path instancesFile() {
+        return root.resolve("instances.json");
+    }
+
+    /**
+     * Legacy persistence file used before instances supported vanilla
+     * games. Read as a fallback by the instance service when
+     * {@link #instancesFile()} does not exist yet.
+     */
+    public Path legacyModdedProfilesFile() {
+        return root.resolve("modded_profiles.json");
+    }
+
     // --- Directory creation ---
 
     /** Creates the full directory tree if it does not already exist. */

@@ -1,51 +1,53 @@
 package org.example.launcher.ui;
 
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.SelectionMode;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.InstallationProgress;
 import org.example.launcher.install.InstallationResult;
 import org.example.launcher.install.InstallationService;
-import org.example.launcher.model.AssetIndex;
-import org.example.launcher.model.DownloadInfo;
 import org.example.launcher.model.GameProfile;
-import org.example.launcher.model.JavaResolutionResult;
 import org.example.launcher.model.JavaRuntime;
 import org.example.launcher.model.JavaVersion;
 import org.example.launcher.model.LaunchResult;
 import org.example.launcher.model.MinecraftProcess;
 import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.model.VersionMetadata;
 import org.example.launcher.service.DefaultJavaResolutionService;
@@ -54,11 +56,16 @@ import org.example.launcher.service.JavaResolutionService;
 import org.example.launcher.service.JavaRuntimeInstaller;
 import org.example.launcher.service.LauncherPreferences;
 import org.example.launcher.service.MinecraftLaunchService;
+import org.example.launcher.service.ModdedProfileService;
 import org.example.launcher.service.ProfileService;
 import org.example.launcher.service.SkinService;
 import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
-import org.example.launcher.util.OsDetector;
+import org.example.launcher.service.modloader.ModLoaderRegistry;
+import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.service.modloader.ModdedProfileVerificationService;
+import org.example.launcher.service.modloader.ModdedVersionService;
+import org.example.launcher.version.StandardVersionType;
 import org.example.launcher.version.VersionType;
 import org.example.launcher.version.VersionTypeRegistry;
 
@@ -68,26 +75,27 @@ import org.example.launcher.version.VersionTypeRegistry;
  * Layout (BorderPane):
  * <pre>
  * +------------------------------------------------------------+
- * |  Header: title + version count                             |
- * +--------+------------------------------------+--------------+
- * | Sidebar|  Version table                     |  Metadata    |
- * |        |                                    |  panel       |
- * | Quick  |  Version | Type   | Release Date   |  (async)     |
- * | Select |  1.21    | Release| 13 Jun 2024    |              |
- * |        |  ...     | ...    | ...            |              |
- * | Filter |                                    |              |
- * | by Type|                                    |              |
- * |        |                                    |              |
- * | Search |                                    |              |
- * +--------+------------------------------------+--------------+
- * |  Details panel: selected version info + Play button        |
- * +------------------------------------------------------------+
+ * |  Header: title + status + account                          |
+ * +--------+---------------------------------------------------+
+ * | Instan-|                                                   |
+ * | ces    |   Selected instance details                       |
+ * | list   |   (badge, name, versions, game directory,        |
+ * |        |    JVM arguments, last played)                    |
+ * | + New  |                                                   |
+ * |        |   [ Play ]  [Folder] [Edit] [Delete]              |
+ * +--------+---------------------------------------------------+
  * </pre>
+ * <p>
+ * Everything is an instance (vanilla or modded), each with its own
+ * game directory. New instances are created via a single simple
+ * dialog (loader chips → version list → loader version list, like
+ * Modrinth); the Mojang manifest is only fetched in the background
+ * to feed that dialog.
  */
 public class MainView {
 
-    private static final String STABLE_BADGE = "stable-badge";
-    private static final String UNSTABLE_BADGE = "unstable-badge";
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
     private final VersionService versionService;
     private final VersionMetadataService metadataService;
@@ -100,51 +108,57 @@ public class MainView {
     private final ElyAuthService elyAuthService;
     private final SkinService skinService;
     private final VersionTypeRegistry typeRegistry;
+    private final ModLoaderRegistry modLoaderRegistry;
+    private final ModdedVersionService moddedVersionService;
+    private final ModdedProfileService moddedProfileService;
+    private final ModdedProfileVerificationService profileVerificationService;
 
     private BorderPane root;
-    private TableView<MinecraftVersion> table;
-    private TextField searchField;
     private Label statusLabel;
-    private Button playButton;
-    private Button retryButton;
-    private ProgressIndicator progressIndicator;
-    private VBox errorBox;
-    private Label errorLabel;
+    private boolean versionsLoadFailed = false;
 
     // Sidebar
-    private ToggleGroup typeFilterGroup;
-    private final Map<VersionType, ToggleButton> typeFilterButtons = new HashMap<>();
-    private ToggleButton allTypesButton;
-    private Button latestReleaseButton;
-    private Button latestSnapshotButton;
-    private final Map<VersionType, Label> typeCountLabels = new HashMap<>();
+    private ListView<ModdedProfile> profileListView;
+    private Button newInstanceButton;
 
-    // Details panel
-    private Label detailsVersionLabel;
-    private Label detailsTypeLabel;
-    private Label detailsDateLabel;
-    private Label detailsUrlLabel;
-    private VBox detailsPanel;
+    // Version browser (center): all versions incl. modded variants
+    private TextField versionSearchField;
+    private FlowPane versionFilterChips;
+    private Label versionBrowserTitle;
+    private ListView<VersionEntry> versionListView;
+    private List<VersionEntry> versionEntries = List.of();
 
-    // Metadata panel
-    private VBox metadataPanel;
-    private ProgressIndicator metadataProgress;
-    private Label metadataErrorLabel;
-    private Label metaMainClassLabel;
-    private Label metaJavaVersionLabel;
-    private Label metaJavaStatusLabel;
-    private Label metaClientJarLabel;
-    private Label metaClientSizeLabel;
-    private Label metaLibrariesLabel;
-    private Label metaNativesLabel;
-    private Label metaAssetsLabel;
-    private Label metaGameArgsLabel;
-    private Label metaJvmArgsLabel;
-    private Label metaLegacyArgsLabel;
+    // Version browser: actions for the selected entry
+    private Label selectedVersionLabel;
+    private Button loaderVersionButton;
+    private Button playVersionButton;
+    private Button folderVersionButton;
+    private boolean versionPlayInFlight = false;
 
-    // Custom Java path
-    private Button browseJavaButton;
-    private Label customJavaLabel;
+    // Loader versions for the selected modded entry (newest first)
+    private ModLoaderVersion selectedLoaderVersion;
+    private List<ModLoaderVersion> selectedLoaderVersions = List.of();
+    private ModLoaderType loaderVersionsFamily;
+    private String loaderVersionsMcId;
+    private boolean loaderVersionChanged = false;
+
+    // Instance details (right)
+    private VBox instanceDetailsContent;
+    private Label instanceEmptyLabel;
+    private Label instanceBadgeLabel;
+    private Label instanceNameLabel;
+    private Label instanceSummaryLabel;
+    private Label instanceVersionLine;
+    private Label instanceDirLine;
+    private Label instanceJvmLine;
+    private Label instanceMetaLine;
+    private List<ModdedProfile> moddedProfiles = List.of();
+    private Button playProfileButton;
+    private Button openProfileFolderButton;
+    private Button editProfileButton;
+    private Button deleteProfileButton;
+
+    // Instance launch state
     private boolean javaDownloadAttempted = false;
 
     // Account
@@ -158,11 +172,19 @@ public class MainView {
     private boolean suppressSelectionListener = false;
     private java.util.Timer elyRefreshTimer;
 
-    private List<MinecraftVersion> allVersions = List.of();
-    private VersionManifest currentManifest;
-    private MinecraftVersion currentlySelectedVersion;
-    private VersionMetadata currentlySelectedMetadata;
-    private JavaResolutionResult currentJavaResolution;
+    /** Versions of the Mojang manifest — basis of the version browser. */
+    private List<MinecraftVersion> manifestVersions = List.of();
+
+    /**
+     * Minecraft versions each registered loader exists for, as
+     * reported by the loader's own metadata service. Loaded once in
+     * the background; a loader's variants appear in the version
+     * browser only after its set arrived (never showing variants
+     * that do not exist — e.g. NeoForge below 1.20.1 or Fabric
+     * below 1.14).
+     */
+    private final Map<ModLoaderType, Set<String>> loaderSupportedVersions =
+            new EnumMap<>(ModLoaderType.class);
 
     public MainView(VersionService versionService,
                     VersionMetadataService metadataService,
@@ -174,7 +196,11 @@ public class MainView {
                     VersionTypeRegistry typeRegistry,
                     LauncherPreferences preferences,
                     ElyAuthService elyAuthService,
-                    SkinService skinService) {
+                    SkinService skinService,
+                    ModLoaderRegistry modLoaderRegistry,
+                    ModdedVersionService moddedVersionService,
+                    ModdedProfileService moddedProfileService,
+                    ModdedProfileVerificationService profileVerificationService) {
         this.versionService = versionService;
         this.metadataService = metadataService;
         this.installationService = installationService;
@@ -186,7 +212,12 @@ public class MainView {
         this.preferences = preferences;
         this.elyAuthService = elyAuthService;
         this.skinService = skinService;
+        this.modLoaderRegistry = modLoaderRegistry;
+        this.moddedVersionService = moddedVersionService;
+        this.moddedProfileService = moddedProfileService;
+        this.profileVerificationService = profileVerificationService;
         buildView();
+        loadLoaderSupport();
     }
 
     public BorderPane getView() {
@@ -202,9 +233,9 @@ public class MainView {
         root.getStyleClass().add("root-pane");
 
         root.setTop(buildHeader());
-        root.setCenter(buildCenter());
         root.setLeft(buildSidebar());
-        root.setBottom(buildDetailsPanel());
+        root.setCenter(buildVersionBrowser());
+        root.setRight(buildInstanceDetailsPanel());
     }
 
     // --- Header ---
@@ -277,297 +308,802 @@ public class MainView {
 
     private VBox buildSidebar() {
         VBox sidebar = new VBox(16);
-        sidebar.setPrefWidth(240);
-        sidebar.setMinWidth(220);
-        sidebar.setMaxWidth(280);
+        sidebar.setPrefWidth(250);
+        sidebar.setMinWidth(230);
+        sidebar.setMaxWidth(300);
         sidebar.setPadding(new Insets(16));
         sidebar.getStyleClass().add("sidebar");
 
-        // -- Quick Select section --
-        Label quickSelectTitle = new Label("Quick Select");
-        quickSelectTitle.getStyleClass().add("section-title");
-
-        latestReleaseButton = new Button("—");
-        latestReleaseButton.getStyleClass().add("quick-select-button");
-        latestReleaseButton.setMaxWidth(Double.MAX_VALUE);
-        latestReleaseButton.setDisable(true);
-        latestReleaseButton.setOnAction(e -> selectLatestRelease());
-
-        latestSnapshotButton = new Button("—");
-        latestSnapshotButton.getStyleClass().add("quick-select-button");
-        latestSnapshotButton.setMaxWidth(Double.MAX_VALUE);
-        latestSnapshotButton.setDisable(true);
-        latestSnapshotButton.setOnAction(e -> selectLatestSnapshot());
-
-        VBox quickSelect = new VBox(6,
-                quickSelectTitle,
-                labeledButton("Latest Release", latestReleaseButton),
-                labeledButton("Latest Snapshot", latestSnapshotButton));
-
-        // -- Filter by Type section --
-        Label filterTitle = new Label("Filter by Type");
-        filterTitle.getStyleClass().add("section-title");
-
-        typeFilterGroup = new ToggleGroup();
-
-        allTypesButton = createTypeFilterButton("All Types", null);
-        allTypesButton.setSelected(true);
-        allTypesButton.getStyleClass().add("filter-button-active");
-
-        VBox filterBox = new VBox(4, filterTitle, allTypesButton);
-        for (VersionType type : typeRegistry.all()) {
-            ToggleButton btn = createTypeFilterButton(type.displayName(), type);
-            filterBox.getChildren().add(btn);
-        }
-
-        // -- Search --
-        Label searchTitle = new Label("Search");
-        searchTitle.getStyleClass().add("section-title");
-
-        searchField = new TextField();
-        searchField.setPromptText("Search version...");
-        searchField.getStyleClass().add("search-field");
-        searchField.textProperty().addListener((obs, old, val) -> applyFilter());
-
-        VBox searchBox = new VBox(6, searchTitle, searchField);
-
-        // -- Spacer to push search to bottom --
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
-
-        sidebar.getChildren().addAll(quickSelect, filterBox, spacer, searchBox);
+        // -- Instances: the playable list (vanilla + modded) --
+        VBox instancesBox = buildInstancesPanel();
+        sidebar.getChildren().add(instancesBox);
         return sidebar;
     }
 
-    private ToggleButton createTypeFilterButton(String label, VersionType type) {
-        HBox buttonContent = new HBox(8);
-        buttonContent.setAlignment(Pos.CENTER_LEFT);
+    // --- Instances panel (sidebar) ---
 
-        Label nameLabel = new Label(label);
-        nameLabel.getStyleClass().add("filter-button-label");
-
-        Label countLabel = new Label("0");
-        countLabel.getStyleClass().add("filter-button-count");
-
-        Region btnSpacer = new Region();
-        HBox.setHgrow(btnSpacer, Priority.ALWAYS);
-
-        buttonContent.getChildren().addAll(nameLabel, btnSpacer, countLabel);
-
-        ToggleButton button = new ToggleButton();
-        button.setGraphic(buttonContent);
-        button.setMaxWidth(Double.MAX_VALUE);
-        button.getStyleClass().add("filter-button");
-        button.setToggleGroup(typeFilterGroup);
-        button.selectedProperty().addListener((obs, old, selected) -> {
-            if (selected) {
-                button.getStyleClass().add("filter-button-active");
-            } else {
-                button.getStyleClass().remove("filter-button-active");
-            }
-            applyFilter();
-        });
-
-        if (type != null) {
-            typeFilterButtons.put(type, button);
-            typeCountLabels.put(type, countLabel);
-        } else {
-            allTypesButton = button;
-        }
-        return button;
-    }
-
-    private VBox labeledButton(String labelText, Button button) {
-        Label label = new Label(labelText);
-        label.getStyleClass().add("quick-select-label");
-        return new VBox(2, label, button);
-    }
-
-    // --- Center (table + metadata panel) ---
-
-    private HBox buildCenter() {
-        StackPane tableArea = buildTableArea();
-        metadataPanel = buildMetadataPanel();
-
-        HBox center = new HBox(0, tableArea, metadataPanel);
-        HBox.setHgrow(tableArea, Priority.ALWAYS);
-        return center;
-    }
-
-    private StackPane buildTableArea() {
-        table = buildVersionTable();
-
-        progressIndicator = new ProgressIndicator();
-        progressIndicator.setMaxSize(64, 64);
-
-        errorLabel = new Label();
-        errorLabel.setWrapText(true);
-        errorLabel.getStyleClass().add("error-label");
-        retryButton = new Button("Retry");
-        retryButton.getStyleClass().add("retry-button");
-        retryButton.setOnAction(e -> loadVersions());
-        errorBox = new VBox(15, errorLabel, retryButton);
-        errorBox.setAlignment(Pos.CENTER);
-        errorBox.setVisible(false);
-
-        StackPane pane = new StackPane(table, progressIndicator, errorBox);
-        pane.setPadding(new Insets(0, 0, 0, 0));
-        return pane;
-    }
-
-    private TableView<MinecraftVersion> buildVersionTable() {
-        TableView<MinecraftVersion> tableView = new TableView<>();
-        tableView.setPlaceholder(new Label("No versions found."));
-        tableView.getStyleClass().add("version-table");
-
-        TableColumn<MinecraftVersion, String> idCol = new TableColumn<>("Version");
-        idCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().id()));
-        idCol.setPrefWidth(220);
-
-        TableColumn<MinecraftVersion, String> typeCol = new TableColumn<>("Type");
-        typeCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().type().displayName()));
-        typeCol.setPrefWidth(120);
-
-        TableColumn<MinecraftVersion, String> dateCol = new TableColumn<>("Release Date");
-        dateCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().formattedReleaseTime()));
-        dateCol.setPrefWidth(180);
-
-        tableView.getColumns().setAll(List.of(idCol, typeCol, dateCol));
-        tableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        tableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-
-        tableView.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, selected) -> onVersionSelected(selected));
-
-        return tableView;
-    }
-
-    // --- Metadata panel (right side of center) ---
-
-    private VBox buildMetadataPanel() {
-        VBox panel = new VBox(10);
-        panel.setPrefWidth(320);
-        panel.setMinWidth(280);
-        panel.setMaxWidth(380);
-        panel.setPadding(new Insets(16));
-        panel.getStyleClass().add("metadata-panel");
-
-        Label title = new Label("Version Metadata");
+    private VBox buildInstancesPanel() {
+        Label title = new Label("Instances");
         title.getStyleClass().add("section-title");
 
-        metadataProgress = new ProgressIndicator();
-        metadataProgress.setMaxSize(36, 36);
-        metadataProgress.setVisible(false);
+        profileListView = new ListView<>();
+        profileListView.getStyleClass().add("profile-list");
+        profileListView.setPlaceholder(new Label(
+                "No instances yet.\nPress '+ New' to create one."));
+        VBox.setVgrow(profileListView, Priority.ALWAYS);
+        profileListView.setCellFactory(list -> new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(ModdedProfile item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    Label badge = new Label(item.loaderType().displayName());
+                    badge.getStyleClass().add(loaderBadgeStyle(item));
+                    Label name = new Label(item.name());
+                    name.getStyleClass().add("profile-name");
+                    Label summary = new Label(item.summary());
+                    summary.getStyleClass().add("profile-summary");
+                    VBox content = new VBox(2, new HBox(6, badge, name), summary);
+                    setText(null);
+                    setGraphic(content);
+                }
+            }
+        });
+        profileListView.getSelectionModel().selectedItemProperty().addListener(
+                (obs, old, val) -> {
+                    updateProfileButtons();
+                    updateInstanceDetails();
+                });
 
-        metadataErrorLabel = new Label();
-        metadataErrorLabel.setWrapText(true);
-        metadataErrorLabel.getStyleClass().add("metadata-error");
-        metadataErrorLabel.setVisible(false);
+        newInstanceButton = new Button("+ New");
+        newInstanceButton.getStyleClass().add("quick-select-button");
+        newInstanceButton.setMaxWidth(Double.MAX_VALUE);
+        newInstanceButton.setOnAction(e -> onNewInstance());
 
-        metaMainClassLabel = createMetaLabel("Main Class");
-        metaJavaVersionLabel = createMetaLabel("Java Version");
-        metaJavaStatusLabel = createMetaLabel("Java Status");
-        metaClientJarLabel = createMetaLabel("Client JAR");
-        metaClientSizeLabel = createMetaLabel("Client Size");
-        metaLibrariesLabel = createMetaLabel("Libraries");
-        metaNativesLabel = createMetaLabel("Natives");
-        metaAssetsLabel = createMetaLabel("Assets Index");
-        metaGameArgsLabel = createMetaLabel("Game Arguments");
-        metaJvmArgsLabel = createMetaLabel("JVM Arguments");
-        metaLegacyArgsLabel = createMetaLabel("Legacy Arguments");
-
-        browseJavaButton = new Button("Browse Java...");
-        browseJavaButton.getStyleClass().add("browse-java-button");
-        browseJavaButton.setOnAction(e -> browseForJava());
-
-        customJavaLabel = new Label("Custom Java: not set");
-        customJavaLabel.getStyleClass().add("metadata-item");
-        customJavaLabel.setWrapText(true);
-
-        VBox metaContent = new VBox(10,
-                metaMainClassLabel,
-                metaJavaVersionLabel,
-                metaJavaStatusLabel,
-                customJavaLabel,
-                browseJavaButton,
-                metaClientJarLabel,
-                metaClientSizeLabel,
-                metaLibrariesLabel,
-                metaNativesLabel,
-                metaAssetsLabel,
-                metaGameArgsLabel,
-                metaJvmArgsLabel,
-                metaLegacyArgsLabel);
-
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
-
-        panel.getChildren().addAll(title, metadataProgress, metadataErrorLabel, metaContent, spacer);
-        panel.setVisible(false);
+        VBox panel = new VBox(6, title, profileListView, newInstanceButton);
+        VBox.setVgrow(panel, Priority.ALWAYS);
         return panel;
     }
 
-    private Label createMetaLabel(String title) {
-        Label label = new Label(title + ": —");
-        label.getStyleClass().add("metadata-item");
-        label.setWrapText(true);
-        return label;
+    /** CSS badge style per instance type. */
+    private static String loaderBadgeStyle(ModdedProfile profile) {
+        return loaderBadgeStyle(profile.loaderType());
     }
 
-    // --- Details panel (bottom) ---
+    /** CSS badge style per loader family. */
+    private static String loaderBadgeStyle(ModLoaderType type) {
+        return switch (type) {
+            case VANILLA -> "loader-badge-vanilla";
+            case FABRIC -> "loader-badge-fabric";
+            case FORGE -> "loader-badge-forge";
+            case NEOFORGE -> "loader-badge-neoforge";
+            case QUILT -> "loader-badge-quilt";
+        };
+    }
 
-    private HBox buildDetailsPanel() {
-        detailsPanel = new VBox(4);
-        detailsPanel.setPadding(new Insets(12, 20, 12, 20));
-        detailsPanel.getStyleClass().add("details-panel");
-        detailsPanel.setVisible(false);
-
-        Label detailsTitle = new Label("Selected Version");
-        detailsTitle.getStyleClass().add("section-title");
-
-        detailsVersionLabel = new Label("—");
-        detailsVersionLabel.getStyleClass().add("details-version");
-
-        detailsTypeLabel = new Label("—");
-        detailsTypeLabel.getStyleClass().add("type-badge");
-
-        detailsDateLabel = new Label("—");
-        detailsDateLabel.getStyleClass().add("details-info");
-
-        detailsUrlLabel = new Label("—");
-        detailsUrlLabel.getStyleClass().add("details-info");
-        detailsUrlLabel.setWrapText(true);
-
-        VBox infoBox = new VBox(6, detailsTitle, detailsVersionLabel,
-                new HBox(8, detailsTypeLabel, detailsDateLabel),
-                detailsUrlLabel);
-        HBox.setHgrow(infoBox, Priority.ALWAYS);
-
-        playButton = new Button("Play");
-        playButton.getStyleClass().add("play-button");
-        playButton.setDisable(true);
-        playButton.setOnAction(e -> onPlay());
-
-        VBox playBox = new VBox(playButton);
-        playBox.setAlignment(Pos.CENTER);
-
-        HBox panel = new HBox(20, infoBox, playBox);
-        panel.setAlignment(Pos.CENTER_LEFT);
-        panel.getStyleClass().add("details-panel-outer");
-        panel.setPadding(new Insets(0));
-
-        detailsPanel.getChildren().add(panel);
-        return new HBox(detailsPanel);
+    private void updateProfileButtons() {
+        boolean hasSelection = profileListView != null
+                && profileListView.getSelectionModel().getSelectedItem() != null;
+        playProfileButton.setDisable(!hasSelection);
+        openProfileFolderButton.setDisable(!hasSelection);
+        editProfileButton.setDisable(!hasSelection);
+        deleteProfileButton.setDisable(!hasSelection);
+        // The version browser's Play follows the same lifecycle: a
+        // running launch attempt blocks it until a terminal callback
+        // (launch end/failure, game exit) refreshes the buttons
+        versionPlayInFlight = false;
+        updateVersionActionBar();
     }
 
     // ------------------------------------------------------------------
-    //  Async: version list loading
+    //  Center: version browser — ALL versions (vanilla + modded
+    //  variants), filterable by text, version type and loader
+    // ------------------------------------------------------------------
+
+    /**
+     * One row of the version browser: a vanilla manifest version or
+     * a modded variant of one ({@code 1.20.1 Fabric}). Modded
+     * variants exist for release versions only; their concrete
+     * loader version is chosen at instance creation (newest by
+     * default, changeable).
+     */
+    private record VersionEntry(MinecraftVersion version,
+                                ModLoaderType variant) {
+
+        boolean isVanilla() {
+            return variant == ModLoaderType.VANILLA;
+        }
+
+        /** Row title, e.g. {@code "1.20.1"} or {@code "1.20.1 Fabric"}. */
+        String displayId() {
+            return isVanilla() ? version.id()
+                    : version.id() + " " + variant.displayName();
+        }
+
+        /** The type badge label (Release/Snapshot/…/Fabric/…). */
+        String typeLabel() {
+            return isVanilla() ? version.type().displayName()
+                    : variant.displayName();
+        }
+
+        String badgeStyle() {
+            return isVanilla() ? typeBadgeStyle(version.type())
+                    : loaderBadgeStyle(variant);
+        }
+    }
+
+    /** CSS badge style per vanilla version type. */
+    private static String typeBadgeStyle(VersionType type) {
+        if (type == StandardVersionType.RELEASE) {
+            return "type-badge-release";
+        }
+        if (type == StandardVersionType.SNAPSHOT) {
+            return "type-badge-snapshot";
+        }
+        if (type == StandardVersionType.OLD_BETA) {
+            return "type-badge-old-beta";
+        }
+        if (type == StandardVersionType.OLD_ALPHA) {
+            return "type-badge-old-alpha";
+        }
+        return "type-badge-old-alpha"; // unknown custom type
+    }
+
+    private VBox buildVersionBrowser() {
+        versionBrowserTitle = new Label("Versions");
+        versionBrowserTitle.getStyleClass().add("section-title");
+
+        versionSearchField = new TextField();
+        versionSearchField.setPromptText(
+                "Filter (e.g. 1.20.1, fabric, snapshot)...");
+        versionSearchField.getStyleClass().add("search-field");
+        versionSearchField.textProperty().addListener(
+                (obs, old, val) -> applyVersionFilter());
+
+        // Filters combine freely: several version types, several
+        // loader families, or both at once (Fabric + Forge + Snapshot
+        // …). No chip selected = every version is shown.
+        versionFilterChips = new FlowPane(5, 5);
+        for (StandardVersionType type : List.of(StandardVersionType.RELEASE,
+                StandardVersionType.SNAPSHOT, StandardVersionType.OLD_BETA,
+                StandardVersionType.OLD_ALPHA)) {
+            addVersionFilterChip(type.displayName(), type);
+        }
+        for (ModLoaderType loader : ModLoaderType.values()) {
+            if (loader != ModLoaderType.VANILLA
+                    && modLoaderRegistry.get(loader).isPresent()) {
+                addVersionFilterChip(loader.displayName(), loader);
+            }
+        }
+
+        versionListView = new ListView<>();
+        versionListView.getStyleClass().add("profile-list");
+        versionListView.setPlaceholder(new Label("No versions match."));
+        VBox.setVgrow(versionListView, Priority.ALWAYS);
+        versionListView.setCellFactory(list -> {
+            ListCell<VersionEntry> cell = new ListCell<>() {
+                @Override
+                protected void updateItem(VersionEntry item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setGraphic(null);
+                    } else {
+                        Label badge = new Label(item.typeLabel());
+                        badge.getStyleClass().add(item.badgeStyle());
+                        Label id = new Label(item.displayId());
+                        id.getStyleClass().add("profile-name");
+                        Label date = new Label(
+                                item.version().formattedReleaseTime());
+                        date.getStyleClass().add("profile-summary");
+                        Region spacer = new Region();
+                        HBox.setHgrow(spacer, Priority.ALWAYS);
+                        HBox row = new HBox(8, badge, id, spacer, date);
+                        row.setAlignment(Pos.CENTER_LEFT);
+                        setText(null);
+                        setGraphic(row);
+                    }
+                }
+            };
+            // Double-click a version (or modded variant) to create an
+            // instance of it right away
+            cell.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !cell.isEmpty()) {
+                    onEntryActivated(cell.getItem());
+                }
+            });
+            return cell;
+        });
+
+        versionListView.getSelectionModel().selectedItemProperty().addListener(
+                (obs, old, val) -> onVersionSelected(val));
+
+        Label hint = new Label(
+                "Filters combine freely (Fabric + Forge + Snapshot…); "
+                        + "none selected shows all versions.");
+        hint.getStyleClass().add("quick-select-label");
+
+        // -- Actions for the selected version: play it, open its
+        //    directory, and for modded entries pick the loader version
+        //    (newest by default, changeable) --
+        selectedVersionLabel = new Label("Select a version to play");
+        selectedVersionLabel.getStyleClass().add("details-info");
+
+        loaderVersionButton = new Button("Loader version");
+        loaderVersionButton.getStyleClass().add("quick-select-button");
+        loaderVersionButton.setOnAction(e -> onChangeLoaderVersion());
+
+        playVersionButton = new Button("Play");
+        playVersionButton.getStyleClass().add("play-button-compact");
+        playVersionButton.setDisable(true);
+        playVersionButton.setOnAction(e -> onPlaySelectedVersion());
+
+        folderVersionButton = new Button("Folder");
+        folderVersionButton.getStyleClass().add("quick-select-button");
+        folderVersionButton.setDisable(true);
+        folderVersionButton.setOnAction(e -> onOpenSelectedVersionFolder());
+
+        Region actionSpacer = new Region();
+        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
+        HBox versionActionBar = new HBox(8, selectedVersionLabel,
+                actionSpacer, loaderVersionButton, playVersionButton,
+                folderVersionButton);
+        versionActionBar.setAlignment(Pos.CENTER_LEFT);
+
+        VBox browser = new VBox(8, versionBrowserTitle, versionSearchField,
+                versionFilterChips, versionListView, versionActionBar, hint);
+        browser.setPadding(new Insets(16));
+        return browser;
+    }
+
+    /**
+     * Adds an independently toggleable filter chip: several chips can
+     * be active at once (e.g. Fabric + Forge), combining their
+     * results.
+     */
+    private void addVersionFilterChip(String label, Object filter) {
+        ToggleButton chip = new ToggleButton(label);
+        chip.getStyleClass().add("filter-button");
+        chip.setUserData(filter);
+        chip.selectedProperty().addListener((obs, old, sel) -> {
+            if (sel) {
+                chip.getStyleClass().add("filter-button-active");
+            } else {
+                chip.getStyleClass().remove("filter-button-active");
+            }
+            applyVersionFilter();
+        });
+        versionFilterChips.getChildren().add(chip);
+    }
+
+    /** Builds every browser row: vanilla versions + modded variants. */
+    private void buildVersionEntries() {
+        List<ModLoaderType> families = new ArrayList<>();
+        for (ModLoaderType loader : ModLoaderType.values()) {
+            if (loader != ModLoaderType.VANILLA
+                    && modLoaderRegistry.get(loader).isPresent()) {
+                families.add(loader);
+            }
+        }
+        List<VersionEntry> entries = new ArrayList<>();
+        for (MinecraftVersion v : manifestVersions) {
+            entries.add(new VersionEntry(v, ModLoaderType.VANILLA));
+            if (v.type() == StandardVersionType.RELEASE) {
+                for (ModLoaderType family : families) {
+                    Set<String> supported = loaderSupportedVersions.get(family);
+                    // Unknown set (still loading / offline) or the
+                    // loader does not exist for this MC version → no
+                    // variant row; only real, installable combinations
+                    // are ever listed
+                    if (supported == null || !supported.contains(v.id())) {
+                        continue;
+                    }
+                    entries.add(new VersionEntry(v, family));
+                }
+            }
+        }
+        versionEntries = entries;
+    }
+
+    /**
+     * Loads each registered loader's set of supported Minecraft
+     * versions in the background (one lightweight call per loader)
+     * and refreshes the version browser as the sets arrive — the
+     * authoritative source of which modded variants actually exist.
+     */
+    private void loadLoaderSupport() {
+        for (ModLoaderType type : ModLoaderType.values()) {
+            if (type == ModLoaderType.VANILLA) {
+                continue;
+            }
+            var entry = modLoaderRegistry.get(type).orElse(null);
+            if (entry == null) {
+                continue;
+            }
+            Thread fetch = new Thread(() -> {
+                Set<String> supported;
+                try {
+                    supported = entry.provider()
+                            .fetchSupportedMinecraftVersions();
+                } catch (Exception ex) {
+                    return; // stays unknown → that loader's variants
+                            // are not listed (offline: no wrong rows)
+                }
+                if (supported == null) {
+                    return;
+                }
+                Platform.runLater(() -> {
+                    loaderSupportedVersions.put(type, supported);
+                    if (!manifestVersions.isEmpty()) {
+                        buildVersionEntries();
+                        applyVersionFilter();
+                    }
+                });
+            }, "loader-support-" + type.name().toLowerCase());
+            fetch.setDaemon(true);
+            fetch.start();
+        }
+    }
+
+    /**
+     * Applies the active chip filters — any combination of version
+     * types and loader families, combined with OR — plus the
+     * free-text filter, newest versions first; the modded variants
+     * cluster right below their vanilla version.
+     */
+    private void applyVersionFilter() {
+        if (versionListView == null) return;
+        Set<StandardVersionType> types = EnumSet.noneOf(StandardVersionType.class);
+        Set<ModLoaderType> loaders = EnumSet.noneOf(ModLoaderType.class);
+        for (var node : versionFilterChips.getChildren()) {
+            if (node instanceof ToggleButton btn && btn.isSelected()) {
+                if (btn.getUserData() instanceof StandardVersionType type) {
+                    types.add(type);
+                } else if (btn.getUserData() instanceof ModLoaderType loader) {
+                    loaders.add(loader);
+                }
+            }
+        }
+        boolean noFilter = types.isEmpty() && loaders.isEmpty();
+        String query = versionSearchField.getText() == null ? ""
+                : versionSearchField.getText().trim().toLowerCase();
+
+        List<VersionEntry> filtered = new ArrayList<>();
+        for (VersionEntry entry : versionEntries) {
+            if (!noFilter) {
+                // Type chips match vanilla entries, loader chips match
+                // modded variants — several active chips combine
+                boolean matches = entry.isVanilla()
+                        ? types.contains(entry.version().type())
+                        : loaders.contains(entry.variant());
+                if (!matches) {
+                    continue;
+                }
+            }
+            if (!query.isEmpty()) {
+                String haystack = (entry.displayId() + " "
+                        + entry.typeLabel()).toLowerCase();
+                if (!haystack.contains(query)) {
+                    continue;
+                }
+            }
+            filtered.add(entry);
+        }
+
+        filtered.sort(Comparator
+                .comparing((VersionEntry e) ->
+                                e.version().releaseTime().orElse(null),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparingInt(e -> e.variant().ordinal())
+                .thenComparing(e -> e.version().id()));
+
+        versionListView.setItems(FXCollections.observableArrayList(filtered));
+        if (versionBrowserTitle != null && !versionEntries.isEmpty()) {
+            versionBrowserTitle.setText(
+                    filtered.size() == versionEntries.size() ? "Versions"
+                            : "Versions (" + filtered.size() + " of "
+                                    + versionEntries.size() + ")");
+        }
+    }
+
+    /** Creates an instance for the double-clicked browser entry. */
+    private void onEntryActivated(VersionEntry entry) {
+        NewInstanceDialog.Result result = NewInstanceDialog.showFor(
+                (Stage) root.getScene().getWindow(),
+                modLoaderRegistry, entry.version(), entry.variant());
+        if (result != null) {
+            createInstance(result);
+        }
+    }
+
+    // --- Selected version: loader version, play, folder ---
+
+    /**
+     * Reacts to a version browser selection: shows the action bar for
+     * it and, for modded entries, loads the loader versions (newest
+     * first) in the background — the newest one is the default.
+     */
+    private void onVersionSelected(VersionEntry entry) {
+        loaderVersionChanged = false;
+        selectedLoaderVersion = null;
+        if (entry == null || entry.isVanilla()) {
+            selectedLoaderVersions = List.of();
+            loaderVersionsFamily = null;
+            loaderVersionsMcId = null;
+            updateVersionActionBar();
+            return;
+        }
+        ModLoaderType family = entry.variant();
+        String mcId = entry.version().id();
+        if (family == loaderVersionsFamily
+                && mcId.equals(loaderVersionsMcId)
+                && !selectedLoaderVersions.isEmpty()) {
+            selectedLoaderVersion = selectedLoaderVersions.get(0);
+            updateVersionActionBar();
+            return;
+        }
+        loaderVersionsFamily = family;
+        loaderVersionsMcId = mcId;
+        selectedLoaderVersions = List.of();
+        updateVersionActionBar();
+
+        var regEntry = modLoaderRegistry.get(family).orElse(null);
+        if (regEntry == null) {
+            updateVersionActionBar();
+            return;
+        }
+        statusLabel.setText("Loading " + family.displayName()
+                + " versions for MC " + mcId + "...");
+        Thread fetch = new Thread(() -> {
+            List<ModLoaderVersion> versions;
+            try {
+                versions = regEntry.provider().fetchVersions(mcId);
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    if (isCurrentEntry(family, mcId)) {
+                        statusLabel.setText("Failed to load "
+                                + family.displayName() + " versions: "
+                                + ex.getMessage());
+                        updateVersionActionBar();
+                    }
+                });
+                return;
+            }
+            Platform.runLater(() -> {
+                if (!isCurrentEntry(family, mcId)) {
+                    return; // selection changed meanwhile
+                }
+                selectedLoaderVersions = versions;
+                selectedLoaderVersion =
+                        versions.isEmpty() ? null : versions.get(0);
+                updateVersionActionBar();
+            });
+        }, "browser-loader-versions");
+        fetch.setDaemon(true);
+        fetch.start();
+    }
+
+    /** True if {@code family} + {@code mcId} is still selected. */
+    private boolean isCurrentEntry(ModLoaderType family, String mcId) {
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        return entry != null && !entry.isVanilla()
+                && entry.variant() == family
+                && entry.version().id().equals(mcId);
+    }
+
+    /** Syncs the action bar with the selection + loader state. */
+    private void updateVersionActionBar() {
+        if (selectedVersionLabel == null) return;
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        boolean has = entry != null;
+        boolean modded = has && !entry.isVanilla();
+
+        if (has) {
+            selectedVersionLabel.setText(
+                    entry.isVanilla()
+                            ? entry.version().id() + " · "
+                                    + entry.typeLabel()
+                            : entry.displayId());
+        } else {
+            selectedVersionLabel.setText("Select a version to play");
+        }
+
+        playVersionButton.setDisable(!has || versionPlayInFlight);
+        folderVersionButton.setDisable(!has);
+
+        loaderVersionButton.setVisible(modded);
+        loaderVersionButton.setManaged(modded);
+        if (!modded) {
+            loaderVersionButton.setText("Loader version");
+            return;
+        }
+        ModLoaderType family = entry.variant();
+        if (selectedLoaderVersions.isEmpty()) {
+            loaderVersionButton.setDisable(true);
+            loaderVersionButton.setText(family.displayName()
+                    + " version: loading...");
+            return;
+        }
+        loaderVersionButton.setDisable(false);
+        String suffix = loaderVersionChanged ? "" : " (latest)";
+        if (selectedLoaderVersion == null) {
+            loaderVersionButton.setText(family.displayName()
+                    + " version: none" + suffix);
+        } else {
+            loaderVersionButton.setText(family.displayName()
+                    + " version: "
+                    + selectedLoaderVersion.loaderVersion() + suffix);
+        }
+    }
+
+    /**
+     * Opens the loader version picker for the selected modded entry:
+     * every listed version is compatible with the chosen Minecraft
+     * version; the newest one is preselected.
+     */
+    private void onChangeLoaderVersion() {
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        if (entry == null || entry.isVanilla()
+                || selectedLoaderVersions.isEmpty()) {
+            return;
+        }
+        ModLoaderVersion picked = LoaderVersionDialog.show(
+                (Stage) root.getScene().getWindow(),
+                entry.variant(), entry.version().id(),
+                selectedLoaderVersions, selectedLoaderVersion);
+        if (picked != null) {
+            selectedLoaderVersion = picked;
+            loaderVersionChanged = true;
+            updateVersionActionBar();
+        }
+    }
+
+    /**
+     * Plays the selected version with the same launch principle as
+     * instance Play: an existing matching instance is launched
+     * directly (verify → repair if needed → launch); otherwise the
+     * instance is created first (installing the version if needed)
+     * and launched right after — with the newest loader version by
+     * default, or the one picked via the loader version button.
+     */
+    private void onPlaySelectedVersion() {
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        if (entry == null) return;
+
+        ModdedProfile match = findPlayableInstance(entry);
+        if (match != null) {
+            profileListView.getSelectionModel().select(match);
+            startInstanceLaunch(match);
+            return;
+        }
+        if (!entry.isVanilla() && selectedLoaderVersion == null) {
+            statusLabel.setText("Loader versions are still loading"
+                    + " — try again in a moment");
+            return;
+        }
+        versionPlayInFlight = true;
+        updateVersionActionBar();
+        NewInstanceDialog.Result result = new NewInstanceDialog.Result(
+                entry.variant(), entry.version(),
+                entry.isVanilla() ? null : selectedLoaderVersion,
+                "", List.of());
+        createInstance(result, true);
+    }
+
+    /**
+     * Finds an existing instance that matches the browser selection:
+     * any instance of that Minecraft version for vanilla entries; for
+     * modded entries preferably one with the chosen loader version,
+     * otherwise any instance of that loader family (only when the
+     * user did not explicitly change the loader version).
+     */
+    private ModdedProfile findPlayableInstance(VersionEntry entry) {
+        String mcId = entry.version().id();
+        if (entry.isVanilla()) {
+            for (ModdedProfile p : moddedProfiles) {
+                if (p.isVanilla() && p.minecraftVersion().equals(mcId)) {
+                    return p;
+                }
+            }
+            return null;
+        }
+        ModdedProfile exact = null;
+        ModdedProfile any = null;
+        for (ModdedProfile p : moddedProfiles) {
+            if (p.isVanilla()
+                    || p.loaderType() != entry.variant()
+                    || !p.minecraftVersion().equals(mcId)) {
+                continue;
+            }
+            if (any == null) {
+                any = p;
+            }
+            if (selectedLoaderVersion != null
+                    && p.loaderVersion().equals(
+                            selectedLoaderVersion.loaderVersion())) {
+                exact = p;
+            }
+        }
+        if (loaderVersionChanged) {
+            return exact;
+        }
+        return exact != null ? exact : any;
+    }
+
+    /**
+     * Opens the selected version's directory in the system file
+     * manager: the instance's game directory if one exists, otherwise
+     * the version's folder under {@code versions/} (or the versions
+     * root while it is not installed yet).
+     */
+    private void onOpenSelectedVersionFolder() {
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        if (entry == null) return;
+        try {
+            ModdedProfile match = findPlayableInstance(entry);
+            if (match != null) {
+                Path dir = moddedProfileService.resolveGameDir(match);
+                ModdedProfileService.ensureProfileFolders(dir);
+                java.awt.Desktop.getDesktop().open(dir.toFile());
+                statusLabel.setText("Opened " + dir);
+                return;
+            }
+            GameDirectory storage = GameDirectory.defaultDirectory();
+            Path dir = entry.isVanilla()
+                    ? storage.versionDir(entry.version().id())
+                    : (selectedLoaderVersion != null
+                            ? storage.versionDir(
+                                    selectedLoaderVersion.installedVersionId())
+                            : null);
+            if (dir == null || !Files.isDirectory(dir)) {
+                dir = storage.versionsDir();
+            }
+            java.awt.Desktop.getDesktop().open(dir.toFile());
+            statusLabel.setText("Opened " + dir);
+        } catch (Exception ex) {
+            statusLabel.setText("Failed to open folder: " + ex.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Open Folder",
+                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Right: selected instance details
+    // ------------------------------------------------------------------
+
+    private VBox buildInstanceDetailsPanel() {
+        instanceEmptyLabel = new Label(
+                "Select an instance —\nor create one with '+ New'.");
+        instanceEmptyLabel.getStyleClass().add("quick-select-label");
+
+        instanceBadgeLabel = new Label();
+        instanceNameLabel = new Label();
+        instanceNameLabel.getStyleClass().add("details-version");
+        instanceSummaryLabel = new Label();
+        instanceSummaryLabel.getStyleClass().add("details-info");
+
+        instanceVersionLine = new Label();
+        instanceVersionLine.getStyleClass().add("metadata-item");
+        instanceDirLine = new Label();
+        instanceDirLine.getStyleClass().add("metadata-item");
+        instanceDirLine.setWrapText(true);
+        instanceJvmLine = new Label();
+        instanceJvmLine.getStyleClass().add("metadata-item");
+        instanceMetaLine = new Label();
+        instanceMetaLine.getStyleClass().add("metadata-item");
+
+        playProfileButton = new Button("Play");
+        playProfileButton.getStyleClass().add("play-button");
+        playProfileButton.setDisable(true);
+        playProfileButton.setMaxWidth(Double.MAX_VALUE);
+        playProfileButton.setOnAction(e -> onPlayProfile());
+
+        openProfileFolderButton = new Button("Folder");
+        openProfileFolderButton.getStyleClass().add("quick-select-button");
+        openProfileFolderButton.setDisable(true);
+        HBox.setHgrow(openProfileFolderButton, Priority.ALWAYS);
+        openProfileFolderButton.setMaxWidth(Double.MAX_VALUE);
+        openProfileFolderButton.setOnAction(e -> onOpenProfileFolder());
+
+        editProfileButton = new Button("Edit");
+        editProfileButton.getStyleClass().add("quick-select-button");
+        editProfileButton.setDisable(true);
+        HBox.setHgrow(editProfileButton, Priority.ALWAYS);
+        editProfileButton.setMaxWidth(Double.MAX_VALUE);
+        editProfileButton.setOnAction(e -> onEditProfile());
+
+        deleteProfileButton = new Button("Delete");
+        deleteProfileButton.getStyleClass().add("quick-select-button");
+        deleteProfileButton.setDisable(true);
+        HBox.setHgrow(deleteProfileButton, Priority.ALWAYS);
+        deleteProfileButton.setMaxWidth(Double.MAX_VALUE);
+        deleteProfileButton.setOnAction(e -> onDeleteProfile());
+
+        HBox manageButtons = new HBox(6, openProfileFolderButton,
+                editProfileButton, deleteProfileButton);
+
+        VBox infoBox = new VBox(6, instanceBadgeLabel, instanceNameLabel,
+                instanceSummaryLabel, instanceVersionLine, instanceDirLine,
+                instanceJvmLine, instanceMetaLine);
+        infoBox.setAlignment(Pos.CENTER_LEFT);
+
+        instanceDetailsContent = new VBox(14, infoBox, playProfileButton,
+                manageButtons);
+        instanceDetailsContent.setAlignment(Pos.CENTER);
+        instanceDetailsContent.setMaxWidth(290);
+        instanceDetailsContent.setVisible(false);
+        instanceDetailsContent.setManaged(false);
+
+        Label title = new Label("Instance");
+        title.getStyleClass().add("section-title");
+
+        VBox panel = new VBox(10, title, instanceEmptyLabel,
+                instanceDetailsContent);
+        panel.setPrefWidth(340);
+        panel.setMinWidth(300);
+        panel.setMaxWidth(380);
+        panel.setPadding(new Insets(16));
+        panel.getStyleClass().add("metadata-panel");
+        return panel;
+    }
+
+    /** Refreshes the right-side details from the selected instance. */
+    private void updateInstanceDetails() {
+        ModdedProfile selected =
+                profileListView.getSelectionModel().getSelectedItem();
+        boolean has = selected != null;
+        if (instanceEmptyLabel != null) {
+            instanceEmptyLabel.setVisible(!has);
+            instanceEmptyLabel.setManaged(!has);
+        }
+        if (instanceDetailsContent == null) {
+            return;
+        }
+        instanceDetailsContent.setVisible(has);
+        instanceDetailsContent.setManaged(has);
+        if (!has) {
+            return;
+        }
+
+        instanceBadgeLabel.setText(selected.loaderType().displayName());
+        instanceBadgeLabel.getStyleClass().clear();
+        instanceBadgeLabel.getStyleClass().add(loaderBadgeStyle(selected));
+
+        instanceNameLabel.setText(selected.name());
+        instanceSummaryLabel.setText(selected.summary());
+        instanceVersionLine.setText("Version: " + selected.minecraftVersion()
+                + (selected.isVanilla() ? " (vanilla)"
+                        : " · " + selected.loaderType().displayName()
+                                + " " + selected.loaderVersion()));
+        instanceDirLine.setText("Game directory: "
+                + GameDirectory.defaultDirectory().root()
+                        .resolve(selected.gameDirPath()));
+        instanceJvmLine.setText("JVM arguments: "
+                + (selected.extraJvmArgs().isEmpty()
+                        ? "none" : String.join(" ", selected.extraJvmArgs())));
+        instanceMetaLine.setText("Created: "
+                + selected.createdTime().map(TIME_FORMATTER::format).orElse("—")
+                + " · Last played: "
+                + selected.lastPlayedTime().map(TIME_FORMATTER::format)
+                        .orElse("never"));
+    }
+
+    // ------------------------------------------------------------------
+    //  Async: version list loading (feeds the New Instance dialog)
     // ------------------------------------------------------------------
 
     public void loadVersions() {
         refreshAccounts();
         startElyByRefreshTimer();
-        showLoading();
+        statusLabel.setText("Loading versions...");
 
         Task<VersionManifest> task = new Task<>() {
             @Override
@@ -675,396 +1211,41 @@ public class MainView {
         }
     }
 
-    private void showLoading() {
-        progressIndicator.setVisible(true);
-        errorBox.setVisible(false);
-        table.setVisible(false);
-        statusLabel.setText("Loading versions...");
-        latestReleaseButton.setDisable(true);
-        latestSnapshotButton.setDisable(true);
-    }
-
     private void onVersionsLoaded(VersionManifest manifest) {
-        progressIndicator.setVisible(false);
-        table.setVisible(true);
-        currentManifest = manifest;
-        allVersions = manifest.versions();
-
-        updateTypeCounts();
-        updateQuickSelectButtons();
-        applyFilter();
-
-        int count = allVersions.size();
-        statusLabel.setText(count + " versions available");
-
-        restoreLastSelectedVersion();
+        manifestVersions = manifest.versions();
+        versionsLoadFailed = false;
+        if (versionListView != null) {
+            versionListView.setPlaceholder(new Label("No versions match."));
+        }
+        buildVersionEntries();
+        applyVersionFilter();
+        statusLabel.setText(versionEntries.size()
+                + " versions available (vanilla + modded variants)");
+        refreshModdedProfiles(null);
     }
 
     private void onLoadFailed(Throwable cause) {
-        progressIndicator.setVisible(false);
-        table.setVisible(false);
-        errorLabel.setText("Failed to load versions:\n" + cause.getMessage());
-        errorBox.setVisible(true);
-        statusLabel.setText("Load failed.");
-    }
-
-    // ------------------------------------------------------------------
-    //  Async: metadata loading on version selection
-    // ------------------------------------------------------------------
-
-    private void onVersionSelected(MinecraftVersion selected) {
-        updateDetailsPanel(selected);
-
-        if (selected == null) {
-            metadataPanel.setVisible(false);
-            currentlySelectedVersion = null;
-            return;
-        }
-
-        if (selected.equals(currentlySelectedVersion)) return;
-        currentlySelectedVersion = selected;
-
-        saveLastSelectedVersion(selected.id());
-
-        loadMetadata(selected);
-    }
-
-    private void loadMetadata(MinecraftVersion version) {
-        metadataPanel.setVisible(true);
-        metadataProgress.setVisible(true);
-        metadataErrorLabel.setVisible(false);
-        clearMetadataLabels();
-
-        Task<VersionMetadata> task = new Task<>() {
-            @Override
-            protected VersionMetadata call() throws Exception {
-                return metadataService.fetchMetadata(version);
-            }
-        };
-        task.setOnSucceeded(e -> onMetadataLoaded(task.getValue()));
-        task.setOnFailed(e -> onMetadataFailed(task.getException()));
-        var thread = new Thread(task, "metadata-fetch");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private void onMetadataLoaded(VersionMetadata meta) {
-        metadataProgress.setVisible(false);
-        currentlySelectedMetadata = meta;
-
-        metaMainClassLabel.setText("Main Class: " + meta.mainClass().orElse("—"));
-
-        int requiredJava = meta.javaVersion()
-                .map(JavaVersion::majorVersion)
-                .orElse(8);
-        meta.javaVersion().ifPresentOrElse(
-                jv -> metaJavaVersionLabel.setText("Java Version: " + jv.majorVersion()
-                        + " (" + jv.componentOpt().orElse("—") + ")"),
-                () -> metaJavaVersionLabel.setText("Java Version: 8 (not specified, default)"));
-
-        resolveJava(meta, requiredJava);
-
-        meta.clientDownload().ifPresentOrElse(
-                dl -> {
-                    metaClientJarLabel.setText("Client JAR: " + dl.url());
-                    metaClientSizeLabel.setText("Client Size: " + formatSize(dl.size()));
-                },
-                () -> {
-                    metaClientJarLabel.setText("Client JAR: —");
-                    metaClientSizeLabel.setText("Client Size: —");
-                });
-
-        metaLibrariesLabel.setText("Libraries: " + meta.libraries().size());
-        metaNativesLabel.setText("Natives: " + meta.nativeLibraries(OsDetector.mojangName()).size()
-                + " (" + OsDetector.mojangName() + ")");
-
-        meta.assetIndex().ifPresentOrElse(
-                ai -> metaAssetsLabel.setText("Assets Index: " + ai.id()
-                        + " (" + formatSize(ai.totalSize()) + ")"),
-                () -> metaAssetsLabel.setText("Assets Index: " + meta.assets().orElse("—")));
-
-        metaGameArgsLabel.setText("Game Arguments: " + meta.gameArguments().size()
-                + (meta.gameArguments().isEmpty() ? "" : " tokens"));
-        metaJvmArgsLabel.setText("JVM Arguments: " + meta.jvmArguments().size()
-                + (meta.jvmArguments().isEmpty() ? "" : " tokens"));
-
-        meta.legacyMinecraftArguments().ifPresentOrElse(
-                args -> metaLegacyArgsLabel.setText("Legacy Arguments: " + args.length() + " chars"),
-                () -> metaLegacyArgsLabel.setText("Legacy Arguments: none"));
-    }
-
-    private void onMetadataFailed(Throwable cause) {
-        metadataProgress.setVisible(false);
-        metadataErrorLabel.setText("Failed to load metadata:\n" + cause.getMessage());
-        metadataErrorLabel.setVisible(true);
-        clearMetadataLabels();
-    }
-
-    private void resolveJava(VersionMetadata meta, int requiredMajor) {
-        Task<JavaResolutionResult> task = new Task<>() {
-            @Override
-            protected JavaResolutionResult call() throws Exception {
-                return javaResolutionService.resolve(meta);
-            }
-        };
-        task.setOnSucceeded(e -> {
-            currentJavaResolution = task.getValue();
-            updateJavaStatusLabel(currentJavaResolution);
-        });
-        task.setOnFailed(e -> {
-            currentJavaResolution = JavaResolutionResult.notFound(
-                    "Java detection failed: " + task.getException().getMessage());
-            updateJavaStatusLabel(currentJavaResolution);
-        });
-        var thread = new Thread(task, "java-resolve");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private void browseForJava() {
-        Stage stage = (Stage) root.getScene().getWindow();
-        javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
-        fc.setTitle("Select Java Executable");
-        fc.getExtensionFilters().add(
-                new javafx.stage.FileChooser.ExtensionFilter("Java Executable", "java.exe", "java"));
-        fc.setInitialDirectory(new java.io.File("C:\\Program Files"));
-        java.io.File chosen = fc.showOpenDialog(stage);
-        if (chosen == null) return;
-
-        Path javaExe = chosen.toPath();
-        customJavaLabel.setText("Custom Java: " + javaExe);
-
-        if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
-            svc.setCustomJavaPath(javaExe);
-        }
-
-        if (currentlySelectedMetadata != null) {
-            int required = currentlySelectedMetadata.javaVersion()
-                    .map(JavaVersion::majorVersion).orElse(8);
-            resolveJava(currentlySelectedMetadata, required);
+        versionsLoadFailed = true;
+        statusLabel.setText("Version list load failed ("
+                + cause.getMessage() + ")");
+        if (versionListView != null) {
+            Hyperlink retry = new Hyperlink(
+                    "Couldn't load versions — click to retry");
+            retry.setOnAction(e -> {
+                statusLabel.setText("Retrying version list...");
+                loadVersions();
+            });
+            versionListView.setPlaceholder(retry);
+            versionListView.getItems().clear();
         }
     }
 
+    /** Whether the version's metadata requires Java 8 or older. */
     private boolean needsJava8(VersionMetadata meta) {
         int required = meta.javaVersion()
                 .map(JavaVersion::majorVersion)
                 .orElse(8);
         return required <= 8;
-    }
-
-    private void downloadAndInstallJava8(MinecraftVersion selected,
-                                          GameDirectory gameDir,
-                                          GameProfile profile) {
-        Task<JavaRuntime> installTask = new Task<>() {
-            @Override
-            protected JavaRuntime call() throws Exception {
-                Path targetDir = gameDir.javaRuntimeDir("jre-legacy");
-                return javaRuntimeInstaller.install(8, targetDir);
-            }
-        };
-        installTask.setOnSucceeded(e -> {
-            JavaRuntime rt = installTask.getValue();
-            statusLabel.setText("Java 8 installed. Launching " + selected.id() + "...");
-
-            if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
-                svc.setCustomJavaPath(rt.javaExecutable());
-            }
-            doLaunch(selected, gameDir, profile, true);
-        });
-        installTask.setOnFailed(e -> {
-            String msg = "Java 8 download failed: "
-                    + installTask.getException().getMessage();
-            statusLabel.setText(msg);
-            playButton.setDisable(false);
-            Stage launcherStage = (Stage) root.getScene().getWindow();
-            ErrorDialog.show(launcherStage, "Java Download Failed",
-                    installTask.getException().getClass().getSimpleName() + ": "
-                            + installTask.getException().getMessage()
-                            + "\n\nPlease install Java 8 manually from adoptium.net"
-                            + " and use 'Browse Java...' to select it.");
-        });
-        var thread = new Thread(installTask, "java-install");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private void updateJavaStatusLabel(JavaResolutionResult result) {
-        metaJavaStatusLabel.getStyleClass().removeAll("java-ok", "java-warn", "java-error");
-        switch (result.status()) {
-            case FOUND -> {
-                JavaRuntime rt = result.runtime().orElseThrow();
-                metaJavaStatusLabel.setText("Java Status: OK (Java " + rt.majorVersion()
-                        + " at " + rt.javaExecutable().getParent() + ")");
-                metaJavaStatusLabel.getStyleClass().add("java-ok");
-            }
-            case INCOMPATIBLE -> {
-                metaJavaStatusLabel.setText("Java Status: " + result.reason().orElse("Incompatible"));
-                metaJavaStatusLabel.getStyleClass().add("java-warn");
-            }
-            case NOT_FOUND -> {
-                metaJavaStatusLabel.setText("Java Status: " + result.reason().orElse("Not found"));
-                metaJavaStatusLabel.getStyleClass().add("java-error");
-            }
-        }
-    }
-
-    private void clearMetadataLabels() {
-        metaMainClassLabel.setText("Main Class: …");
-        metaJavaVersionLabel.setText("Java Version: …");
-        metaJavaStatusLabel.setText("Java Status: …");
-        metaJavaStatusLabel.getStyleClass().removeAll("java-ok", "java-warn", "java-error");
-        metaClientJarLabel.setText("Client JAR: …");
-        metaClientSizeLabel.setText("Client Size: …");
-        metaLibrariesLabel.setText("Libraries: …");
-        metaNativesLabel.setText("Natives: …");
-        metaAssetsLabel.setText("Assets Index: …");
-        metaGameArgsLabel.setText("Game Arguments: …");
-        metaJvmArgsLabel.setText("JVM Arguments: …");
-        metaLegacyArgsLabel.setText("Legacy Arguments: …");
-    }
-
-    // ------------------------------------------------------------------
-    //  Sidebar updates
-    // ------------------------------------------------------------------
-
-    private void updateTypeCounts() {
-        Map<VersionType, Integer> counts = new HashMap<>();
-        for (VersionType t : typeRegistry.all()) {
-            counts.put(t, 0);
-        }
-        for (MinecraftVersion v : allVersions) {
-            counts.merge(v.type(), 1, Integer::sum);
-        }
-        for (var entry : typeCountLabels.entrySet()) {
-            Label label = entry.getValue();
-            int c = counts.getOrDefault(entry.getKey(), 0);
-            label.setText(String.valueOf(c));
-        }
-    }
-
-    private void updateQuickSelectButtons() {
-        if (currentManifest == null) return;
-
-        currentManifest.latestReleaseId().ifPresentOrElse(
-                id -> {
-                    latestReleaseButton.setText(id);
-                    latestReleaseButton.setDisable(false);
-                },
-                () -> {
-                    latestReleaseButton.setText("—");
-                    latestReleaseButton.setDisable(true);
-                }
-        );
-
-        currentManifest.latestSnapshotId().ifPresentOrElse(
-                id -> {
-                    latestSnapshotButton.setText(id);
-                    latestSnapshotButton.setDisable(false);
-                },
-                () -> {
-                    latestSnapshotButton.setText("—");
-                    latestSnapshotButton.setDisable(true);
-                }
-        );
-    }
-
-    // ------------------------------------------------------------------
-    //  Filtering
-    // ------------------------------------------------------------------
-
-    private VersionType getSelectedFilterType() {
-        ToggleButton selected = (ToggleButton) typeFilterGroup.getSelectedToggle();
-        if (selected == null || selected == allTypesButton) {
-            return null;
-        }
-        for (var entry : typeFilterButtons.entrySet()) {
-            if (entry.getValue() == selected) {
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
-
-    private void applyFilter() {
-        if (table == null) return;
-        if (allVersions.isEmpty()) {
-            table.setItems(FXCollections.emptyObservableList());
-            return;
-        }
-
-        VersionType selectedType = getSelectedFilterType();
-        String query = (searchField.getText() != null) ? searchField.getText().trim().toLowerCase() : "";
-
-        List<MinecraftVersion> filtered = new ArrayList<>();
-        for (MinecraftVersion v : allVersions) {
-            if (selectedType != null && !v.type().equals(selectedType)) {
-                continue;
-            }
-            if (!query.isEmpty() && !v.id().toLowerCase().contains(query)) {
-                continue;
-            }
-            filtered.add(v);
-        }
-
-        filtered.sort(Comparator.comparing(
-                (MinecraftVersion v) -> v.releaseTime().orElse(null),
-                Comparator.nullsLast(Comparator.reverseOrder())));
-
-        table.setItems(FXCollections.observableArrayList(filtered));
-    }
-
-    // ------------------------------------------------------------------
-    //  Quick select actions
-    // ------------------------------------------------------------------
-
-    private void selectLatestRelease() {
-        if (currentManifest == null) return;
-        currentManifest.latestReleaseId().ifPresent(this::selectVersionById);
-    }
-
-    private void selectLatestSnapshot() {
-        if (currentManifest == null) return;
-        currentManifest.latestSnapshotId().ifPresent(this::selectVersionById);
-    }
-
-    private void selectVersionById(String id) {
-        for (MinecraftVersion v : table.getItems()) {
-            if (v.id().equals(id)) {
-                table.getSelectionModel().select(v);
-                table.scrollTo(v);
-                return;
-            }
-        }
-    }
-
-    private void restoreLastSelectedVersion() {
-        if (preferences == null) return;
-        try {
-            preferences.getLastSelectedVersion().ifPresent(id -> {
-                for (MinecraftVersion v : allVersions) {
-                    if (v.id().equals(id)) {
-                        if (getSelectedFilterType() != null
-                                && !v.type().equals(getSelectedFilterType())) {
-                            allTypesButton.setSelected(true);
-                            applyFilter();
-                        }
-                        selectVersionById(id);
-                        break;
-                    }
-                }
-            });
-        } catch (java.io.IOException e) {
-            // Non-fatal — just don't restore
-        }
-    }
-
-    private void saveLastSelectedVersion(String versionId) {
-        if (preferences == null) return;
-        try {
-            preferences.setLastSelectedVersion(versionId);
-        } catch (java.io.IOException e) {
-            // Non-fatal — preference just won't persist
-        }
     }
 
     private void saveLastSelectedAccount(String accountName) {
@@ -1236,191 +1417,534 @@ public class MainView {
     //  Details panel
     // ------------------------------------------------------------------
 
-    private void updateDetailsPanel(MinecraftVersion selected) {
-        if (selected == null) {
-            detailsPanel.setVisible(false);
-            playButton.setDisable(true);
-            return;
-        }
-
-        detailsPanel.setVisible(true);
-        playButton.setDisable(false);
-
-        detailsVersionLabel.setText(selected.id());
-
-        detailsTypeLabel.setText(selected.type().displayName());
-        detailsTypeLabel.getStyleClass().removeAll(STABLE_BADGE, UNSTABLE_BADGE);
-        detailsTypeLabel.getStyleClass().add(
-                selected.type().isStable() ? STABLE_BADGE : UNSTABLE_BADGE);
-
-        detailsDateLabel.setText(selected.formattedReleaseTime());
-
-        String url = selected.metadataUrl();
-        detailsUrlLabel.setText(url != null ? url : "—");
-    }
-
     // ------------------------------------------------------------------
-    //  Play action
+    //  Instance creation
     // ------------------------------------------------------------------
 
-    private void onPlay() {
-        MinecraftVersion selected = table.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-
-        if (currentlySelectedMetadata == null) {
-            statusLabel.setText("Metadata not loaded yet, please wait...");
+    /**
+     * Opens the New Instance dialog — one simple screen with loader
+     * chips, the version list and the loader version list — and
+     * creates the instance on confirmation. The version browser's
+     * double-click offers a shortcut with a fixed version/loader.
+     */
+    private void onNewInstance() {
+        if (manifestVersions.isEmpty()) {
+            if (versionsLoadFailed) {
+                statusLabel.setText("Retrying version list...");
+                loadVersions();
+            } else {
+                statusLabel.setText("Versions are still loading — please wait...");
+            }
             return;
         }
-
-        GameProfile profile = getOrCreateProfile();
-        GameDirectory gameDir = GameDirectory.defaultDirectory();
-
-        playButton.setDisable(true);
-        javaDownloadAttempted = false;
-        statusLabel.setText("Launching " + selected.id() + "...");
-
-        if (profile.isElyBy()) {
-            refreshAndLaunch(selected, gameDir, profile);
-        } else {
-            doLaunch(selected, gameDir, profile, false);
+        NewInstanceDialog.Result result = NewInstanceDialog.show(
+                (Stage) root.getScene().getWindow(),
+                modLoaderRegistry, manifestVersions);
+        if (result != null) {
+            createInstance(result);
         }
     }
 
-    private void refreshAndLaunch(MinecraftVersion selected, GameDirectory gameDir,
-                                   GameProfile profile) {
-        statusLabel.setText("Refreshing Ely.by profile...");
-        Task<GameProfile> refreshTask = new Task<>() {
+    /**
+     * Creates the instance in one background task: installs the
+     * game/loader version only when it is not already installed
+     * (skip-if-valid: intact files are not re-downloaded; no network
+     * access at all for already-present versions) and registers the
+     * instance with its own game directory.
+     */
+    private void createInstance(NewInstanceDialog.Result result) {
+        createInstance(result, false);
+    }
+
+    /**
+     * @param playWhenReady launch the instance right after creating
+     *                      it (playing straight from the version
+     *                      browser)
+     */
+    private void createInstance(NewInstanceDialog.Result result,
+                                boolean playWhenReady) {
+        ModLoaderType type = result.type();
+        MinecraftVersion mc = result.mcVersion();
+        ModLoaderVersion loader = result.loader();
+        GameDirectory storage = GameDirectory.defaultDirectory();
+
+        statusLabel.setText("Creating instance ("
+                + (type == ModLoaderType.VANILLA ? "vanilla " + mc.id()
+                        : type.displayName() + " " + loader.loaderVersion()
+                                + " for MC " + mc.id()) + ")...");
+
+        Stage owner = (Stage) root.getScene().getWindow();
+        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
+        progressDialog.setTitle("Creating Instance");
+        progressDialog.show();
+
+        Task<ModdedProfile> task = new Task<>() {
             @Override
-            protected GameProfile call() throws Exception {
-                return elyAuthService.refreshProfile(profile);
+            protected ModdedProfile call() throws Exception {
+                String versionId = type == ModLoaderType.VANILLA
+                        ? mc.id() : loader.installedVersionId();
+                // Already-installed versions need no metadata fetch or
+                // download — instance creation works offline then
+                boolean alreadyInstalled = type == ModLoaderType.VANILLA
+                        ? Files.isRegularFile(storage.clientJar(mc.id()))
+                        : Files.isRegularFile(storage.versionMetadata(versionId));
+                if (!alreadyInstalled) {
+                    VersionMetadata vanillaMetadata =
+                            metadataService.fetchMetadata(mc);
+                    if (type == ModLoaderType.VANILLA) {
+                        installationService.install(mc, vanillaMetadata,
+                                storage, progressDialog);
+                    } else {
+                        var entry = modLoaderRegistry.get(type).orElseThrow(
+                                () -> new IOException(type.displayName()
+                                        + " support is not registered"));
+                        entry.installer().install(mc, vanillaMetadata, loader,
+                                storage, progressDialog);
+                    }
+                }
+                return moddedProfileService.createProfile(
+                        result.name(), type,
+                        type == ModLoaderType.VANILLA ? "" : loader.loaderVersion(),
+                        mc.id(), versionId, result.extraJvmArgs());
             }
         };
-        refreshTask.setOnSucceeded(e -> {
-            GameProfile refreshed = refreshTask.getValue();
-
-            String oldName = profile.name();
-            String newName = refreshed.name();
-            boolean nameChanged = !oldName.equals(newName);
-
-            if (nameChanged) {
-                try {
-                    var profiles = new java.util.ArrayList<>(profileService.loadProfiles());
-                    profiles.removeIf(p -> p.uuid().equals(refreshed.uuid())
-                            || p.name().equals(oldName));
-                    profiles.add(refreshed);
-                    profileService.saveProfiles(profiles);
-                    refreshAccounts();
-                    for (GameProfile p : accountCombo.getItems()) {
-                        if (p.uuid().isPresent()
-                                && p.uuid().get().equals(refreshed.uuid().orElse(""))) {
-                            suppressSelectionListener = true;
-                            accountCombo.getSelectionModel().select(p);
-                            selectedProfile = p;
-                            suppressSelectionListener = false;
-                            break;
-                        }
-                    }
-                    updateAvatar(refreshed);
-                    saveLastSelectedAccount(newName);
-                } catch (java.io.IOException ex) {
-                    // Non-fatal
-                }
+        task.setOnSucceeded(e -> {
+            ModdedProfile profile = task.getValue();
+            progressDialog.onComplete(new InstallationResult(0, 0, 0, 0, 0,
+                    List.of()));
+            refreshModdedProfiles(profile.id());
+            statusLabel.setText("Instance ready: " + profile.name()
+                    + " — press Play"
+                    + (profile.isVanilla() ? "" : " and add mods via Folder"));
+            if (playWhenReady) {
+                startInstanceLaunch(profile);
             }
-
-            if (nameChanged) {
-                statusLabel.setText("Nick changed: " + oldName + " -> " + newName
-                        + ". Launching " + selected.id() + "...");
-            } else {
-                statusLabel.setText("Launching " + selected.id() + "...");
-            }
-            doLaunch(selected, gameDir, refreshed, false);
         });
-        refreshTask.setOnFailed(e -> {
-            statusLabel.setText("Launching " + selected.id() + " (profile refresh failed)...");
-            doLaunch(selected, gameDir, profile, false);
+        task.setOnFailed(e -> {
+            Throwable cause = task.getException();
+            progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
+            statusLabel.setText("Instance creation failed: " + cause.getMessage());
+            ErrorDialog.show(owner, "Instance Creation Failed",
+                    cause.getClass().getSimpleName() + ": " + cause.getMessage());
         });
-        var thread = new Thread(refreshTask, "ely-refresh");
+        var thread = new Thread(task, "instance-create");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private void doLaunch(MinecraftVersion selected, GameDirectory gameDir,
-                          GameProfile profile, boolean isRetry) {
+    // ------------------------------------------------------------------
+    //  Instances: listing, launch, folder, deletion
+    // ------------------------------------------------------------------
+
+    /**
+     * Reloads the instance list into the sidebar panel.
+     *
+     * @param selectId instance id to select after loading, or null
+     */
+    private void refreshModdedProfiles(String selectId) {
+        try {
+            moddedProfiles = moddedProfileService.loadProfiles();
+            profileListView.getItems().setAll(moddedProfiles);
+            if (selectId != null) {
+                for (ModdedProfile p : moddedProfiles) {
+                    if (p.id().equals(selectId)) {
+                        profileListView.getSelectionModel().select(p);
+                        break;
+                    }
+                }
+            }
+            updateProfileButtons();
+            updateInstanceDetails();
+        } catch (java.io.IOException e) {
+            statusLabel.setText("Failed to load instances: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Opens the selected profile's game directory in the system file
+     * manager, so the user can add mods, resource packs, shader packs,
+     * worlds or check logs manually.
+     */
+    private void onOpenProfileFolder() {
+        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+        if (profile == null) return;
+        try {
+            Path dir = moddedProfileService.resolveGameDir(profile);
+            ModdedProfileService.ensureProfileFolders(dir);
+            java.awt.Desktop.getDesktop().open(dir.toFile());
+            statusLabel.setText("Opened " + dir);
+        } catch (Exception ex) {
+            statusLabel.setText("Failed to open folder: " + ex.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Open Folder",
+                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Opens the edit dialog for the selected profile (display name and
+     * extra JVM arguments) and persists the changes. The game directory
+     * and versions stay fixed.
+     */
+    private void onEditProfile() {
+        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+        if (profile == null) return;
+
+        EditProfileDialog.Result result = EditProfileDialog.show(
+                (Stage) root.getScene().getWindow(), profile);
+        if (result == null) return;
+
+        try {
+            Optional<ModdedProfile> updated = moddedProfileService.updateProfile(
+                    profile.id(), result.name(), result.extraJvmArgs());
+            if (updated.isPresent()) {
+                refreshModdedProfiles(profile.id());
+                statusLabel.setText("Instance updated: " + updated.get().name()
+                        + (result.extraJvmArgs().isEmpty() ? ""
+                                : " (" + result.extraJvmArgs().size()
+                                + " JVM args)"));
+            }
+        } catch (java.io.IOException e) {
+            statusLabel.setText("Failed to update instance: " + e.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Update Instance",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    private void onDeleteProfile() {
+        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+        if (profile == null) return;
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete Instance");
+        alert.setHeaderText("Delete instance '" + profile.name() + "'?");
+        alert.setContentText(
+                "The instance is removed from the list, but the game directory with "
+                        + "your mods, configs and saves is kept on disk:\n"
+                        + GameDirectory.defaultDirectory().root()
+                                .resolve(profile.gameDirPath()));
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                try {
+                    var keptDir = moddedProfileService.deleteProfile(profile.id());
+                    refreshModdedProfiles(null);
+                    statusLabel.setText("Instance deleted"
+                            + keptDir.map(d -> "; files kept at " + d).orElse(""));
+                } catch (java.io.IOException e) {
+                    statusLabel.setText("Failed to delete instance: " + e.getMessage());
+                }
+            }
+        });
+    }
+
+    // --- Instance launch (verify → repair if needed → launch) ---
+
+    private void onPlayProfile() {
+        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+        if (profile == null) return;
+
+        playProfileButton.setDisable(true);
+        startInstanceLaunch(profile);
+    }
+
+    /**
+     * Common launch entry for both Play buttons (instance panel and
+     * version browser): account resolution, Ely.by refresh and then
+     * the verify → repair-if-needed → launch chain.
+     */
+    private void startInstanceLaunch(ModdedProfile profile) {
+        GameProfile account = getOrCreateProfile();
+        GameDirectory storage = GameDirectory.defaultDirectory();
+
+        // A launch attempt blocks both Play buttons until a terminal
+        // callback (launch end/failure, game exit) refreshes them
+        versionPlayInFlight = true;
+        updateVersionActionBar();
+        javaDownloadAttempted = false;
+        statusLabel.setText("Verifying " + profile.name() + "...");
+
+        if (account.isElyBy()) {
+            statusLabel.setText("Refreshing Ely.by profile...");
+            Task<GameProfile> refreshTask = new Task<>() {
+                @Override
+                protected GameProfile call() throws Exception {
+                    return elyAuthService.refreshProfile(account);
+                }
+            };
+            refreshTask.setOnSucceeded(e ->
+                    verifyProfileAndLaunch(profile, refreshTask.getValue(), storage));
+            refreshTask.setOnFailed(e ->
+                    verifyProfileAndLaunch(profile, account, storage));
+            var thread = new Thread(refreshTask, "ely-refresh");
+            thread.setDaemon(true);
+            thread.start();
+        } else {
+            verifyProfileAndLaunch(profile, account, storage);
+        }
+    }
+
+    /**
+     * Verifies the profile's installation; on problems, attempts an
+     * automatic repair (re-downloading only missing or corrupt files)
+     * and re-verifies before launching. Non-repairable problems are
+     * reported with their causes.
+     */
+    private void verifyProfileAndLaunch(ModdedProfile profile,
+                                        GameProfile account,
+                                        GameDirectory storage) {
+        Task<ModdedProfileVerificationService.VerificationReport> verifyTask = new Task<>() {
+            @Override
+            protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
+                return profileVerificationService.verify(profile, storage);
+            }
+        };
+        verifyTask.setOnSucceeded(e -> {
+            ModdedProfileVerificationService.VerificationReport report =
+                    verifyTask.getValue();
+            if (report.ok()) {
+                doLaunchProfile(profile, account, report.metadata().orElseThrow(),
+                        storage);
+            } else {
+                handleInstanceVerificationFailure(profile, account, storage,
+                        report, false);
+            }
+        });
+        verifyTask.setOnFailed(e -> {
+            updateProfileButtons();
+            statusLabel.setText("Verification error: "
+                    + verifyTask.getException().getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Instance Verification Error",
+                    verifyTask.getException().getClass().getSimpleName() + ": "
+                            + verifyTask.getException().getMessage());
+        });
+        var thread = new Thread(verifyTask, "instance-verify");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
+     * Routes a failed verification to the right recovery path:
+     * automatic Java 8 download for legacy versions that only lack a
+     * runtime, a single automatic repair (re-downloading missing or
+     * corrupt files), or a diagnostic report with the causes.
+     *
+     * @param repairAttempted whether a repair already ran for this
+     *                        launch attempt (prevents repair loops)
+     */
+    private void handleInstanceVerificationFailure(
+            ModdedProfile profile,
+            GameProfile account,
+            GameDirectory storage,
+            ModdedProfileVerificationService.VerificationReport report,
+            boolean repairAttempted) {
+        // Legacy versions: everything is fine except the Java runtime
+        if (!javaDownloadAttempted
+                && report.metadata().isPresent()
+                && needsJava8(report.metadata().get())
+                && report.errors().stream().allMatch(e ->
+                        e.startsWith("No suitable Java runtime"))) {
+            javaDownloadAttempted = true;
+            downloadAndInstallJava8ForInstance(profile, account, storage,
+                    report.metadata().get());
+            return;
+        }
+        // Automatic repair: reinstall vanilla/loader — intact files
+        // are skipped, only missing/corrupt ones are downloaded — then
+        // verify again
+        if (report.isRepairableByInstall() && !repairAttempted) {
+            repairProfileAndLaunch(profile, account, storage, report);
+            return;
+        }
+        showProfileVerificationErrors(profile, report);
+    }
+
+    private void repairProfileAndLaunch(ModdedProfile profile,
+                                        GameProfile account,
+                                        GameDirectory storage,
+                                        ModdedProfileVerificationService.VerificationReport original) {
+        statusLabel.setText("Repairing " + profile.name()
+                + " (downloading missing files)...");
+
+        Stage owner = (Stage) root.getScene().getWindow();
+        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
+        progressDialog.setTitle("Repairing " + profile.name());
+        progressDialog.show();
+
+        Task<ModdedProfileVerificationService.VerificationReport> repairTask = new Task<>() {
+            @Override
+            protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
+                profileVerificationService.repair(profile, storage, progressDialog);
+                return profileVerificationService.verify(profile, storage);
+            }
+        };
+        repairTask.setOnSucceeded(e -> {
+            ModdedProfileVerificationService.VerificationReport report =
+                    repairTask.getValue();
+            if (report.ok()) {
+                doLaunchProfile(profile, account, report.metadata().orElseThrow(),
+                        storage);
+            } else {
+                handleInstanceVerificationFailure(profile, account, storage,
+                        report, true);
+            }
+        });
+        repairTask.setOnFailed(e -> {
+            updateProfileButtons();
+            Throwable cause = repairTask.getException();
+            progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
+            statusLabel.setText("Repair failed: " + cause.getMessage());
+            StringBuilder msg = new StringBuilder();
+            msg.append("Automatic repair failed:\n")
+                    .append(cause.getClass().getSimpleName()).append(": ")
+                    .append(cause.getMessage()).append("\n\n")
+                    .append("Problems found before repair:\n");
+            for (String error : original.errors()) {
+                msg.append(" - ").append(error).append('\n');
+            }
+            ErrorDialog.show(owner, "Instance Repair Failed — " + profile.name(),
+                    msg.toString());
+        });
+        var thread = new Thread(repairTask, "instance-repair");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /**
+     * Reports verification problems with their causes and re-enables
+     * the instance controls.
+     */
+    private void showProfileVerificationErrors(
+            ModdedProfile profile,
+            ModdedProfileVerificationService.VerificationReport report) {
+        updateProfileButtons();
+        statusLabel.setText("Instance not launchable: "
+                + report.errors().get(0));
+
+        StringBuilder msg = new StringBuilder(
+                "The instance cannot be launched.\n\nProblems found:\n");
+        for (String error : report.errors()) {
+            msg.append(" - ").append(error).append('\n');
+        }
+        if (!report.warnings().isEmpty()) {
+            msg.append("\nWarnings:\n");
+            for (String warning : report.warnings()) {
+                msg.append(" - ").append(warning).append('\n');
+            }
+        }
+        ErrorDialog.show((Stage) root.getScene().getWindow(),
+                "Instance Verification Failed — " + profile.name(),
+                msg.toString());
+    }
+
+    private void doLaunchProfile(ModdedProfile profile,
+                                 GameProfile account,
+                                 VersionMetadata metadata,
+                                 GameDirectory storage) {
+        statusLabel.setText("Launching " + profile.name() + "...");
+        Path runtimeDir = storage.root().resolve(profile.gameDirPath());
+
         Task<LaunchResult> launchTask = new Task<>() {
             @Override
             protected LaunchResult call() throws Exception {
-                return launchService.launch(currentlySelectedMetadata, gameDir, profile);
+                // The profile's game directory must exist before the
+                // process can run inside it
+                ModdedProfileService.ensureProfileFolders(runtimeDir);
+                return launchService.launch(metadata, storage, account,
+                        runtimeDir, profile.extraJvmArgs());
             }
         };
         launchTask.setOnSucceeded(e -> {
             LaunchResult result = launchTask.getValue();
             if (result.isSuccess()) {
-                statusLabel.setText("Minecraft " + selected.id() + " is running");
+                try {
+                    moddedProfileService.touchLastPlayed(profile.id());
+                } catch (java.io.IOException ignored) {
+                    // Non-fatal
+                }
+                statusLabel.setText("Minecraft " + profile.versionId()
+                        + " is running (" + profile.name() + ")");
                 Stage launcherStage = (Stage) root.getScene().getWindow();
                 launcherStage.hide();
-                monitorProcess(result.process().orElseThrow(), selected.id(), launcherStage);
-            } else if (result.status() == LaunchResult.Status.FILE_CHECK_FAILED && !isRetry) {
-                statusLabel.setText("Files missing, installing " + selected.id() + "...");
-                startInstallation(selected, gameDir, profile);
-            } else if (result.status() == LaunchResult.Status.JAVA_NOT_FOUND
-                    && !javaDownloadAttempted && needsJava8(currentlySelectedMetadata)) {
-                javaDownloadAttempted = true;
-                statusLabel.setText("Java 8 required. Downloading JRE 8...");
-                downloadAndInstallJava8(selected, gameDir, profile);
+                monitorProcess(result.process().orElseThrow(),
+                        profile.versionId(), launcherStage);
+            } else if (result.status() == LaunchResult.Status.FILE_CHECK_FAILED) {
+                // Rare race (files vanished between verify and launch)
+                ModdedProfileVerificationService.VerificationReport report =
+                        new ModdedProfileVerificationService.VerificationReport(
+                                false, List.of(result.message()), List.of(),
+                                java.util.Optional.of(metadata));
+                repairProfileAndLaunch(profile, account, storage, report);
             } else {
+                updateProfileButtons();
                 String msg = "Launch failed: " + result.message();
                 statusLabel.setText(msg);
-                playButton.setDisable(false);
                 Stage launcherStage = (Stage) root.getScene().getWindow();
                 ErrorDialog.show(launcherStage, "Launch Failed",
                         result.status() + ": " + result.message());
             }
         });
         launchTask.setOnFailed(e -> {
+            updateProfileButtons();
             String msg = "Launch error: " + launchTask.getException().getMessage();
             statusLabel.setText(msg);
-            playButton.setDisable(false);
             Stage launcherStage = (Stage) root.getScene().getWindow();
             ErrorDialog.show(launcherStage, "Launch Error",
                     launchTask.getException().getClass().getSimpleName() + ": "
                             + launchTask.getException().getMessage());
         });
-        var thread = new Thread(launchTask, "launch");
+        var thread = new Thread(launchTask, "profile-launch");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private void startInstallation(MinecraftVersion selected, GameDirectory gameDir,
-                                   GameProfile profile) {
-        statusLabel.setText("Installing " + selected.id() + "...");
+    // ------------------------------------------------------------------
+    //  Java 8 auto-download (legacy instances)
+    // ------------------------------------------------------------------
 
-        Stage owner = (Stage) root.getScene().getWindow();
-        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
-        progressDialog.show();
+    /**
+     * Downloads and installs a managed JRE 8 for a legacy instance
+     * whose only problem is the missing runtime, then re-verifies and
+     * launches.
+     */
+    private void downloadAndInstallJava8ForInstance(ModdedProfile profile,
+                                                    GameProfile account,
+                                                    GameDirectory storage,
+                                                    VersionMetadata meta) {
+        statusLabel.setText("Java 8 required for " + profile.name()
+                + ". Downloading JRE 8...");
 
-        Task<InstallationResult> installTask = new Task<>() {
+        Task<JavaRuntime> installTask = new Task<>() {
             @Override
-            protected InstallationResult call() throws Exception {
-                return installationService.install(
-                        selected, currentlySelectedMetadata, gameDir, progressDialog);
+            protected JavaRuntime call() throws Exception {
+                Path targetDir = storage.javaRuntimeDir("jre-legacy");
+                return javaRuntimeInstaller.install(8, targetDir);
             }
         };
         installTask.setOnSucceeded(e -> {
-            InstallationResult result = installTask.getValue();
-            if (result.hasFailures()) {
-                statusLabel.setText("Installation completed with "
-                        + result.failed() + " failures");
-                playButton.setDisable(false);
-                return;
+            JavaRuntime rt = installTask.getValue();
+            statusLabel.setText("Java 8 installed. Verifying " + profile.name()
+                    + " again...");
+
+            if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
+                svc.setCustomJavaPath(rt.javaExecutable());
             }
-            statusLabel.setText("Installation complete. Launching " + selected.id() + "...");
-            doLaunch(selected, gameDir, profile, true);
+            verifyProfileAndLaunch(profile, account, storage);
         });
         installTask.setOnFailed(e -> {
-            statusLabel.setText("Installation failed: " + installTask.getException().getMessage());
-            playButton.setDisable(false);
+            updateProfileButtons();
+            String msg = "Java 8 download failed: "
+                    + installTask.getException().getMessage();
+            statusLabel.setText(msg);
+            Stage launcherStage = (Stage) root.getScene().getWindow();
+            ErrorDialog.show(launcherStage, "Java Download Failed",
+                    installTask.getException().getClass().getSimpleName() + ": "
+                            + installTask.getException().getMessage()
+                            + "\n\nPlease install Java 8 manually from adoptium.net"
+                            + " and restart the launcher.");
         });
-        var thread = new Thread(installTask, "install");
+        var thread = new Thread(installTask, "java-install");
         thread.setDaemon(true);
         thread.start();
     }
@@ -1472,13 +1996,13 @@ public class MainView {
                                                     .reduce("", (a, b) -> a + b + "\n"));
                         }
                     }
-                    playButton.setDisable(false);
+                    updateProfileButtons();
                 });
             } catch (InterruptedException e) {
                 javafx.application.Platform.runLater(() -> {
                     launcherStage.show();
                     statusLabel.setText("Process monitoring interrupted");
-                    playButton.setDisable(false);
+                    updateProfileButtons();
                 });
             }
         }, "mc-monitor");
@@ -1489,11 +2013,4 @@ public class MainView {
     // ------------------------------------------------------------------
     //  Utilities
     // ------------------------------------------------------------------
-
-    private static String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-        if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
-        return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
-    }
 }
