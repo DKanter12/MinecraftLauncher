@@ -46,6 +46,13 @@ class ForgeNeoForgeVersionProviderTest {
                   <version>21.4.147</version>
                   <version>47.1.104</version>
                   <version>21.5.11-beta</version>
+                  <version>26.1.0.0-alpha.1+snapshot-1</version>
+                  <version>26.1.0.19-beta</version>
+                  <version>26.1.1.5-beta</version>
+                  <version>26.1.2.101</version>
+                  <version>26.2.0.3-beta</version>
+                  <version>0.25w14craftmine.3-beta</version>
+                  <version>0.25w14craftmine.4-beta</version>
                 </versions>
               </versioning>
             </metadata>
@@ -77,16 +84,7 @@ class ForgeNeoForgeVersionProviderTest {
     }
 
     @Test
-    @DisplayName("NeoForge: prefix mapping encodes the MC version")
-    void neoforgePrefixMapping() {
-        assertEquals("47.", NeoForgeVersionProvider.neoforgePrefix("1.20.1"));
-        assertEquals("21.0.", NeoForgeVersionProvider.neoforgePrefix("1.21"));
-        assertEquals("21.4.", NeoForgeVersionProvider.neoforgePrefix("1.21.4"));
-        assertEquals("20.4.", NeoForgeVersionProvider.neoforgePrefix("1.20.4"));
-    }
-
-    @Test
-    @DisplayName("NeoForge: filters by prefix, newest first, installer URL resolved")
+    @DisplayName("NeoForge: filters by exact decoded MC version, newest first, installer URL resolved")
     void neoforgeParsesAndFilters() {
         NeoForgeVersionProvider provider = new NeoForgeVersionProvider(
                 NeoForgeVersionProvider.DEFAULT_METADATA_URL,
@@ -105,7 +103,7 @@ class ForgeNeoForgeVersionProviderTest {
     }
 
     @Test
-    @DisplayName("NeoForge: 1.20.1 uses the legacy 47.x build prefix")
+    @DisplayName("NeoForge: 1.20.1 resolves the legacy 47.x build")
     void neoforgeLegacy1201() {
         NeoForgeVersionProvider provider = new NeoForgeVersionProvider(
                 NeoForgeVersionProvider.DEFAULT_METADATA_URL,
@@ -114,6 +112,31 @@ class ForgeNeoForgeVersionProviderTest {
         List<ModLoaderVersion> versions = provider.parseVersions(NEOFORGE_XML, "1.20.1");
         assertEquals(1, versions.size());
         assertEquals("47.1.104", versions.get(0).loaderVersion());
+    }
+
+    @Test
+    @DisplayName("NeoForge: modern 26.x builds filter by their own MC version only")
+    void neoforgeModernVersionFiltering() {
+        NeoForgeVersionProvider provider = new NeoForgeVersionProvider(
+                NeoForgeVersionProvider.DEFAULT_METADATA_URL,
+                NeoForgeVersionProvider.INSTALLER_URL_TEMPLATE);
+
+        // MC 26.1 owns only its 26.1.0.x builds — the 26.1.1.x and
+        // 26.1.2.x builds belong to MC 26.1.1 / 26.1.2 and must not
+        // leak into the list
+        List<ModLoaderVersion> versions = provider.parseVersions(NEOFORGE_XML, "26.1");
+        assertEquals(2, versions.size());
+        assertEquals("26.1.0.19-beta", versions.get(0).loaderVersion());
+        assertTrue(versions.get(0).stable());
+        assertEquals("26.1.0.0-alpha.1+snapshot-1", versions.get(1).loaderVersion());
+        assertTrue(!versions.get(1).stable());
+        assertEquals("neoforge-26.1.0.19-beta", versions.get(0).installedVersionId());
+        assertEquals("https://maven.neoforged.net/releases/net/neoforged/neoforge/"
+                        + "26.1.0.19-beta/neoforge-26.1.0.19-beta-installer.jar",
+                versions.get(0).installerUrl());
+
+        assertEquals(1, provider.parseVersions(NEOFORGE_XML, "26.1.2").size());
+        assertEquals(1, provider.parseVersions(NEOFORGE_XML, "26.2").size());
     }
 
     @Test
@@ -142,31 +165,46 @@ class ForgeNeoForgeVersionProviderTest {
                 provider.parseSupportedMinecraftVersions(NEOFORGE_XML);
 
         // 47.1.104 → 1.20.1 (legacy numbering), 21.0.167 → 1.21,
-        // 20.4.237 → 1.20.4, 21.4.x → 1.21.4, beta suffix stripped
+        // 20.4.237 → 1.20.4, 21.4.x → 1.21.4, 21.5.11-beta → 1.21.5;
+        // modern builds: 26.1.0.x → 26.1 (incl. the +snapshot alpha),
+        // 26.1.1.x → 26.1.1, 26.1.2.101 → 26.1.2, 26.2.0.x → 26.2;
+        // the odd 25w14craftmine builds decode to nothing
         assertEquals(java.util.Set.of("1.20.1", "1.21", "1.20.4", "1.21.4",
-                        "1.21.5"),
+                        "1.21.5", "26.1", "26.1.1", "26.1.2", "26.2"),
                 supported);
     }
 
     @Test
-    @DisplayName("NeoForge: build number ↔ MC version round trip")
-    void neoforgeVersionMappingRoundTrip() {
+    @DisplayName("NeoForge: build number → MC version mapping, both numbering schemes")
+    void neoforgeVersionMapping() {
+        // Legacy 3-component scheme (MC 1.20–1.21 era)
         assertEquals("1.20.1", NeoForgeVersionProvider.minecraftVersionOf("47.1.104"));
+        assertEquals("1.20.1", NeoForgeVersionProvider.minecraftVersionOf("20.1.0"));
+        assertEquals("1.20.2", NeoForgeVersionProvider.minecraftVersionOf("20.2.88-beta"));
+        assertEquals("1.20.4", NeoForgeVersionProvider.minecraftVersionOf("20.4.237"));
         assertEquals("1.21", NeoForgeVersionProvider.minecraftVersionOf("21.0.167"));
         assertEquals("1.21.4", NeoForgeVersionProvider.minecraftVersionOf("21.4.147"));
-        assertEquals("1.20.4", NeoForgeVersionProvider.minecraftVersionOf("20.4.237"));
         assertEquals("1.21.5", NeoForgeVersionProvider.minecraftVersionOf("21.5.11-beta"));
-        assertEquals("1.20.1", NeoForgeVersionProvider.minecraftVersionOf("20.1.0"));
+        assertEquals("1.21.11", NeoForgeVersionProvider.minecraftVersionOf("21.11.7"));
+
+        // Modern scheme (MC 26.x era, no "1." prefix): every component
+        // but the last (the build) forms the MC version
+        assertEquals("26.1", NeoForgeVersionProvider.minecraftVersionOf("26.1.0.19-beta"));
+        assertEquals("26.1", NeoForgeVersionProvider.minecraftVersionOf(
+                "26.1.0.0-alpha.1+snapshot-1"));
+        assertEquals("26.1.1", NeoForgeVersionProvider.minecraftVersionOf("26.1.1.5-beta"));
+        assertEquals("26.1.2", NeoForgeVersionProvider.minecraftVersionOf("26.1.2.101"));
+        assertEquals("26.2", NeoForgeVersionProvider.minecraftVersionOf("26.2.0.3"));
+        assertEquals("26.2", NeoForgeVersionProvider.minecraftVersionOf("26.2.5"));
+
+        // Unknown and special builds decode to nothing
+        assertNull(NeoForgeVersionProvider.minecraftVersionOf("26.1"));
         assertNull(NeoForgeVersionProvider.minecraftVersionOf("10.0.0"));
         assertNull(NeoForgeVersionProvider.minecraftVersionOf("garbage"));
-
-        // Every prefix mapping decodes back to the same MC version
-        for (String mc : List.of("1.20.2", "1.20.4", "1.20.6", "1.21",
-                "1.21.1", "1.21.4")) {
-            String prefix = NeoForgeVersionProvider.neoforgePrefix(mc);
-            String build = prefix + "1";
-            assertEquals(mc, NeoForgeVersionProvider.minecraftVersionOf(build),
-                    "round trip for " + mc);
-        }
+        // Special builds that appear in the real Maven metadata must
+        // not crash the decoder (NumberFormatException broke the whole
+        // supported-set fetch and removed every NeoForge variant)
+        assertNull(NeoForgeVersionProvider.minecraftVersionOf(
+                "0.25w14craftmine.3-beta"));
     }
 }

@@ -19,10 +19,10 @@ import org.example.launcher.model.ModLoaderVersion;
  * NeoForge Maven repository metadata.
  * <p>
  * {@code GET https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml}
- * lists all NeoForge builds. NeoForge version numbering encodes the
- * target Minecraft version (see {@link #neoforgePrefix(String)}), so
- * entries are filtered by prefix and every returned version is
- * compatible by construction.
+ * lists all NeoForge builds. Every build number encodes its target
+ * Minecraft version (see {@link #minecraftVersionOf}), so entries are
+ * filtered by exact decode and every returned version is compatible
+ * by construction.
  */
 public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
 
@@ -95,80 +95,86 @@ public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Maps a Minecraft version to the NeoForge version-numbering
-     * prefix used to filter the Maven metadata:
+     * Maps a NeoForge build number to the Minecraft version it
+     * targets — both numbering schemes NeoForge has used:
      * <ul>
-     *   <li>{@code 1.20.1} → {@code 47.} (the only version carrying the
-     *       legacy Forge build number)</li>
-     *   <li>{@code 1.21} → {@code 21.0.}</li>
-     *   <li>{@code 1.21.4} → {@code 21.4.}</li>
+     *   <li>legacy 3-component {@code {major}.{minor}.{build}} for
+     *       the MC {@code 1.x} era: {@code 47.1.104} →
+     *       {@code 1.20.1} (the only version carrying the old Forge
+     *       build number), {@code 21.0.167} → {@code 1.21},
+     *       {@code 21.4.147} → {@code 1.21.4}</li>
+     *   <li>modern 4-component {@code {mc…}.{build}} for the MC
+     *       {@code 26.x} era: {@code 26.1.0.19} → {@code 26.1} (a
+     *       {@code .0} patch component marks the 2-part MC version),
+     *       {@code 26.1.2.101} → {@code 26.1.2},
+     *       {@code 26.2.0.3} → {@code 26.2}</li>
      * </ul>
-     */
-    public static String neoforgePrefix(String minecraftVersion) {
-        if ("1.20.1".equals(minecraftVersion)) {
-            return "47.";
-        }
-        if (minecraftVersion.startsWith("1.")) {
-            String rest = minecraftVersion.substring(2);
-            if (rest.indexOf('.') < 0) {
-                return rest + ".0.";
-            }
-            return rest + ".";
-        }
-        return minecraftVersion + ".";
-    }
-
-    /**
-     * Inverse of {@link #neoforgePrefix} — maps a NeoForge build
-     * number to the Minecraft version it targets:
-     * {@code 47.1.104} → {@code 1.20.1}, {@code 21.0.167} →
-     * {@code 1.21}, {@code 21.4.147} → {@code 1.21.4}. Returns
-     * {@code null} for numbers that encode no known Minecraft
-     * version.
+     * Returns {@code null} for numbers that encode no known Minecraft
+     * version — including odd special builds like
+     * {@code 0.25w14craftmine.3-beta} that occasionally appear in the
+     * Maven metadata.
      */
     public static String minecraftVersionOf(String neoforgeVersion) {
         String number = neoforgeVersion;
+        // Strip qualifiers: "-beta", "-rc", "+snapshot-1" after
+        // "alpha.N", … — whichever comes first
+        int cut = number.length();
         int dash = number.indexOf('-');
-        if (dash >= 0) {
-            number = number.substring(0, dash); // strip -beta etc.
-        }
+        int plus = number.indexOf('+');
+        if (dash >= 0) cut = Math.min(cut, dash);
+        if (plus >= 0) cut = Math.min(cut, plus);
+        number = number.substring(0, cut);
+
         if (number.startsWith("47.")) {
             return "1.20.1";
         }
         String[] parts = number.split("\\.");
-        if (parts.length < 2) {
+        if (parts.length < 2 || parts.length > 4) {
             return null;
         }
-        if (!Character.isDigit(parts[0].charAt(0))
-                || !Character.isDigit(parts[1].charAt(0))) {
-            return null;
+        int major;
+        int minor;
+        try {
+            major = Integer.parseInt(parts[0]);
+            minor = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+            return null; // e.g. "0.25w14craftmine.3"
         }
-        int major = Integer.parseInt(parts[0]);
-        int minor = Integer.parseInt(parts[1]);
-        if (major < 20) {
-            return null; // 1.20.1's 47.x is handled above; the oldest
-                         // scheme-based build is 20.2 (MC 1.20.2)
+        if (major == 20 || major == 21) {
+            // Legacy scheme (MC 1.20–1.21): 1.{major}.{minor}
+            return minor == 0 ? "1." + major
+                    : "1." + major + "." + minor;
         }
-        return minor == 0 ? "1." + major : "1." + major + "." + minor;
+        if (major >= 22 && parts.length >= 3) {
+            // Modern scheme (MC 26.x): every component but the last
+            // (the build) forms the MC version; a ".0" patch marks
+            // the 2-part MC version (26.1.0.x → 26.1)
+            String[] mcParts = new String[parts.length - 1];
+            System.arraycopy(parts, 0, mcParts, 0, mcParts.length);
+            if (mcParts.length == 3 && "0".equals(mcParts[2])) {
+                return mcParts[0] + "." + mcParts[1];
+            }
+            return String.join(".", mcParts);
+        }
+        return null;
     }
 
     /**
-     * Parses NeoForge maven-metadata.xml and keeps only versions
-     * matching the requested Minecraft version. Exposed for unit
-     * testing.
+     * Parses NeoForge maven-metadata.xml and keeps only builds whose
+     * decoded target Minecraft version equals the requested one.
+     * Exposed for unit testing.
      * <p>
      * The metadata lists versions ascending; the result is reversed so
      * the newest build comes first, and the newest build is flagged as
      * stable.
      */
     public List<ModLoaderVersion> parseVersions(String xml, String minecraftVersion) {
-        String prefix = neoforgePrefix(minecraftVersion);
         List<String> matching = new ArrayList<>();
 
         Matcher m = VERSION_TAG.matcher(xml);
         while (m.find()) {
             String version = m.group(1).trim();
-            if (version.startsWith(prefix)) {
+            if (minecraftVersion.equals(minecraftVersionOf(version))) {
                 matching.add(version);
             }
         }

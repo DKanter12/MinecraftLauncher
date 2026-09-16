@@ -46,12 +46,13 @@ import org.example.launcher.version.StandardVersionType;
  *       asynchronously from the loader's provider (all entries are
  *       guaranteed compatible with the chosen version).</li>
  * </ol>
- * An optional name and extra JVM arguments (e.g. {@code -Xmx4G}) can
- * be given; otherwise defaults are derived.
+ * Extra JVM arguments (e.g. {@code -Xmx4G}) can be given; the
+ * instance name is typed in freely and defaults to the loader and
+ * the Minecraft version when left empty.
  *
  * <p>There is also a <b>fixed-entry mode</b> (double-clicked version
  * browser row): loader family and Minecraft version are preset and
- * only the loader version, name and JVM arguments are chosen.</p>
+ * only the name, the loader version and JVM arguments are chosen.</p>
  */
 public class NewInstanceDialog extends Stage {
 
@@ -62,14 +63,15 @@ public class NewInstanceDialog extends Stage {
      * @param mcVersion    the target Minecraft version
      * @param loader       the selected loader version ({@code null}
      *                     for vanilla)
-     * @param name         display name (may be blank)
      * @param extraJvmArgs additional JVM launch parameters
+     * @param name         instance display name (blank means the
+     *                     automatic "Loader MC" name)
      */
     public record Result(ModLoaderType type,
                          MinecraftVersion mcVersion,
                          ModLoaderVersion loader,
-                         String name,
-                         List<String> extraJvmArgs) {
+                         List<String> extraJvmArgs,
+                         String name) {
     }
 
     private Result result;
@@ -88,8 +90,8 @@ public class NewInstanceDialog extends Stage {
     private final HBox categoryChips = new HBox(6);
     private final ListView<MinecraftVersion> versionList = new ListView<>();
     private final ComboBox<ModLoaderVersion> loaderCombo = new ComboBox<>();
-    private final TextField nameField = new TextField();
     private final TextArea jvmArgsArea = new TextArea();
+    private final TextField nameField = new TextField();
     private final ProgressIndicator loaderProgress = new ProgressIndicator();
     private final Label loaderStatusLabel = new Label();
     private final Button createButton = new Button("Create");
@@ -117,8 +119,8 @@ public class NewInstanceDialog extends Stage {
     /**
      * Fixed-entry mode (double-clicked version browser row): the
      * Minecraft version and loader family are already chosen; only
-     * the loader version (newest by default, changeable), name and
-     * JVM arguments are picked here.
+     * the loader version (newest by default, changeable) and JVM
+     * arguments are picked here.
      */
     private NewInstanceDialog(Stage owner,
                               ModLoaderRegistry registry,
@@ -147,6 +149,14 @@ public class NewInstanceDialog extends Stage {
                                 ? manifestVersions.get(0) : null);
         setTitle("New Instance"
                 + (shownVersion != null ? ": " + shownVersion.id() : ""));
+
+        // -- 0. Instance name (optional — automatic when empty) --
+        Label nameTitle = new Label("Instance name");
+        nameTitle.getStyleClass().add("section-title");
+        nameField.setPromptText("e.g. My Pack (optional)");
+        nameField.getStyleClass().add("search-field");
+        nameField.setMaxWidth(Double.MAX_VALUE);
+        VBox nameBox = new VBox(4, nameTitle, nameField);
 
         // -- 1. Loader chips --
         Label loaderTitle = new Label("Loader");
@@ -282,18 +292,12 @@ public class NewInstanceDialog extends Stage {
             HBox.setHgrow(fixedSpacer, Priority.ALWAYS);
             HBox versionRow = new HBox(8, idLabel, fixedSpacer, detailsLabel);
             versionRow.setAlignment(Pos.CENTER_LEFT);
-            versionRow.setPadding(new Insets(6, 0, 6, 0));
+            versionRow.getStyleClass().add("slot-box");
             fixedBox = new VBox(4, fixedTitle, versionRow);
         } else {
             fixedBox = new VBox();
         }
         fixedInfoBox = fixedBox;
-
-        // -- Name --
-        Label nameLabel = new Label("Name (optional)");
-        nameLabel.getStyleClass().add("section-title");
-        nameField.setPromptText("Defaults to type + version");
-        nameField.getStyleClass().add("search-field");
 
         // -- JVM args --
         Label jvmLabel = new Label(
@@ -315,8 +319,8 @@ public class NewInstanceDialog extends Stage {
                     effectiveVersion(),
                     type == ModLoaderType.VANILLA ? null
                             : loaderCombo.getValue(),
-                    nameField.getText(),
-                    parseJvmArgs(jvmArgsArea.getText()));
+                    parseJvmArgs(jvmArgsArea.getText()),
+                    nameField.getText().trim());
             close();
         });
         Button cancelButton = new Button("Cancel");
@@ -338,12 +342,12 @@ public class NewInstanceDialog extends Stage {
         }
 
         VBox content = new VBox(6,
+                nameBox,
                 loaderChipsBox,
                 categoryBox,
                 versionListBox,
                 fixedInfoBox,
                 loaderBox,
-                nameLabel, nameField,
                 jvmLabel, jvmArgsArea,
                 buttons);
         content.setPadding(new Insets(18));

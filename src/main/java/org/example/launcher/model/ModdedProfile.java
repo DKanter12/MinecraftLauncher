@@ -41,6 +41,11 @@ import org.example.launcher.service.modloader.ModLoaderType;
  *                        ["minecraft:1.21.4", "fabric-loader:0.16.9"]
  * @param extraJvmArgs    additional JVM launch parameters for this
  *                        profile (e.g. "-Xmx4G")
+ * @param memoryMb        dedicated RAM limit in megabytes, applied as
+ *                        {@code -Xmx} at launch (overrides any
+ *                        {@code -Xmx}/{@code -Xms} in
+ *                        {@code extraJvmArgs}); {@code 0} means automatic
+ *                        (no explicit limit)
  * @param createdTimeRaw     ISO-8601 creation timestamp
  * @param lastPlayedTimeRaw  ISO-8601 timestamp of the last launch,
  *                           or {@code null} if never played
@@ -55,6 +60,7 @@ public record ModdedProfile(
         String gameDirPath,
         List<String> components,
         List<String> extraJvmArgs,
+        int memoryMb,
         String createdTimeRaw,
         String lastPlayedTimeRaw) {
 

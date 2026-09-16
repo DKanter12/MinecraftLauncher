@@ -7,8 +7,10 @@ import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import com.google.gson.Gson;
@@ -129,13 +131,13 @@ public class ModdedProfileService {
      * <p>
      * The instance may be vanilla ({@code loaderType == VANILLA},
      * {@code loaderVersion} empty) or a mod loader installation. The
-     * directory name is derived from the (sanitized) instance name and
-     * made unique by appending a numeric suffix if needed. The
-     * standard folder layout is created immediately so the user can
-     * start dropping mods into {@code mods/} right away.
+     * display name defaults to the loader and the Minecraft version
+     * but can be chosen freely and renamed later; the directory name
+     * is derived from it (sanitized) and made unique by appending a
+     * numeric suffix if needed. The standard folder layout is created
+     * immediately so the user can start dropping mods into
+     * {@code mods/} right away.
      *
-     * @param name            display name (may be blank — a default
-     *                        name is derived from type and MC version)
      * @param loaderType      the instance type (VANILLA or a loader)
      * @param loaderVersion   the loader version (empty for vanilla)
      * @param minecraftVersion the target Minecraft version
@@ -143,23 +145,28 @@ public class ModdedProfileService {
      *                        launches
      * @param extraJvmArgs    additional JVM launch parameters
      *                        (may be empty)
+     * @param displayName     human-readable instance name; blank means
+     *                        the automatic "Loader MC" name
+     * @param memoryMb        dedicated RAM limit in megabytes;
+     *                        {@code <= 0} means automatic (no limit)
      * @return the created, persisted instance
      * @throws IOException if the instance cannot be persisted or the
      *                     game directory cannot be created
      */
-    public ModdedProfile createProfile(String name,
-                                       ModLoaderType loaderType,
+    public ModdedProfile createProfile(ModLoaderType loaderType,
                                        String loaderVersion,
                                        String minecraftVersion,
                                        String versionId,
-                                       List<String> extraJvmArgs) throws IOException {
+                                       List<String> extraJvmArgs,
+                                       String displayName,
+                                       int memoryMb) throws IOException {
         boolean vanilla = loaderType == ModLoaderType.VANILLA;
-        String defaultName = loaderType.displayName() + " " + minecraftVersion;
-        String displayName = (name == null || name.isBlank())
-                ? defaultName : name.trim();
+        String name = (displayName == null || displayName.isBlank())
+                ? defaultDisplayName(loaderType, minecraftVersion)
+                : displayName.trim();
 
         List<ModdedProfile> existing = loadProfiles();
-        String dirName = uniqueDirectoryName(displayName, existing);
+        String dirName = uniqueDirectoryName(name, existing);
         String now = OffsetDateTime.now().format(TIME_FORMAT);
 
         List<String> components = new ArrayList<>();
@@ -171,7 +178,7 @@ public class ModdedProfileService {
 
         ModdedProfile profile = new ModdedProfile(
                 dirName,
-                displayName,
+                name,
                 loaderType,
                 vanilla ? "" : loaderVersion,
                 minecraftVersion,
@@ -179,6 +186,7 @@ public class ModdedProfileService {
                 "profiles/" + dirName,
                 List.copyOf(components),
                 extraJvmArgs == null ? List.of() : List.copyOf(extraJvmArgs),
+                normalizeMemory(memoryMb),
                 now,
                 null);
 
@@ -214,34 +222,62 @@ public class ModdedProfileService {
     }
 
     /**
-     * Updates a profile's display name and extra JVM launch arguments.
+     * Updates a profile's display name, extra JVM launch arguments
+     * and memory limit.
      * <p>
-     * The profile id and game directory stay fixed, so the mods, configs
-     * and saves in the profile directory are never orphaned by an edit.
+     * Renaming also renames the game directory (and the profile id,
+     * which follows the folder), so the folder always matches the
+     * launcher name; mods, saves and builds move along untouched. A
+     * blank name keeps the current one. When the target folder cannot
+     * be renamed (e.g. the game is running from it), nothing is
+     * persisted and an error is thrown.
      *
      * @param id            the profile to update
-     * @param newName       new display name (blank keeps the current one)
      * @param extraJvmArgs  new JVM launch parameters (may be empty)
+     * @param displayName   new display name (blank keeps the old one)
+     * @param memoryMb      new RAM limit in megabytes;
+     *                      {@code <= 0} means automatic (no limit)
      * @return the updated profile, or empty if no profile with this id
      *         exists
      * @throws IOException if the profile list cannot be persisted
      */
     public Optional<ModdedProfile> updateProfile(String id,
-                                                 String newName,
-                                                 List<String> extraJvmArgs)
+                                                 List<String> extraJvmArgs,
+                                                 String displayName,
+                                                 int memoryMb)
             throws IOException {
         List<ModdedProfile> profiles = loadProfiles();
         for (int i = 0; i < profiles.size(); i++) {
             ModdedProfile p = profiles.get(i);
             if (p.id().equals(id)) {
-                String name = (newName == null || newName.isBlank())
-                        ? p.name() : newName.trim();
+                String name = (displayName == null || displayName.isBlank())
+                        ? p.name() : displayName.trim();
+                // Renaming also renames the folder, so it always
+                // matches the launcher name; the id follows the
+                // folder. Mods, saves and builds move along untouched.
+                String dirName = uniqueDirectoryName(name, profiles, p.id());
+                if (!dirName.equals(p.id())) {
+                    Path source = storage.moddedProfileDir(p.id());
+                    Path target = storage.moddedProfileDir(dirName);
+                    try {
+                        if (Files.exists(source)) {
+                            Files.move(source, target);
+                        }
+                    } catch (IOException e) {
+                        throw new IOException(
+                                "Could not rename the instance folder "
+                                + "(is the game running?): "
+                                + e.getMessage(), e);
+                    }
+                }
                 ModdedProfile updated = new ModdedProfile(
-                        p.id(), name, p.loaderType(), p.loaderVersion(),
-                        p.minecraftVersion(), p.versionId(), p.gameDirPath(),
+                        dirName, name, p.loaderType(), p.loaderVersion(),
+                        p.minecraftVersion(), p.versionId(),
+                        "profiles/" + dirName,
                         p.components(),
                         extraJvmArgs == null ? List.of()
                                 : List.copyOf(extraJvmArgs),
+                        normalizeMemory(memoryMb),
                         p.createdTimeRaw(), p.lastPlayedTimeRaw());
                 profiles.set(i, updated);
                 saveProfiles(profiles);
@@ -262,7 +298,7 @@ public class ModdedProfileService {
                 profiles.set(i, new ModdedProfile(
                         p.id(), p.name(), p.loaderType(), p.loaderVersion(),
                         p.minecraftVersion(), p.versionId(), p.gameDirPath(),
-                        p.components(), p.extraJvmArgs(),
+                        p.components(), p.extraJvmArgs(), p.memoryMb(),
                         p.createdTimeRaw(),
                         OffsetDateTime.now().format(TIME_FORMAT)));
                 break;
@@ -304,6 +340,17 @@ public class ModdedProfileService {
      */
     private String uniqueDirectoryName(String displayName,
                                        List<ModdedProfile> existing) {
+        return uniqueDirectoryName(displayName, existing, null);
+    }
+
+    /**
+     * Derives a filesystem-safe, unique directory name from the
+     * display name. The profile being renamed ({@code excludeId}) does
+     * not block its own name, so cosmetic renames keep their folder.
+     */
+    private String uniqueDirectoryName(String displayName,
+                                       List<ModdedProfile> existing,
+                                       String excludeId) {
         String base = sanitize(displayName);
         if (base.isBlank()) {
             base = "profile";
@@ -311,29 +358,69 @@ public class ModdedProfileService {
 
         String candidate = base;
         int suffix = 2;
-        while (isTaken(candidate, existing)) {
+        while (isTaken(candidate, existing, excludeId)) {
             candidate = base + "-" + suffix;
             suffix++;
         }
         return candidate;
     }
 
-    private boolean isTaken(String dirName, List<ModdedProfile> existing) {
-        if (existing.stream().anyMatch(p -> p.id().equals(dirName))) {
+    private boolean isTaken(String dirName, List<ModdedProfile> existing,
+                            String excludeId) {
+        if (existing.stream().anyMatch(p -> p.id().equals(dirName)
+                && !p.id().equals(excludeId))) {
             return true;
         }
-        return Files.exists(storage.moddedProfileDir(dirName));
+        Path dir = storage.moddedProfileDir(dirName);
+        if (excludeId != null
+                && dir.equals(storage.moddedProfileDir(excludeId))) {
+            return false;
+        }
+        return Files.exists(dir);
     }
 
     /**
-     * Keeps only safe filename characters ([A-Za-z0-9_-]); everything
-     * else collapses to a single dash.
+     * Keeps only safe filename characters ([A-Za-z0-9_-]); Cyrillic
+     * letters are transliterated first (so "Моя сборка" becomes
+     * "moya-sborka"), everything else collapses to a single dash.
      */
     static String sanitize(String name) {
         if (name == null) return "";
-        return name.replaceAll("[^A-Za-z0-9_-]+", "-")
-                .replaceAll("^-+|-+$", "")
-                .toLowerCase(Locale.ROOT);
+        String lower = name.toLowerCase(Locale.ROOT);
+        StringBuilder latin = new StringBuilder(lower.length());
+        for (int i = 0; i < lower.length();) {
+            int codePoint = lower.codePointAt(i);
+            String mapped = TRANSLIT.get(codePoint);
+            if (mapped != null) {
+                latin.append(mapped);
+            } else {
+                latin.appendCodePoint(codePoint);
+            }
+            i += Character.charCount(codePoint);
+        }
+        return latin.toString().replaceAll("[^a-z0-9_-]+", "-")
+                .replaceAll("^-+|-+$", "");
+    }
+
+    /** Cyrillic → Latin, so folders stay readable ASCII. */
+    private static final Map<Integer, String> TRANSLIT = buildTranslit();
+
+    private static Map<Integer, String> buildTranslit() {
+        Map<Integer, String> map = new HashMap<>();
+        String[][] pairs = {
+            {"а", "a"}, {"б", "b"}, {"в", "v"}, {"г", "g"}, {"д", "d"},
+            {"е", "e"}, {"ё", "yo"}, {"ж", "zh"}, {"з", "z"}, {"и", "i"},
+            {"й", "y"}, {"к", "k"}, {"л", "l"}, {"м", "m"}, {"н", "n"},
+            {"о", "o"}, {"п", "p"}, {"р", "r"}, {"с", "s"}, {"т", "t"},
+            {"у", "u"}, {"ф", "f"}, {"х", "h"}, {"ц", "ts"}, {"ч", "ch"},
+            {"ш", "sh"}, {"щ", "shch"}, {"ъ", ""}, {"ы", "y"}, {"ь", ""},
+            {"э", "e"}, {"ю", "yu"}, {"я", "ya"},
+            {"ґ", "g"}, {"є", "ye"}, {"і", "i"}, {"ї", "yi"},
+        };
+        for (String[] pair : pairs) {
+            map.put(pair[0].codePointAt(0), pair[1]);
+        }
+        return Map.copyOf(map);
     }
 
     // ------------------------------------------------------------------
@@ -351,6 +438,7 @@ public class ModdedProfileService {
         obj.addProperty("gameDirPath", p.gameDirPath());
         obj.add("components", stringArray(p.components()));
         obj.add("extraJvmArgs", stringArray(p.extraJvmArgs()));
+        obj.addProperty("memoryMb", p.memoryMb());
         obj.addProperty("createdTime", p.createdTimeRaw());
         if (p.lastPlayedTimeRaw() != null) {
             obj.addProperty("lastPlayedTime", p.lastPlayedTimeRaw());
@@ -371,12 +459,13 @@ public class ModdedProfileService {
 
             List<String> components = stringList(obj, "components");
             List<String> extraJvmArgs = stringList(obj, "extraJvmArgs");
+            int memoryMb = normalizeMemory(optionalInt(obj, "memoryMb"));
             String created = optionalString(obj, "createdTime");
             String lastPlayed = optionalString(obj, "lastPlayedTime");
 
             return new ModdedProfile(id, name, loaderType, loaderVersion,
                     minecraftVersion, versionId, gameDirPath, components,
-                    extraJvmArgs, created, lastPlayed);
+                    extraJvmArgs, memoryMb, created, lastPlayed);
         } catch (Exception e) {
             // Skip corrupt entries rather than failing the whole list
             return null;
@@ -413,5 +502,66 @@ public class ModdedProfileService {
     private static String optionalString(JsonObject obj, String key) {
         return obj.has(key) && obj.get(key).isJsonPrimitive()
                 ? obj.get(key).getAsString() : null;
+    }
+
+    private static int optionalInt(JsonObject obj, String key) {
+        if (!obj.has(key) || !obj.get(key).isJsonPrimitive()) {
+            return 0;
+        }
+        try {
+            return obj.get(key).getAsInt();
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Names, memory and effective launch arguments
+    // ------------------------------------------------------------------
+
+    /** The automatic display name: "Loader MC" (e.g. "Forge 1.20.1"). */
+    public static String defaultDisplayName(ModLoaderType loaderType,
+                                            String minecraftVersion) {
+        return loaderType.displayName() + " " + minecraftVersion;
+    }
+
+    /** Normalizes a RAM limit: {@code <= 0} means automatic. */
+    public static int normalizeMemory(int memoryMb) {
+        return Math.max(0, memoryMb);
+    }
+
+    /**
+     * Short human form of a RAM limit: "4 GB", "512 MB" or "Auto".
+     */
+    public static String formatMemory(int memoryMb) {
+        if (memoryMb <= 0) {
+            return "Auto";
+        }
+        if (memoryMb >= 1024 && memoryMb % 1024 == 0) {
+            return (memoryMb / 1024) + " GB";
+        }
+        return memoryMb + " MB";
+    }
+
+    /**
+     * The JVM arguments actually used at launch: the configured
+     * memory limit first (as {@code -Xmx}), then the profile's extra
+     * arguments with any conflicting {@code -Xmx}/{@code -Xms}
+     * removed. Without a configured limit the extra arguments are
+     * used as-is.
+     */
+    public static List<String> effectiveJvmArgs(ModdedProfile profile) {
+        if (profile.memoryMb() <= 0) {
+            return profile.extraJvmArgs();
+        }
+        List<String> args = new ArrayList<>();
+        args.add("-Xmx" + profile.memoryMb() + "M");
+        for (String arg : profile.extraJvmArgs()) {
+            if (arg.matches("-Xmx\\d+[mMgG]") || arg.matches("-Xms\\d+[mMgG]")) {
+                continue;
+            }
+            args.add(arg);
+        }
+        return List.copyOf(args);
     }
 }

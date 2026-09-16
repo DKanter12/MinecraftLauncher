@@ -80,6 +80,20 @@ public class ProfileService {
                 .findFirst();
     }
 
+    /**
+     * Removes the profile with the given name and saves.
+     *
+     * @return true when a profile was removed
+     */
+    public boolean deleteProfile(String name) throws IOException {
+        var profiles = new ArrayList<>(loadProfiles());
+        boolean removed = profiles.removeIf(p -> p.name().equals(name));
+        if (removed) {
+            saveProfiles(profiles);
+        }
+        return removed;
+    }
+
     // ------------------------------------------------------------------
     //  Parsing (pure, testable)
     // ------------------------------------------------------------------

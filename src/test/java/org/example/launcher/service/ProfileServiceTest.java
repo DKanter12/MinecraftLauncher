@@ -143,4 +143,19 @@ class ProfileServiceTest {
         assertTrue(service.findByName("Finder").isPresent());
         assertTrue(service.findByName("NonExistent").isEmpty());
     }
+
+    @Test
+    @DisplayName("deleteProfile removes the profile and keeps the rest")
+    void deleteProfile(@TempDir Path dir) throws IOException {
+        ProfileService service = new ProfileService(dir.resolve("launcher_profiles.json"));
+        service.addOfflineProfile("Keeper");
+        service.addOfflineProfile("Gone");
+
+        assertTrue(service.deleteProfile("Gone"));
+        assertFalse(service.deleteProfile("Gone"));
+
+        List<GameProfile> loaded = service.loadProfiles();
+        assertEquals(1, loaded.size());
+        assertEquals("Keeper", loaded.get(0).name());
+    }
 }

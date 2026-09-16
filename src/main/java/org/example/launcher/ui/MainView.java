@@ -1,6 +1,8 @@
 package org.example.launcher.ui;
 
 import java.time.format.DateTimeFormatter;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -21,22 +23,34 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 
+import org.example.launcher.distribution.RemoteBuildService;
+import org.example.launcher.distribution.ServerAuthService;
+import org.example.launcher.distribution.ServerSession;
+import org.example.launcher.distribution.api.AdminLauncherServerApi;
+import org.example.launcher.distribution.api.OfflineLauncherServerApi;
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.install.InstallationResult;
 import org.example.launcher.install.InstallationService;
@@ -50,6 +64,7 @@ import org.example.launcher.model.ModLoaderVersion;
 import org.example.launcher.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.service.BuildService;
 import org.example.launcher.service.DefaultJavaResolutionService;
 import org.example.launcher.service.ElyAuthService;
 import org.example.launcher.service.JavaResolutionService;
@@ -97,6 +112,8 @@ public class MainView {
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
+    private static final String APP_VERSION = "v1.0";
+
     private final VersionService versionService;
     private final VersionMetadataService metadataService;
     private final InstallationService installationService;
@@ -117,9 +134,35 @@ public class MainView {
     private Label statusLabel;
     private boolean versionsLoadFailed = false;
 
-    // Sidebar
-    private ListView<ModdedProfile> profileListView;
-    private Button newInstanceButton;
+    // Navigation rail + views
+    private enum View {
+        INSTANCES, VERSIONS, PROFILES, SETTINGS
+    }
+
+    private View currentView = View.INSTANCES;
+    private final List<Button> navButtons = new ArrayList<>();
+    private StackPane viewStack;
+    private Label viewTitleLabel;
+    private TextField instanceSearchField;
+
+    // Instances view (cards grid)
+    private FlowPane instanceCards;
+    private ScrollPane instancesScroll;
+    private HBox instanceFilterChips;
+    private ToggleGroup instanceFilterGroup;
+    private String selectedInstanceId;
+    private String instanceSearchText = "";
+    private ModLoaderType instanceLoaderFilter;
+
+    // Other views
+    private VBox instancesView;
+    private VBox versionsView;
+    private VBox profilesView;
+    private VBox profilesBox;
+    private VBox settingsView;
+    private TextField javaPathField;
+    private Label serverSessionLabel;
+    private Label footerVersionLabel;
 
     // Version browser (center): all versions incl. modded variants
     private TextField versionSearchField;
@@ -131,6 +174,7 @@ public class MainView {
     // Version browser: actions for the selected entry
     private Label selectedVersionLabel;
     private Button loaderVersionButton;
+    private ComboBox<ModdedProfile> instanceChooser;
     private Button playVersionButton;
     private Button folderVersionButton;
     private boolean versionPlayInFlight = false;
@@ -142,21 +186,21 @@ public class MainView {
     private String loaderVersionsMcId;
     private boolean loaderVersionChanged = false;
 
-    // Instance details (right)
-    private VBox instanceDetailsContent;
-    private Label instanceEmptyLabel;
-    private Label instanceBadgeLabel;
-    private Label instanceNameLabel;
-    private Label instanceSummaryLabel;
-    private Label instanceVersionLine;
-    private Label instanceDirLine;
-    private Label instanceJvmLine;
-    private Label instanceMetaLine;
+    // Instances (cards grid)
     private List<ModdedProfile> moddedProfiles = List.of();
-    private Button playProfileButton;
-    private Button openProfileFolderButton;
-    private Button editProfileButton;
-    private Button deleteProfileButton;
+
+    // Builds (mods/configs sets) of the selected instance
+    private final BuildService buildService = new BuildService();
+
+    // Launcher server: admin-distributed builds. Without a configured
+    // server the offline API keeps the launcher fully local.
+    private final AdminLauncherServerApi serverApi = new OfflineLauncherServerApi();
+    private final ServerAuthService serverAuthService = new ServerAuthService(
+            serverApi, GameDirectory.defaultDirectory().root()
+                    .resolve(ServerAuthService.SESSION_FILE_NAME));
+    private final RemoteBuildService remoteBuildService = new RemoteBuildService(serverApi);
+    private ServerSession serverSession;
+    private Button serverButton;
 
     // Instance launch state
     private boolean javaDownloadAttempted = false;
@@ -166,8 +210,6 @@ public class MainView {
     private Button createAccountButton;
     private Button elyLoginButton;
     private ImageView avatarView;
-    private Label accountNameLabel;
-    private Label accountTypeLabel;
     private GameProfile selectedProfile;
     private boolean suppressSelectionListener = false;
     private java.util.Timer elyRefreshTimer;
@@ -216,6 +258,7 @@ public class MainView {
         this.moddedVersionService = moddedVersionService;
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
+        serverSession = serverAuthService.restoreSession().orElse(null);
         buildView();
         loadLoaderSupport();
     }
@@ -232,34 +275,47 @@ public class MainView {
         root = new BorderPane();
         root.getStyleClass().add("root-pane");
 
-        root.setTop(buildHeader());
-        root.setLeft(buildSidebar());
-        root.setCenter(buildVersionBrowser());
-        root.setRight(buildInstanceDetailsPanel());
+        instancesView = buildInstancesView();
+        versionsView = buildVersionBrowser();
+        profilesView = buildProfilesView();
+        settingsView = buildSettingsView();
+        viewStack = new StackPane(instancesView, versionsView,
+                profilesView, settingsView);
+
+        root.setTop(buildTopBar());
+        root.setLeft(buildNavRail());
+        root.setCenter(viewStack);
+        root.setBottom(buildFooter());
+        showView(View.INSTANCES);
     }
 
-    // --- Header ---
+    // --- Top bar ---
 
-    private HBox buildHeader() {
-        Label title = new Label("Minecraft Launcher");
-        title.getStyleClass().add("title-label");
+    private HBox buildTopBar() {
+        viewTitleLabel = new Label("My Instances");
+        viewTitleLabel.getStyleClass().add("view-title");
 
-        statusLabel = new Label("Loading versions...");
-        statusLabel.getStyleClass().add("status-label");
-        HBox.setHgrow(statusLabel, Priority.ALWAYS);
+        instanceSearchField = new TextField();
+        instanceSearchField.setPromptText("Search Instances...");
+        instanceSearchField.getStyleClass().add("search-field");
+        instanceSearchField.setPrefWidth(260);
+        instanceSearchField.textProperty().addListener((obs, old, val) -> {
+            instanceSearchText = val == null ? "" : val.trim().toLowerCase();
+            refreshInstanceCards();
+        });
 
-        // Account widget
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Account widget (quick switcher; full management lives in Profiles)
         avatarView = new ImageView();
-        avatarView.setFitWidth(32);
-        avatarView.setFitHeight(32);
+        avatarView.setFitWidth(28);
+        avatarView.setFitHeight(28);
         avatarView.setPreserveRatio(true);
         avatarView.setVisible(false);
 
-        Label accountLabel = new Label("Account:");
-        accountLabel.getStyleClass().add("account-label");
-
         accountCombo = new ComboBox<>();
-        accountCombo.setPrefWidth(200);
+        accountCombo.setPrefWidth(180);
         accountCombo.setPromptText("No account");
         accountCombo.setConverter(new javafx.util.StringConverter<>() {
             @Override
@@ -283,6 +339,24 @@ public class MainView {
                         updateAvatar(val);
                     }
                 });
+        // Right-click a row asks whether to delete that account
+        accountCombo.setCellFactory(list -> new ListCell<>() {
+            @Override
+            protected void updateItem(GameProfile item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setOnContextMenuRequested(null);
+                } else {
+                    setText(item.name()
+                            + (item.isElyBy() ? " [Ely.by]" : " [Offline]"));
+                    setOnContextMenuRequested(e -> {
+                        onDeleteAccount(item);
+                        e.consume();
+                    });
+                }
+            }
+        });
 
         createAccountButton = new Button("+");
         createAccountButton.getStyleClass().add("browse-java-button");
@@ -294,82 +368,150 @@ public class MainView {
         elyLoginButton.setStyle("-fx-font-size: 11px;");
         elyLoginButton.setOnAction(e -> onElyLogin());
 
-        HBox accountBox = new HBox(8, avatarView, accountLabel, accountCombo, createAccountButton, elyLoginButton);
-        accountBox.setAlignment(Pos.CENTER_LEFT);
+        serverButton = new Button("Server");
+        serverButton.getStyleClass().add("browse-java-button");
+        serverButton.setStyle("-fx-font-size: 11px;");
+        serverButton.setOnAction(e -> onServerLogin());
+        updateServerButtonText();
 
-        HBox header = new HBox(15, title, statusLabel, accountBox);
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(14, 20, 14, 20));
-        header.getStyleClass().add("header");
-        return header;
+        HBox accountBox = new HBox(8, avatarView, accountCombo,
+                createAccountButton, elyLoginButton, serverButton);
+        accountBox.setAlignment(Pos.CENTER);
+        accountBox.getStyleClass().add("account-pill");
+
+        HBox topBar = new HBox(16, viewTitleLabel, instanceSearchField,
+                spacer, accountBox);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(12, 20, 12, 20));
+        topBar.getStyleClass().add("topbar");
+        return topBar;
     }
 
-    // --- Sidebar ---
+    // --- Navigation rail ---
 
-    private VBox buildSidebar() {
-        VBox sidebar = new VBox(16);
-        sidebar.setPrefWidth(250);
-        sidebar.setMinWidth(230);
-        sidebar.setMaxWidth(300);
-        sidebar.setPadding(new Insets(16));
-        sidebar.getStyleClass().add("sidebar");
-
-        // -- Instances: the playable list (vanilla + modded) --
-        VBox instancesBox = buildInstancesPanel();
-        sidebar.getChildren().add(instancesBox);
-        return sidebar;
+    private VBox buildNavRail() {
+        VBox rail = new VBox(6);
+        rail.setPrefWidth(190);
+        rail.setPadding(new Insets(16, 10, 16, 10));
+        rail.getStyleClass().add("nav-rail");
+        addNavButton(rail, "My Instances", View.INSTANCES);
+        addNavButton(rail, "Game Versions", View.VERSIONS);
+        addNavButton(rail, "Profiles", View.PROFILES);
+        addNavButton(rail, "Settings", View.SETTINGS);
+        return rail;
     }
 
-    // --- Instances panel (sidebar) ---
+    private void addNavButton(VBox rail, String text, View view) {
+        Button button = new Button(text);
+        button.getStyleClass().add("nav-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setUserData(view);
+        button.setOnAction(e -> showView(view));
+        navButtons.add(button);
+        rail.getChildren().add(button);
+    }
 
-    private VBox buildInstancesPanel() {
-        Label title = new Label("Instances");
-        title.getStyleClass().add("section-title");
+    // --- Footer (status left, launcher info right) ---
 
-        profileListView = new ListView<>();
-        profileListView.getStyleClass().add("profile-list");
-        profileListView.setPlaceholder(new Label(
-                "No instances yet.\nPress '+ New' to create one."));
-        VBox.setVgrow(profileListView, Priority.ALWAYS);
-        profileListView.setCellFactory(list -> new javafx.scene.control.ListCell<>() {
-            @Override
-            protected void updateItem(ModdedProfile item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setGraphic(null);
-                } else {
-                    Label badge = new Label(item.loaderType().displayName());
-                    badge.getStyleClass().add(loaderBadgeStyle(item));
-                    Label name = new Label(item.name());
-                    name.getStyleClass().add("profile-name");
-                    Label summary = new Label(item.summary());
-                    summary.getStyleClass().add("profile-summary");
-                    VBox content = new VBox(2, new HBox(6, badge, name), summary);
-                    setText(null);
-                    setGraphic(content);
-                }
+    private HBox buildFooter() {
+        statusLabel = new Label("Loading versions...");
+        statusLabel.getStyleClass().add("status-label");
+        HBox.setHgrow(statusLabel, Priority.ALWAYS);
+
+        footerVersionLabel = new Label("Launcher " + APP_VERSION);
+        footerVersionLabel.getStyleClass().add("footer-version");
+
+        HBox footer = new HBox(12, statusLabel, footerVersionLabel);
+        footer.setAlignment(Pos.CENTER_LEFT);
+        footer.setPadding(new Insets(8, 20, 8, 20));
+        footer.getStyleClass().add("footer");
+        return footer;
+    }
+
+    // --- Instances view: filter chips + cards grid ---
+
+    private VBox buildInstancesView() {
+        instanceFilterChips = new HBox(8);
+        instanceFilterChips.getStyleClass().add("filter-row");
+        instanceFilterGroup = new ToggleGroup();
+        addInstanceFilterChip("All", null);
+        for (ModLoaderType loader : ModLoaderType.values()) {
+            addInstanceFilterChip(loader.displayName(), loader);
+        }
+
+        instanceCards = new FlowPane();
+        instanceCards.setHgap(14);
+        instanceCards.setVgap(14);
+        instanceCards.setPadding(new Insets(4));
+        instanceCards.getStyleClass().add("cards-flow");
+
+        instancesScroll = new ScrollPane(instanceCards);
+        instancesScroll.setFitToWidth(true);
+        instancesScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        instancesScroll.getStyleClass().add("cards-scroll");
+        VBox.setVgrow(instancesScroll, Priority.ALWAYS);
+
+        VBox view = new VBox(10, instanceFilterChips, instancesScroll);
+        view.setPadding(new Insets(16));
+        VBox.setVgrow(view, Priority.ALWAYS);
+        return view;
+    }
+
+    private void addInstanceFilterChip(String text, ModLoaderType loader) {
+        ToggleButton chip = new ToggleButton(text);
+        chip.getStyleClass().add("filter-button");
+        chip.setToggleGroup(instanceFilterGroup);
+        chip.setUserData(loader);
+        chip.setSelected(loader == null);
+        chip.setOnAction(e -> {
+            // A single-choice filter never goes empty: clicking the
+            // active chip again keeps it
+            if (!chip.isSelected()) {
+                chip.setSelected(true);
+                return;
             }
+            instanceLoaderFilter = (ModLoaderType) chip.getUserData();
+            refreshInstanceCards();
         });
-        profileListView.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, val) -> {
-                    updateProfileButtons();
-                    updateInstanceDetails();
-                });
-
-        newInstanceButton = new Button("+ New");
-        newInstanceButton.getStyleClass().add("quick-select-button");
-        newInstanceButton.setMaxWidth(Double.MAX_VALUE);
-        newInstanceButton.setOnAction(e -> onNewInstance());
-
-        VBox panel = new VBox(6, title, profileListView, newInstanceButton);
-        VBox.setVgrow(panel, Priority.ALWAYS);
-        return panel;
+        instanceFilterChips.getChildren().add(chip);
     }
 
-    /** CSS badge style per instance type. */
-    private static String loaderBadgeStyle(ModdedProfile profile) {
-        return loaderBadgeStyle(profile.loaderType());
+    /** Switches the center view and updates the title, search and nav. */
+    private void showView(View view) {
+        currentView = view;
+        instancesView.setVisible(view == View.INSTANCES);
+        instancesView.setManaged(view == View.INSTANCES);
+        versionsView.setVisible(view == View.VERSIONS);
+        versionsView.setManaged(view == View.VERSIONS);
+        profilesView.setVisible(view == View.PROFILES);
+        profilesView.setManaged(view == View.PROFILES);
+        settingsView.setVisible(view == View.SETTINGS);
+        settingsView.setManaged(view == View.SETTINGS);
+        viewTitleLabel.setText(switch (view) {
+            case INSTANCES -> "My Instances";
+            case VERSIONS -> "Game Versions";
+            case PROFILES -> "Profiles";
+            case SETTINGS -> "Settings";
+        });
+        instanceSearchField.setVisible(view == View.INSTANCES);
+        instanceSearchField.setManaged(view == View.INSTANCES);
+        for (Button nav : navButtons) {
+            boolean active = nav.getUserData() == view;
+            if (active) {
+                if (!nav.getStyleClass().contains("nav-button-active")) {
+                    nav.getStyleClass().add("nav-button-active");
+                }
+            } else {
+                nav.getStyleClass().remove("nav-button-active");
+            }
+        }
+        if (view == View.INSTANCES) {
+            refreshInstanceCards();
+        } else if (view == View.PROFILES) {
+            refreshProfilesView();
+        } else if (view == View.SETTINGS) {
+            refreshSettingsView();
+        }
     }
 
     /** CSS badge style per loader family. */
@@ -383,18 +525,389 @@ public class MainView {
         };
     }
 
-    private void updateProfileButtons() {
-        boolean hasSelection = profileListView != null
-                && profileListView.getSelectionModel().getSelectedItem() != null;
-        playProfileButton.setDisable(!hasSelection);
-        openProfileFolderButton.setDisable(!hasSelection);
-        editProfileButton.setDisable(!hasSelection);
-        deleteProfileButton.setDisable(!hasSelection);
-        // The version browser's Play follows the same lifecycle: a
-        // running launch attempt blocks it until a terminal callback
-        // (launch end/failure, game exit) refreshes the buttons
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("dd MMM yyyy");
+
+    /** The selected instance (cards grid), or null. */
+    private ModdedProfile selectedInstance() {
+        if (selectedInstanceId == null) return null;
+        for (ModdedProfile p : moddedProfiles) {
+            if (p.id().equals(selectedInstanceId)) return p;
+        }
+        return null;
+    }
+
+    /**
+     * Selects a card in place (no rebuild, so double-click to play
+     * keeps working); full rebuilds happen after data changes.
+     */
+    /**
+     * Jumps to a freshly created instance: reloads the list, moves
+     * the loader filter to its family (so the card is visible even
+     * when another family was filtered), clears the search, opens
+     * the Instances view and expands the card.
+     */
+    private void jumpToInstance(ModdedProfile profile) {
+        instanceLoaderFilter = profile.loaderType();
+        syncInstanceFilterChips();
+        if (!instanceSearchField.getText().isEmpty()) {
+            instanceSearchField.clear();
+        }
+        showView(View.INSTANCES);
+        refreshModdedProfiles(profile.id());
+    }
+
+    /** Reflects {@link #instanceLoaderFilter} in the filter chips. */
+    private void syncInstanceFilterChips() {
+        if (instanceFilterChips == null) return;
+        for (var node : instanceFilterChips.getChildren()) {
+            if (node instanceof ToggleButton chip) {
+                Object family = chip.getUserData();
+                chip.setSelected(family == null
+                        ? instanceLoaderFilter == null
+                        : family == instanceLoaderFilter);
+            }
+        }
+    }
+
+    private void selectInstance(String id) {
+        if (id != null && id.equals(selectedInstanceId)) return;
+        selectedInstanceId = id;
+        if (instanceCards == null) return;
+        for (javafx.scene.Node node : instanceCards.getChildren()) {
+            Object key = node.getUserData();
+            if (!(key instanceof String)) continue;
+            boolean sel = key.equals(selectedInstanceId);
+            if (sel) {
+                if (!node.getStyleClass().contains("instance-card-selected")) {
+                    node.getStyleClass().add("instance-card-selected");
+                }
+            } else {
+                node.getStyleClass().remove("instance-card-selected");
+            }
+            Object details = node.getProperties().get("details");
+            if (details instanceof Region region) {
+                region.setVisible(sel);
+                region.setManaged(sel);
+            }
+        }
+    }
+
+    /**
+     * Re-enables every Play button after a launch attempt reaches a
+     * terminal state (launched, failed, repaired or game exited).
+     */
+    private void refreshLaunchButtons() {
         versionPlayInFlight = false;
         updateVersionActionBar();
+        refreshInstanceCards();
+    }
+
+    /** Rebuilds the cards grid from the current filter + search. */
+    private void refreshInstanceCards() {
+        if (instanceCards == null) return;
+        double scroll = instancesScroll != null
+                ? instancesScroll.getVvalue() : 0;
+        instanceCards.getChildren().clear();
+        List<ModdedProfile> shown = new ArrayList<>();
+        for (ModdedProfile p : moddedProfiles) {
+            if (instanceLoaderFilter != null
+                    && p.loaderType() != instanceLoaderFilter) {
+                continue;
+            }
+            if (!instanceSearchText.isEmpty()) {
+                String haystack = (p.name() + " " + p.minecraftVersion()
+                        + " " + p.loaderType().displayName()
+                        + " " + p.versionId()).toLowerCase();
+                if (!haystack.contains(instanceSearchText)) continue;
+            }
+            shown.add(p);
+        }
+        shown.sort(Comparator
+                .comparing((ModdedProfile p) -> p.lastPlayedTime().orElse(null),
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                .reversed()
+                .thenComparing(p -> p.name().toLowerCase()));
+        for (ModdedProfile p : shown) {
+            instanceCards.getChildren().add(buildInstanceCard(p));
+        }
+        instanceCards.getChildren().add(buildAddInstanceCard());
+        if (scroll > 0 && instancesScroll != null) {
+            double restore = scroll;
+            Platform.runLater(() -> instancesScroll.setVvalue(restore));
+        }
+    }
+
+    private VBox buildInstanceCard(ModdedProfile profile) {
+        boolean selected = profile.id().equals(selectedInstanceId);
+        VBox card = new VBox(8);
+        card.setPrefWidth(300);
+        card.setUserData(profile.id());
+        card.getStyleClass().addAll("instance-card",
+                accentClass(profile.loaderType()));
+        if (selected) {
+            card.getStyleClass().add("instance-card-selected");
+        }
+
+        Label icon = new Label(iconText(profile.loaderType()));
+        icon.getStyleClass().addAll("instance-icon",
+                accentClass(profile.loaderType()));
+
+        Label name = new Label(profile.name());
+        name.getStyleClass().add("instance-card-name");
+        name.setWrapText(true);
+        Label sub = new Label(cardSubLine(profile));
+        sub.getStyleClass().add("instance-card-sub");
+        Label played = new Label(cardPlayedLine(profile));
+        played.getStyleClass().add("instance-card-sub");
+        VBox titles = new VBox(2, name, sub, played);
+
+        HBox top = new HBox(10, icon, titles);
+        top.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(titles, Priority.ALWAYS);
+        card.getChildren().add(top);
+
+        if (!profile.isVanilla()) {
+            Label buildLine = new Label(activeBuildText(profile));
+            buildLine.getStyleClass().add("instance-card-build");
+            buildLine.setWrapText(true);
+            card.getChildren().add(buildLine);
+        }
+
+        Button play = new Button("Play");
+        play.getStyleClass().add("card-play");
+        play.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(play, Priority.ALWAYS);
+        play.setDisable(versionPlayInFlight);
+        play.setOnAction(e -> {
+            selectInstance(profile.id());
+            startInstanceLaunch(profile);
+        });
+
+        Button folder = new Button("Folder");
+        folder.getStyleClass().add("card-ghost-button");
+        folder.setOnAction(e -> onOpenProfileFolder(profile));
+
+        Button edit = new Button("Edit");
+        edit.getStyleClass().add("card-ghost-button");
+        edit.setOnAction(e -> onEditProfile(profile));
+
+        Button more = new Button("...");
+        more.getStyleClass().add("card-ghost-button");
+        more.setOnAction(e -> showCardMenu(more, profile));
+
+        HBox actions = new HBox(6, play, folder, edit, more);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        card.getChildren().add(actions);
+
+        VBox details = buildInstanceDetails(profile);
+        details.setVisible(selected);
+        details.setManaged(selected);
+        card.getProperties().put("details", details);
+        card.getChildren().add(details);
+
+        card.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                selectInstance(profile.id());
+                if (!versionPlayInFlight) {
+                    startInstanceLaunch(profile);
+                }
+            } else {
+                selectInstance(profile.id());
+            }
+        });
+        return card;
+    }
+
+    /** Expanded block of the selected card: facts + builds + delete. */
+    private VBox buildInstanceDetails(ModdedProfile profile) {
+        VBox details = new VBox(3);
+        details.getStyleClass().add("instance-card-details");
+        details.getChildren().add(detailLine("MC " + profile.minecraftVersion()
+                + (profile.isVanilla() ? " (vanilla)"
+                        : "  ·  " + profile.loaderType().displayName()
+                                + " " + profile.loaderVersion())));
+        Path dir = moddedProfileService.resolveGameDir(profile);
+        details.getChildren().add(detailLine("Game Dir:  .../"
+                + shortGameDir(dir)));
+        details.getChildren().add(detailLine("Memory:  "
+                + ModdedProfileService.formatMemory(profile.memoryMb())));
+        details.getChildren().add(detailLine("JVM Args:  "
+                + (profile.extraJvmArgs().isEmpty()
+                        ? "None" : String.join(" ", profile.extraJvmArgs()))));
+        details.getChildren().add(detailLine("Created:  "
+                + profile.createdTime().map(MainView::formatDate).orElse("—")));
+
+        if (!profile.isVanilla()) {
+            Button selectBuild = new Button("Select Build");
+            selectBuild.getStyleClass().add("card-small-button");
+            selectBuild.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(selectBuild, Priority.ALWAYS);
+            selectBuild.setOnAction(e -> onSelectBuild(profile));
+            Button saveBuild = new Button("Save Build");
+            saveBuild.getStyleClass().add("card-small-button");
+            saveBuild.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(saveBuild, Priority.ALWAYS);
+            saveBuild.setOnAction(e -> onSaveBuild(profile));
+            Button serverBuilds = new Button("Server Builds");
+            serverBuilds.getStyleClass().add("card-small-button");
+            serverBuilds.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(serverBuilds, Priority.ALWAYS);
+            serverBuilds.setOnAction(e -> onServerBuilds(profile));
+            HBox buildsRow = new HBox(6, selectBuild, saveBuild, serverBuilds);
+            details.getChildren().add(buildsRow);
+        }
+
+        Button delete = new Button("Delete");
+        delete.getStyleClass().add("card-danger-button");
+        delete.setMaxWidth(Double.MAX_VALUE);
+        delete.setOnAction(e -> onDeleteProfile(profile));
+        details.getChildren().add(delete);
+        return details;
+    }
+
+    private static Label detailLine(String text) {
+        Label line = new Label(text);
+        line.getStyleClass().add("instance-card-detail-line");
+        line.setWrapText(true);
+        return line;
+    }
+
+    private void showCardMenu(Button anchor, ModdedProfile profile) {
+        ContextMenu menu = new ContextMenu();
+        if (!profile.isVanilla()) {
+            MenuItem selectBuild = new MenuItem("Select Build");
+            selectBuild.setOnAction(e -> onSelectBuild(profile));
+            MenuItem saveBuild = new MenuItem("Save Build");
+            saveBuild.setOnAction(e -> onSaveBuild(profile));
+            MenuItem serverBuilds = new MenuItem("Server Builds");
+            serverBuilds.setOnAction(e -> onServerBuilds(profile));
+            menu.getItems().addAll(selectBuild, saveBuild, serverBuilds);
+        }
+        MenuItem delete = new MenuItem("Delete Instance");
+        delete.getStyleClass().add("menu-item-danger");
+        delete.setOnAction(e -> onDeleteProfile(profile));
+        menu.getItems().add(delete);
+        menu.show(anchor, javafx.geometry.Side.BOTTOM, 0, 0);
+    }
+
+    private VBox buildAddInstanceCard() {
+        Label plus = new Label("+");
+        plus.getStyleClass().add("add-instance-plus");
+        Label text = new Label("Add New Instance");
+        text.getStyleClass().add("add-instance-text");
+        VBox card = new VBox(6, plus, text);
+        card.setAlignment(Pos.CENTER);
+        card.setPrefWidth(300);
+        card.setMinHeight(190);
+        card.getStyleClass().add("add-instance-card");
+        card.setCursor(javafx.scene.Cursor.HAND);
+        card.setOnMouseClicked(e -> onNewInstance());
+        return card;
+    }
+
+    /** Accent style per loader family, like the reference mockup. */
+    private static String accentClass(ModLoaderType type) {
+        return switch (type) {
+            case VANILLA -> "accent-vanilla";
+            case FABRIC -> "accent-fabric";
+            case FORGE -> "accent-forge";
+            case NEOFORGE -> "accent-neoforge";
+            case QUILT -> "accent-quilt";
+        };
+    }
+
+    private static String iconText(ModLoaderType type) {
+        return switch (type) {
+            case VANILLA -> "V";
+            case FABRIC -> "Fb";
+            case FORGE -> "Fo";
+            case NEOFORGE -> "N";
+            case QUILT -> "Q";
+        };
+    }
+
+    private String cardSubLine(ModdedProfile profile) {
+        if (profile.isVanilla()) {
+            return "MC " + profile.minecraftVersion();
+        }
+        int mods = modsCount(profile);
+        return profile.loaderType().displayName() + " "
+                + profile.minecraftVersion()
+                + (mods < 0 ? "" : "  (" + mods + " Mods)");
+    }
+
+    private String cardPlayedLine(ModdedProfile profile) {
+        if (profile.lastPlayedTime().isPresent()) {
+            return "Last played: "
+                    + relativeTime(profile.lastPlayedTime().get());
+        }
+        return profile.createdTime()
+                .map(t -> "Created: " + relativeTime(t))
+                .orElse("Never played");
+    }
+
+    /** Counts mod jars; negative when unreadable. */
+    private int modsCount(ModdedProfile profile) {
+        try {
+            Path mods = moddedProfileService.resolveGameDir(profile)
+                    .resolve("mods");
+            if (!Files.isDirectory(mods)) {
+                return profile.isVanilla() ? -1 : 0;
+            }
+            try (var stream = Files.list(mods)) {
+                return (int) stream
+                        .filter(f -> f.getFileName().toString()
+                                .endsWith(".jar"))
+                        .count();
+            }
+        } catch (IOException e) {
+            return -1;
+        }
+    }
+
+    private String activeBuildText(ModdedProfile profile) {
+        Path dir = moddedProfileService.resolveGameDir(profile);
+        String active = buildService.selectedBuild(dir).orElse(null);
+        return active == null ? "No build selected"
+                : "Active build: " + active;
+    }
+
+    private static String shortGameDir(Path dir) {
+        Path root = GameDirectory.defaultDirectory().root();
+        try {
+            return root.relativize(dir).toString();
+        } catch (IllegalArgumentException e) {
+            return dir.toString();
+        }
+    }
+
+    private static String relativeTime(OffsetDateTime time) {
+        Duration age = Duration.between(time, OffsetDateTime.now());
+        if (age.isNegative()) {
+            age = Duration.ZERO;
+        }
+        long minutes = age.toMinutes();
+        if (minutes < 1) return "just now";
+        if (minutes < 60) {
+            return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
+        }
+        long hours = age.toHours();
+        if (hours < 24) {
+            return hours + (hours == 1 ? " hour ago" : " hours ago");
+        }
+        long days = age.toDays();
+        if (days == 1) return "Yesterday";
+        if (days < 7) return days + " days ago";
+        long weeks = days / 7;
+        if (weeks < 5) {
+            return weeks + (weeks == 1 ? " week ago" : " weeks ago");
+        }
+        return formatDate(time);
+    }
+
+    private static String formatDate(OffsetDateTime time) {
+        return DATE_FORMATTER.format(time);
     }
 
     // ------------------------------------------------------------------
@@ -525,15 +1038,52 @@ public class MainView {
                         + "none selected shows all versions.");
         hint.getStyleClass().add("quick-select-label");
 
-        // -- Actions for the selected version: play it, open its
-        //    directory, and for modded entries pick the loader version
-        //    (newest by default, changeable) --
+        // -- Actions for the selected version: pick the instance to
+        //    play (named automatically after the version), open its
+        //    directory, and for modded entries pick the loader
+        //    version (newest by default, changeable). Mods sets are
+        //    managed as builds in the instance panel --
         selectedVersionLabel = new Label("Select a version to play");
         selectedVersionLabel.getStyleClass().add("details-info");
 
         loaderVersionButton = new Button("Loader version");
         loaderVersionButton.getStyleClass().add("quick-select-button");
         loaderVersionButton.setOnAction(e -> onChangeLoaderVersion());
+
+        Region actionSpacer = new Region();
+        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
+        HBox versionActionTop = new HBox(8, selectedVersionLabel,
+                actionSpacer, loaderVersionButton);
+        versionActionTop.setAlignment(Pos.CENTER_LEFT);
+
+        instanceChooser = new ComboBox<>();
+        instanceChooser.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(instanceChooser, Priority.ALWAYS);
+        instanceChooser.setPromptText("Not installed yet — Play creates it");
+        instanceChooser.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ModdedProfile profile) {
+                if (profile == null) {
+                    return "";
+                }
+                return profile.name() + " · last played "
+                        + profile.lastPlayedTime().map(TIME_FORMATTER::format)
+                                .orElse("never");
+            }
+
+            @Override
+            public ModdedProfile fromString(String string) {
+                return null;
+            }
+        });
+        // Choosing an instance also selects its card, so its
+        // details (incl. builds) show up expanded
+        instanceChooser.getSelectionModel().selectedItemProperty().addListener(
+                (obs, old, val) -> {
+                    if (val != null) {
+                        selectInstance(val.id());
+                    }
+                });
 
         playVersionButton = new Button("Play");
         playVersionButton.getStyleClass().add("play-button-compact");
@@ -545,16 +1095,16 @@ public class MainView {
         folderVersionButton.setDisable(true);
         folderVersionButton.setOnAction(e -> onOpenSelectedVersionFolder());
 
-        Region actionSpacer = new Region();
-        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
-        HBox versionActionBar = new HBox(8, selectedVersionLabel,
-                actionSpacer, loaderVersionButton, playVersionButton,
-                folderVersionButton);
+        HBox versionActionBar = new HBox(8, instanceChooser,
+                playVersionButton, folderVersionButton);
         versionActionBar.setAlignment(Pos.CENTER_LEFT);
 
         VBox browser = new VBox(8, versionBrowserTitle, versionSearchField,
-                versionFilterChips, versionListView, versionActionBar, hint);
+                versionFilterChips, versionListView, versionActionTop,
+                versionActionBar, hint);
         browser.setPadding(new Insets(16));
+        browser.getStyleClass().add("center-panel");
+        versionsView = browser;
         return browser;
     }
 
@@ -732,6 +1282,7 @@ public class MainView {
             selectedLoaderVersions = List.of();
             loaderVersionsFamily = null;
             loaderVersionsMcId = null;
+            updateInstanceChooser();
             updateVersionActionBar();
             return;
         }
@@ -741,12 +1292,14 @@ public class MainView {
                 && mcId.equals(loaderVersionsMcId)
                 && !selectedLoaderVersions.isEmpty()) {
             selectedLoaderVersion = selectedLoaderVersions.get(0);
+            updateInstanceChooser();
             updateVersionActionBar();
             return;
         }
         loaderVersionsFamily = family;
         loaderVersionsMcId = mcId;
         selectedLoaderVersions = List.of();
+        updateInstanceChooser();
         updateVersionActionBar();
 
         var regEntry = modLoaderRegistry.get(family).orElse(null);
@@ -778,6 +1331,7 @@ public class MainView {
                 selectedLoaderVersions = versions;
                 selectedLoaderVersion =
                         versions.isEmpty() ? null : versions.get(0);
+                updateInstanceChooser();
                 updateVersionActionBar();
             });
         }, "browser-loader-versions");
@@ -859,16 +1413,20 @@ public class MainView {
         if (picked != null) {
             selectedLoaderVersion = picked;
             loaderVersionChanged = true;
+            // An instance with this loader version becomes the
+            // preferred choice in the instance chooser
+            updateInstanceChooser();
             updateVersionActionBar();
         }
     }
 
     /**
-     * Plays the selected version with the same launch principle as
-     * instance Play: an existing matching instance is launched
-     * directly (verify → repair if needed → launch); otherwise the
-     * instance is created first (installing the version if needed)
-     * and launched right after — with the newest loader version by
+     * Plays the selected version: the instance chosen in the instance
+     * chooser is launched (same principle as instance Play: verify →
+     * repair if needed → launch; a selected build replaces the mods
+     * and configs right before the game starts); with no instance
+     * yet, it is created first (installing the version if needed) and
+     * launched right after — with the newest loader version by
      * default, or the one picked via the loader version button.
      */
     private void onPlaySelectedVersion() {
@@ -876,9 +1434,16 @@ public class MainView {
                 versionListView.getSelectionModel().getSelectedItem();
         if (entry == null) return;
 
+        ModdedProfile chosen =
+                instanceChooser.getSelectionModel().getSelectedItem();
+        if (chosen != null) {
+            selectInstance(chosen.id());
+            startInstanceLaunch(chosen);
+            return;
+        }
         ModdedProfile match = findPlayableInstance(entry);
         if (match != null) {
-            profileListView.getSelectionModel().select(match);
+            selectInstance(match.id());
             startInstanceLaunch(match);
             return;
         }
@@ -892,7 +1457,7 @@ public class MainView {
         NewInstanceDialog.Result result = new NewInstanceDialog.Result(
                 entry.variant(), entry.version(),
                 entry.isVanilla() ? null : selectedLoaderVersion,
-                "", List.of());
+                List.of(), "");
         createInstance(result, true);
     }
 
@@ -937,6 +1502,76 @@ public class MainView {
     }
 
     /**
+     * Existing instances of the selected browser entry: vanilla
+     * entries match vanilla instances, modded entries match instances
+     * of the same loader family (each with its own game directory).
+     * Most recently played first.
+     */
+    private List<ModdedProfile> matchingInstances(VersionEntry entry) {
+        String mcId = entry.version().id();
+        List<ModdedProfile> matches = new ArrayList<>();
+        for (ModdedProfile p : moddedProfiles) {
+            if (!p.minecraftVersion().equals(mcId)) {
+                continue;
+            }
+            if (entry.isVanilla() ? p.isVanilla()
+                    : !p.isVanilla() && p.loaderType() == entry.variant()) {
+                matches.add(p);
+            }
+        }
+        matches.sort(Comparator
+                .comparing((ModdedProfile p) -> p.lastPlayedTime().orElse(null),
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                .reversed()
+                .thenComparing(p -> p.name().toLowerCase()));
+        return matches;
+    }
+
+    /**
+     * Syncs the instance chooser with the current browser selection
+     * and the instance list. Preference: the instance with the chosen
+     * loader version, then the previously chosen one, then the most
+     * recently played.
+     */
+    private void updateInstanceChooser() {
+        if (instanceChooser == null) return;
+        VersionEntry entry =
+                versionListView.getSelectionModel().getSelectedItem();
+        List<ModdedProfile> matches =
+                entry == null ? List.of() : matchingInstances(entry);
+        ModdedProfile previous =
+                instanceChooser.getSelectionModel().getSelectedItem();
+        instanceChooser.getItems().setAll(matches);
+        if (matches.isEmpty()) {
+            instanceChooser.getSelectionModel().clearSelection();
+            return;
+        }
+        ModdedProfile pick = null;
+        if (entry != null && !entry.isVanilla()
+                && selectedLoaderVersion != null) {
+            for (ModdedProfile p : matches) {
+                if (p.loaderVersion().equals(
+                        selectedLoaderVersion.loaderVersion())) {
+                    pick = p;
+                    break;
+                }
+            }
+        }
+        if (pick == null && previous != null) {
+            for (ModdedProfile p : matches) {
+                if (p.id().equals(previous.id())) {
+                    pick = p;
+                    break;
+                }
+            }
+        }
+        if (pick == null) {
+            pick = matches.get(0);
+        }
+        instanceChooser.getSelectionModel().select(pick);
+    }
+
+    /**
      * Opens the selected version's directory in the system file
      * manager: the instance's game directory if one exists, otherwise
      * the version's folder under {@code versions/} (or the versions
@@ -947,7 +1582,10 @@ public class MainView {
                 versionListView.getSelectionModel().getSelectedItem();
         if (entry == null) return;
         try {
-            ModdedProfile match = findPlayableInstance(entry);
+            ModdedProfile chosen =
+                    instanceChooser.getSelectionModel().getSelectedItem();
+            ModdedProfile match = chosen != null ? chosen
+                    : findPlayableInstance(entry);
             if (match != null) {
                 Path dir = moddedProfileService.resolveGameDir(match);
                 ModdedProfileService.ensureProfileFolders(dir);
@@ -976,124 +1614,386 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Right: selected instance details
+    //  Profiles view: accounts management
     // ------------------------------------------------------------------
 
-    private VBox buildInstanceDetailsPanel() {
-        instanceEmptyLabel = new Label(
-                "Select an instance —\nor create one with '+ New'.");
-        instanceEmptyLabel.getStyleClass().add("quick-select-label");
+    private VBox buildProfilesView() {
+        Button addOffline = new Button("+ Offline");
+        addOffline.getStyleClass().add("quick-select-button");
+        addOffline.setOnAction(e -> onCreateAccount());
+        Button ely = new Button("Ely.by");
+        ely.getStyleClass().add("quick-select-button");
+        ely.setOnAction(e -> onElyLogin());
+        Button server = new Button("Server");
+        server.getStyleClass().add("quick-select-button");
+        server.setOnAction(e -> {
+            onServerLogin();
+            refreshProfilesView();
+        });
+        HBox buttons = new HBox(8, addOffline, ely, server);
+        buttons.setAlignment(Pos.CENTER_LEFT);
 
-        instanceBadgeLabel = new Label();
-        instanceNameLabel = new Label();
-        instanceNameLabel.getStyleClass().add("details-version");
-        instanceSummaryLabel = new Label();
-        instanceSummaryLabel.getStyleClass().add("details-info");
+        profilesBox = new VBox(10);
+        VBox.setVgrow(profilesBox, Priority.ALWAYS);
 
-        instanceVersionLine = new Label();
-        instanceVersionLine.getStyleClass().add("metadata-item");
-        instanceDirLine = new Label();
-        instanceDirLine.getStyleClass().add("metadata-item");
-        instanceDirLine.setWrapText(true);
-        instanceJvmLine = new Label();
-        instanceJvmLine.getStyleClass().add("metadata-item");
-        instanceMetaLine = new Label();
-        instanceMetaLine.getStyleClass().add("metadata-item");
+        Label hint = new Label("The active account launches the game. "
+                + "Offline accounts need no password; Ely.by accounts "
+                + "bring skins and capes.");
+        hint.getStyleClass().add("quick-select-label");
+        hint.setWrapText(true);
 
-        playProfileButton = new Button("Play");
-        playProfileButton.getStyleClass().add("play-button");
-        playProfileButton.setDisable(true);
-        playProfileButton.setMaxWidth(Double.MAX_VALUE);
-        playProfileButton.setOnAction(e -> onPlayProfile());
-
-        openProfileFolderButton = new Button("Folder");
-        openProfileFolderButton.getStyleClass().add("quick-select-button");
-        openProfileFolderButton.setDisable(true);
-        HBox.setHgrow(openProfileFolderButton, Priority.ALWAYS);
-        openProfileFolderButton.setMaxWidth(Double.MAX_VALUE);
-        openProfileFolderButton.setOnAction(e -> onOpenProfileFolder());
-
-        editProfileButton = new Button("Edit");
-        editProfileButton.getStyleClass().add("quick-select-button");
-        editProfileButton.setDisable(true);
-        HBox.setHgrow(editProfileButton, Priority.ALWAYS);
-        editProfileButton.setMaxWidth(Double.MAX_VALUE);
-        editProfileButton.setOnAction(e -> onEditProfile());
-
-        deleteProfileButton = new Button("Delete");
-        deleteProfileButton.getStyleClass().add("quick-select-button");
-        deleteProfileButton.setDisable(true);
-        HBox.setHgrow(deleteProfileButton, Priority.ALWAYS);
-        deleteProfileButton.setMaxWidth(Double.MAX_VALUE);
-        deleteProfileButton.setOnAction(e -> onDeleteProfile());
-
-        HBox manageButtons = new HBox(6, openProfileFolderButton,
-                editProfileButton, deleteProfileButton);
-
-        VBox infoBox = new VBox(6, instanceBadgeLabel, instanceNameLabel,
-                instanceSummaryLabel, instanceVersionLine, instanceDirLine,
-                instanceJvmLine, instanceMetaLine);
-        infoBox.setAlignment(Pos.CENTER_LEFT);
-
-        instanceDetailsContent = new VBox(14, infoBox, playProfileButton,
-                manageButtons);
-        instanceDetailsContent.setAlignment(Pos.CENTER);
-        instanceDetailsContent.setMaxWidth(290);
-        instanceDetailsContent.setVisible(false);
-        instanceDetailsContent.setManaged(false);
-
-        Label title = new Label("Instance");
-        title.getStyleClass().add("section-title");
-
-        VBox panel = new VBox(10, title, instanceEmptyLabel,
-                instanceDetailsContent);
-        panel.setPrefWidth(340);
-        panel.setMinWidth(300);
-        panel.setMaxWidth(380);
-        panel.setPadding(new Insets(16));
-        panel.getStyleClass().add("metadata-panel");
-        return panel;
+        VBox view = new VBox(12, buttons, profilesBox, hint);
+        view.setPadding(new Insets(16));
+        VBox.setVgrow(view, Priority.ALWAYS);
+        return view;
     }
 
-    /** Refreshes the right-side details from the selected instance. */
-    private void updateInstanceDetails() {
-        ModdedProfile selected =
-                profileListView.getSelectionModel().getSelectedItem();
-        boolean has = selected != null;
-        if (instanceEmptyLabel != null) {
-            instanceEmptyLabel.setVisible(!has);
-            instanceEmptyLabel.setManaged(!has);
-        }
-        if (instanceDetailsContent == null) {
-            return;
-        }
-        instanceDetailsContent.setVisible(has);
-        instanceDetailsContent.setManaged(has);
-        if (!has) {
+    private void refreshProfilesView() {
+        if (profilesBox == null) return;
+        profilesBox.getChildren().clear();
+        List<GameProfile> accounts;
+        try {
+            accounts = profileService.loadProfiles();
+        } catch (IOException e) {
+            statusLabel.setText("Failed to load accounts: " + e.getMessage());
             return;
         }
 
-        instanceBadgeLabel.setText(selected.loaderType().displayName());
-        instanceBadgeLabel.getStyleClass().clear();
-        instanceBadgeLabel.getStyleClass().add(loaderBadgeStyle(selected));
+        String serverText = serverSession == null
+                ? "Launcher server: not signed in (local mode)"
+                : "Launcher server: " + serverSession.accountName()
+                        + (serverSession.isAdmin() ? " (administrator)"
+                                : " (user)");
+        Label serverLabel = new Label(serverText);
+        serverLabel.getStyleClass().add("account-row-sub");
+        HBox serverRow = new HBox(10, serverLabel);
+        serverRow.setAlignment(Pos.CENTER_LEFT);
+        serverRow.getStyleClass().add("account-row");
+        profilesBox.getChildren().add(serverRow);
 
-        instanceNameLabel.setText(selected.name());
-        instanceSummaryLabel.setText(selected.summary());
-        instanceVersionLine.setText("Version: " + selected.minecraftVersion()
-                + (selected.isVanilla() ? " (vanilla)"
-                        : " · " + selected.loaderType().displayName()
-                                + " " + selected.loaderVersion()));
-        instanceDirLine.setText("Game directory: "
-                + GameDirectory.defaultDirectory().root()
-                        .resolve(selected.gameDirPath()));
-        instanceJvmLine.setText("JVM arguments: "
-                + (selected.extraJvmArgs().isEmpty()
-                        ? "none" : String.join(" ", selected.extraJvmArgs())));
-        instanceMetaLine.setText("Created: "
-                + selected.createdTime().map(TIME_FORMATTER::format).orElse("—")
-                + " · Last played: "
-                + selected.lastPlayedTime().map(TIME_FORMATTER::format)
-                        .orElse("never"));
+        for (GameProfile account : accounts) {
+            boolean active = selectedProfile != null
+                    && selectedProfile.equals(account);
+            String initial = account.name().isEmpty() ? "?"
+                    : account.name().substring(0, 1).toUpperCase();
+            Label tile = new Label(initial);
+            tile.getStyleClass().addAll("account-tile", account.isElyBy()
+                    ? "account-tile-ely" : "account-tile-offline");
+            Label name = new Label(account.name()
+                    + (active ? "  (active)" : ""));
+            name.getStyleClass().add("account-row-name");
+            String sub = account.isElyBy() ? "Ely.by" : "Offline";
+            if (account.uuid().isPresent()) {
+                String uuid = account.uuid().get();
+                sub += "  ·  " + uuid.substring(0, Math.min(8, uuid.length()));
+            }
+            Label subLabel = new Label(sub);
+            subLabel.getStyleClass().add("account-row-sub");
+            VBox texts = new VBox(2, name, subLabel);
+            HBox.setHgrow(texts, Priority.ALWAYS);
+            Button use = new Button("Use");
+            use.getStyleClass().add("card-ghost-button");
+            use.setDisable(active);
+            use.setOnAction(e -> onUseAccount(account));
+            Button delete = new Button("Delete");
+            delete.getStyleClass().add("card-danger-button");
+            delete.setOnAction(e -> onDeleteAccount(account));
+            HBox row = new HBox(10, tile, texts, use, delete);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.getStyleClass().add("account-row");
+            if (active) {
+                row.getStyleClass().add("account-row-active");
+            }
+            profilesBox.getChildren().add(row);
+        }
+    }
+
+    private void onUseAccount(GameProfile account) {
+        selectedProfile = account;
+        saveLastSelectedAccount(account.name());
+        updateAvatar(account);
+        refreshAccounts();
+        refreshProfilesView();
+        statusLabel.setText("Active account: " + account.name());
+    }
+
+    private void onDeleteAccount(GameProfile account) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete Account");
+        alert.setHeaderText("Delete account '" + account.name() + "'?");
+        alert.setContentText("It is removed from the launcher. "
+                + "Ely.by credentials stay valid on ely.by itself.");
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                try {
+                    profileService.deleteProfile(account.name());
+                    if (selectedProfile != null
+                            && selectedProfile.equals(account)) {
+                        selectedProfile = null;
+                    }
+                    refreshAccounts();
+                    refreshProfilesView();
+                    statusLabel.setText("Account deleted: " + account.name());
+                } catch (IOException e) {
+                    statusLabel.setText("Failed to delete account: "
+                            + e.getMessage());
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    //  Settings view: folders, Java override, server session
+    // ------------------------------------------------------------------
+
+    private VBox buildSettingsView() {
+        Label dirTitle = new Label("Game Directory");
+        dirTitle.getStyleClass().add("section-title");
+        Label dirPath = new Label(
+                GameDirectory.defaultDirectory().root().toString());
+        dirPath.getStyleClass().add("settings-value");
+        dirPath.setWrapText(true);
+        Button openDir = new Button("Open Folder");
+        openDir.getStyleClass().add("quick-select-button");
+        openDir.setOnAction(e -> {
+            try {
+                java.awt.Desktop.getDesktop().open(
+                        GameDirectory.defaultDirectory().root().toFile());
+            } catch (Exception ex) {
+                statusLabel.setText("Failed to open folder: "
+                        + ex.getMessage());
+            }
+        });
+        VBox dirBox = new VBox(6, dirTitle, dirPath, openDir);
+        dirBox.getStyleClass().add("settings-group");
+
+        Label javaTitle = new Label("Java Executable");
+        javaTitle.getStyleClass().add("section-title");
+        javaPathField = new TextField();
+        javaPathField.setPromptText("Auto-detect (recommended)");
+        javaPathField.getStyleClass().add("search-field");
+        javaPathField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(javaPathField, Priority.ALWAYS);
+        Button browse = new Button("Browse...");
+        browse.getStyleClass().add("quick-select-button");
+        browse.setOnAction(e -> onBrowseJava());
+        Button apply = new Button("Apply");
+        apply.getStyleClass().add("quick-select-button");
+        apply.setOnAction(e -> onApplyJava());
+        Button clear = new Button("Clear");
+        clear.getStyleClass().add("quick-select-button");
+        clear.setOnAction(e -> {
+            javaPathField.clear();
+            onApplyJava();
+        });
+        HBox javaRow = new HBox(8, javaPathField, browse, apply, clear);
+        javaRow.setAlignment(Pos.CENTER_LEFT);
+        Label javaHint = new Label("Overrides Java auto-detection until "
+                + "the launcher restarts. Leave empty for auto-detect.");
+        javaHint.getStyleClass().add("quick-select-label");
+        javaHint.setWrapText(true);
+        VBox javaBox = new VBox(6, javaTitle, javaRow, javaHint);
+        javaBox.getStyleClass().add("settings-group");
+
+        Label serverTitle = new Label("Launcher Server");
+        serverTitle.getStyleClass().add("section-title");
+        serverSessionLabel = new Label();
+        serverSessionLabel.getStyleClass().add("settings-value");
+        serverSessionLabel.setWrapText(true);
+        Button serverButton = new Button("Sign In / Out");
+        serverButton.getStyleClass().add("quick-select-button");
+        serverButton.setOnAction(e -> {
+            onServerLogin();
+            refreshSettingsView();
+        });
+        VBox serverBox = new VBox(6, serverTitle, serverSessionLabel,
+                serverButton);
+        serverBox.getStyleClass().add("settings-group");
+
+        Label aboutTitle = new Label("About");
+        aboutTitle.getStyleClass().add("section-title");
+        Label about = new Label("Minecraft Launcher " + APP_VERSION
+                + "  ·  instances, local builds and server-distributed builds.");
+        about.getStyleClass().add("settings-value");
+        about.setWrapText(true);
+        VBox aboutBox = new VBox(6, aboutTitle, about);
+        aboutBox.getStyleClass().add("settings-group");
+
+        VBox view = new VBox(12, dirBox, javaBox, serverBox, aboutBox);
+        view.setPadding(new Insets(16));
+        VBox.setVgrow(view, Priority.ALWAYS);
+        return view;
+    }
+
+    private void refreshSettingsView() {
+        if (serverSessionLabel == null) return;
+        serverSessionLabel.setText(serverSession == null
+                ? "Not signed in — the launcher runs in local mode."
+                : "Signed in as " + serverSession.accountName()
+                        + (serverSession.isAdmin() ? " (administrator)"
+                                : " (user)"));
+    }
+
+    private void onBrowseJava() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select Java Executable");
+        java.io.File picked =
+                chooser.showOpenDialog(root.getScene().getWindow());
+        if (picked != null) {
+            javaPathField.setText(picked.getAbsolutePath());
+        }
+    }
+
+    private void onApplyJava() {
+        String path = javaPathField.getText() == null ? ""
+                : javaPathField.getText().trim();
+        if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
+            svc.setCustomJavaPath(path.isEmpty() ? null : Path.of(path));
+            statusLabel.setText(path.isEmpty()
+                    ? "Java executable: auto-detect"
+                    : "Java executable override: " + path);
+        } else {
+            statusLabel.setText(
+                    "Custom Java path is not supported by the active resolver");
+        }
+    }
+
+    /**
+     * Opens the build picker for the selected modded instance: the
+     * chosen build (or none) replaces the instance's mods/config
+     * folders at launch.
+     */
+    private void onSelectBuild(ModdedProfile profile) {
+        if (profile == null || profile.isVanilla()) return;
+        Path dir = moddedProfileService.resolveGameDir(profile);
+        String active = buildService.selectedBuild(dir).orElse(null);
+
+        SelectBuildDialog.Result result = SelectBuildDialog.show(
+                (Stage) root.getScene().getWindow(), profile.name(),
+                active, buildService, dir);
+        if (result == null) return; // cancelled
+
+        try {
+            buildService.selectBuild(dir, result.buildName());
+            statusLabel.setText(result.buildName() == null
+                    ? "Build cleared — " + profile.name()
+                            + " launches with its current folders"
+                    : "Build selected: " + result.buildName()
+                            + " — applied at launch");
+            refreshInstanceCards();
+        } catch (java.io.IOException e) {
+            statusLabel.setText("Failed to select build: " + e.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Select Build",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Saves the current mods/configs of the selected modded instance
+     * as a new build: the user names it, chooses the contents (mods
+     * only, or mods together with configs) and whether to activate it
+     * right away — the checkbox is off by default, so saving alone
+     * never changes the active build.
+     */
+    private void onSaveBuild(ModdedProfile profile) {
+        if (profile == null || profile.isVanilla()) return;
+
+        SaveBuildDialog.Result result = SaveBuildDialog.show(
+                (Stage) root.getScene().getWindow());
+        if (result == null) return; // cancelled
+
+        Path dir = moddedProfileService.resolveGameDir(profile);
+        try {
+            ModdedProfileService.ensureProfileFolders(dir);
+            BuildService.BuildInfo saved = buildService.saveBuild(
+                    dir, result.name(), result.mods(), result.configs());
+            // Activating is the user's explicit choice; all other
+            // builds stay saved and untouched either way
+            if (result.activate()) {
+                buildService.selectBuild(dir, saved.name());
+                statusLabel.setText("Build saved and activated: "
+                        + saved.name() + " (" + saved.description()
+                        + ") — applied at launch");
+            } else {
+                statusLabel.setText("Build saved: " + saved.name()
+                        + " (" + saved.description() + ")"
+                        + " — choose it via Select Build");
+            }
+            refreshInstanceCards();
+        } catch (java.io.IOException e) {
+            statusLabel.setText("Failed to save build: " + e.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Save Build",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Signs in to (or out of) the launcher server. The dialog performs
+     * the whole flow; afterwards only the token is stored — the role
+     * it brought decides whether administrative functions (publishing
+     * builds) become available.
+     */
+    private void onServerLogin() {
+        ServerSession result = ServerLoginDialog.show(
+                (Stage) root.getScene().getWindow(), serverAuthService, serverSession);
+        boolean changed = result != serverSession;
+        serverSession = result;
+        updateServerButtonText();
+        if (changed) {
+            statusLabel.setText(serverSession == null
+                    ? "Signed out of the launcher server — running in local mode"
+                    : "Signed in to the launcher server as "
+                            + serverSession.accountName()
+                            + (serverSession.isAdmin()
+                                    ? " (administrator)"
+                                    : ""));
+        }
+        refreshProfilesView();
+        refreshSettingsView();
+    }
+
+    private void updateServerButtonText() {
+        if (serverButton == null) {
+            return;
+        }
+        serverButton.setText(serverSession == null ? "Server"
+                : "Server: " + serverSession.accountName()
+                        + (serverSession.isAdmin() ? " (admin)" : ""));
+    }
+
+    /**
+     * Opens the catalog of builds the administrator published and
+     * installs the chosen one into the selected modded instance. Each
+     * build gets its own folder — saved builds and other server
+     * builds are never touched; afterwards it is activated via Select
+     * Build like any local build. Requires a signed-in session (the
+     * sign-in dialog opens automatically when none exists).
+     */
+    private void onServerBuilds(ModdedProfile profile) {
+        if (profile == null || profile.isVanilla()) return;
+        if (serverSession == null) {
+            onServerLogin();
+            if (serverSession == null) {
+                statusLabel.setText(
+                        "Sign in to the launcher server first (Server, top right)");
+                return;
+            }
+        }
+        Path dir = moddedProfileService.resolveGameDir(profile);
+
+        ServerBuildsDialog.Outcome outcome = ServerBuildsDialog.show(
+                (Stage) root.getScene().getWindow(), serverSession,
+                remoteBuildService, serverApi, profile, dir);
+
+        if (outcome != null) {
+            statusLabel.setText((outcome.wasUpdate() ? "Build updated: "
+                    : "Build installed: ")
+                    + outcome.displayName() + " " + outcome.version()
+                    + " — activate it via Select Build");
+            refreshInstanceCards();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1221,6 +2121,8 @@ public class MainView {
         applyVersionFilter();
         statusLabel.setText(versionEntries.size()
                 + " versions available (vanilla + modded variants)");
+        footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  All "
+                + versionEntries.size() + " versions available");
         refreshModdedProfiles(null);
     }
 
@@ -1343,6 +2245,7 @@ public class MainView {
         try {
             profileService.addOfflineProfile(name);
             refreshAccounts();
+            refreshProfilesView();
             for (GameProfile p : accountCombo.getItems()) {
                 if (p.name().equals(name)) {
                     accountCombo.getSelectionModel().select(p);
@@ -1385,6 +2288,7 @@ public class MainView {
                 // Non-fatal
             }
             refreshAccounts();
+            refreshProfilesView();
             for (GameProfile p : accountCombo.getItems()) {
                 if (profile.uuid().isPresent() && p.uuid().isPresent()
                         && p.uuid().get().equals(profile.uuid().get())) {
@@ -1468,6 +2372,10 @@ public class MainView {
         ModLoaderVersion loader = result.loader();
         GameDirectory storage = GameDirectory.defaultDirectory();
 
+        // Several instances may share one version (each has its own
+        // name, game directory, mods and builds) — every creation
+        // makes a new one; the directory name stays unique
+        // automatically
         statusLabel.setText("Creating instance ("
                 + (type == ModLoaderType.VANILLA ? "vanilla " + mc.id()
                         : type.displayName() + " " + loader.loaderVersion()
@@ -1502,17 +2410,21 @@ public class MainView {
                                 storage, progressDialog);
                     }
                 }
+                // The display name is typed in freely (automatic
+                // "Loader MC" when empty); the memory limit defaults
+                // to automatic and is tuned in the Edit dialog
                 return moddedProfileService.createProfile(
-                        result.name(), type,
+                        type,
                         type == ModLoaderType.VANILLA ? "" : loader.loaderVersion(),
-                        mc.id(), versionId, result.extraJvmArgs());
+                        mc.id(), versionId, result.extraJvmArgs(),
+                        result.name(), 0);
             }
         };
         task.setOnSucceeded(e -> {
             ModdedProfile profile = task.getValue();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 0, 0,
                     List.of()));
-            refreshModdedProfiles(profile.id());
+            jumpToInstance(profile);
             statusLabel.setText("Instance ready: " + profile.name()
                     + " — press Play"
                     + (profile.isVanilla() ? "" : " and add mods via Folder"));
@@ -1544,17 +2456,13 @@ public class MainView {
     private void refreshModdedProfiles(String selectId) {
         try {
             moddedProfiles = moddedProfileService.loadProfiles();
-            profileListView.getItems().setAll(moddedProfiles);
             if (selectId != null) {
-                for (ModdedProfile p : moddedProfiles) {
-                    if (p.id().equals(selectId)) {
-                        profileListView.getSelectionModel().select(p);
-                        break;
-                    }
-                }
+                selectedInstanceId = selectId;
+            } else if (selectedInstance() == null) {
+                selectedInstanceId = null;
             }
-            updateProfileButtons();
-            updateInstanceDetails();
+            refreshInstanceCards();
+            updateInstanceChooser();
         } catch (java.io.IOException e) {
             statusLabel.setText("Failed to load instances: " + e.getMessage());
         }
@@ -1565,8 +2473,7 @@ public class MainView {
      * manager, so the user can add mods, resource packs, shader packs,
      * worlds or check logs manually.
      */
-    private void onOpenProfileFolder() {
-        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+    private void onOpenProfileFolder(ModdedProfile profile) {
         if (profile == null) return;
         try {
             Path dir = moddedProfileService.resolveGameDir(profile);
@@ -1582,12 +2489,12 @@ public class MainView {
     }
 
     /**
-     * Opens the edit dialog for the selected profile (display name and
-     * extra JVM arguments) and persists the changes. The game directory
-     * and versions stay fixed.
+     * Opens the edit dialog for the selected profile (display name,
+     * memory limit and extra JVM arguments) and persists the changes.
+     * Renaming also renames the game directory (mods, saves and
+     * builds move along); the versions stay fixed.
      */
-    private void onEditProfile() {
-        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+    private void onEditProfile(ModdedProfile profile) {
         if (profile == null) return;
 
         EditProfileDialog.Result result = EditProfileDialog.show(
@@ -1595,14 +2502,20 @@ public class MainView {
         if (result == null) return;
 
         try {
+            // Renaming also renames the folder (mods/saves/builds
+            // move along), so select by the new id afterwards
             Optional<ModdedProfile> updated = moddedProfileService.updateProfile(
-                    profile.id(), result.name(), result.extraJvmArgs());
+                    profile.id(), result.extraJvmArgs(), result.name(),
+                    result.memoryMb());
             if (updated.isPresent()) {
-                refreshModdedProfiles(profile.id());
+                refreshModdedProfiles(updated.get().id());
                 statusLabel.setText("Instance updated: " + updated.get().name()
+                        + "  ·  Memory: "
+                        + ModdedProfileService.formatMemory(
+                                updated.get().memoryMb())
                         + (result.extraJvmArgs().isEmpty() ? ""
-                                : " (" + result.extraJvmArgs().size()
-                                + " JVM args)"));
+                                : "  ·  " + result.extraJvmArgs().size()
+                                        + " JVM args"));
             }
         } catch (java.io.IOException e) {
             statusLabel.setText("Failed to update instance: " + e.getMessage());
@@ -1612,8 +2525,7 @@ public class MainView {
         }
     }
 
-    private void onDeleteProfile() {
-        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
+    private void onDeleteProfile(ModdedProfile profile) {
         if (profile == null) return;
 
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -1640,18 +2552,10 @@ public class MainView {
 
     // --- Instance launch (verify → repair if needed → launch) ---
 
-    private void onPlayProfile() {
-        ModdedProfile profile = profileListView.getSelectionModel().getSelectedItem();
-        if (profile == null) return;
-
-        playProfileButton.setDisable(true);
-        startInstanceLaunch(profile);
-    }
-
     /**
-     * Common launch entry for both Play buttons (instance panel and
-     * version browser): account resolution, Ely.by refresh and then
-     * the verify → repair-if-needed → launch chain.
+     * Common launch entry for every Play button (cards and version
+     * browser): account resolution, Ely.by refresh and then the
+     * verify → repair-if-needed → launch chain.
      */
     private void startInstanceLaunch(ModdedProfile profile) {
         GameProfile account = getOrCreateProfile();
@@ -1711,7 +2615,7 @@ public class MainView {
             }
         });
         verifyTask.setOnFailed(e -> {
-            updateProfileButtons();
+            refreshLaunchButtons();
             statusLabel.setText("Verification error: "
                     + verifyTask.getException().getMessage());
             ErrorDialog.show((Stage) root.getScene().getWindow(),
@@ -1791,7 +2695,7 @@ public class MainView {
             }
         });
         repairTask.setOnFailed(e -> {
-            updateProfileButtons();
+            refreshLaunchButtons();
             Throwable cause = repairTask.getException();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
             statusLabel.setText("Repair failed: " + cause.getMessage());
@@ -1818,7 +2722,7 @@ public class MainView {
     private void showProfileVerificationErrors(
             ModdedProfile profile,
             ModdedProfileVerificationService.VerificationReport report) {
-        updateProfileButtons();
+        refreshLaunchButtons();
         statusLabel.setText("Instance not launchable: "
                 + report.errors().get(0));
 
@@ -1851,8 +2755,18 @@ public class MainView {
                 // The profile's game directory must exist before the
                 // process can run inside it
                 ModdedProfileService.ensureProfileFolders(runtimeDir);
+                // A selected build replaces the instance's mods and
+                // config folders right before the game starts
+                if (!profile.isVanilla()) {
+                    String build = buildService.selectedBuild(runtimeDir)
+                            .orElse(null);
+                    if (build != null) {
+                        buildService.applyBuild(runtimeDir, build);
+                    }
+                }
                 return launchService.launch(metadata, storage, account,
-                        runtimeDir, profile.extraJvmArgs());
+                        runtimeDir,
+                        ModdedProfileService.effectiveJvmArgs(profile));
             }
         };
         launchTask.setOnSucceeded(e -> {
@@ -1877,7 +2791,7 @@ public class MainView {
                                 java.util.Optional.of(metadata));
                 repairProfileAndLaunch(profile, account, storage, report);
             } else {
-                updateProfileButtons();
+                refreshLaunchButtons();
                 String msg = "Launch failed: " + result.message();
                 statusLabel.setText(msg);
                 Stage launcherStage = (Stage) root.getScene().getWindow();
@@ -1886,7 +2800,7 @@ public class MainView {
             }
         });
         launchTask.setOnFailed(e -> {
-            updateProfileButtons();
+            refreshLaunchButtons();
             String msg = "Launch error: " + launchTask.getException().getMessage();
             statusLabel.setText(msg);
             Stage launcherStage = (Stage) root.getScene().getWindow();
@@ -1933,7 +2847,7 @@ public class MainView {
             verifyProfileAndLaunch(profile, account, storage);
         });
         installTask.setOnFailed(e -> {
-            updateProfileButtons();
+            refreshLaunchButtons();
             String msg = "Java 8 download failed: "
                     + installTask.getException().getMessage();
             statusLabel.setText(msg);
@@ -1996,13 +2910,13 @@ public class MainView {
                                                     .reduce("", (a, b) -> a + b + "\n"));
                         }
                     }
-                    updateProfileButtons();
+                    refreshLaunchButtons();
                 });
             } catch (InterruptedException e) {
                 javafx.application.Platform.runLater(() -> {
                     launcherStage.show();
                     statusLabel.setText("Process monitoring interrupted");
-                    updateProfileButtons();
+                    refreshLaunchButtons();
                 });
             }
         }, "mc-monitor");

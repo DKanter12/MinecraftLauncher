@@ -141,14 +141,14 @@ class ModdedProfileVerificationServiceTest {
     private static ModdedProfile fabricProfile() {
         return new ModdedProfile("pack", "Pack", ModLoaderType.FABRIC, "0.16.9",
                 "1.21.4", "fabric-loader-0.16.9-1.21.4", "profiles/pack",
-                List.of("minecraft:1.21.4", "fabric:0.16.9"), List.of(),
+                List.of("minecraft:1.21.4", "fabric:0.16.9"), List.of(), 0,
                 "2024-12-03T10:00:00+00:00", null);
     }
 
     private static ModdedProfile vanillaProfile() {
         return new ModdedProfile("clean", "Clean", ModLoaderType.VANILLA, "",
                 "1.21.4", "1.21.4", "profiles/clean",
-                List.of("minecraft:1.21.4"), List.of(),
+                List.of("minecraft:1.21.4"), List.of(), 0,
                 "2024-12-03T10:00:00+00:00", null);
     }
 
@@ -241,7 +241,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedProfile profile = new ModdedProfile("pack", "Pack",
                 ModLoaderType.FABRIC, "0.16.9", "1.21.4",
                 "fabric-loader-0.16.9-1.20.1", "profiles/pack",
-                List.of(), List.of(), null, null);
+                List.of(), List.of(), 0, null, null);
 
         var report = service(MINIMAL_VANILLA_JSON, ALWAYS_JAVA)
                 .verify(profile, gameDir);
@@ -265,7 +265,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedProfile profile = new ModdedProfile("pack", "Pack",
                 ModLoaderType.FABRIC, "0.16.9", "1.21.4",
                 "fabric-loader-0.15.0-1.21.4", "profiles/pack",
-                List.of(), List.of(), null, null);
+                List.of(), List.of(), 0, null, null);
 
         var report = service(MINIMAL_VANILLA_JSON, ALWAYS_JAVA)
                 .verify(profile, gameDir);
@@ -532,7 +532,7 @@ class ModdedProfileVerificationServiceTest {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfile ghost = new ModdedProfile("ghost", "Ghost",
                 ModLoaderType.VANILLA, "", "1.99.99", "1.99.99",
-                "profiles/ghost", List.of(), List.of(), null, null);
+                "profiles/ghost", List.of(), List.of(), 0, null, null);
 
         var report = service(MINIMAL_VANILLA_JSON, ALWAYS_JAVA)
                 .verify(ghost, gameDir);
