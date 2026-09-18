@@ -5,35 +5,27 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -44,7 +36,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.util.StringConverter;
 
 import org.example.launcher.distribution.RemoteBuildService;
 import org.example.launcher.distribution.ServerAuthService;
@@ -80,37 +71,31 @@ import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
-import org.example.launcher.version.StandardVersionType;
-import org.example.launcher.version.VersionType;
-import org.example.launcher.version.VersionTypeRegistry;
 
 /**
  * Builds and manages the main launcher window.
  * <p>
  * Layout (BorderPane):
  * <pre>
- * +------------------------------------------------------------+
- * |  Header: title + status + account                          |
- * +--------+---------------------------------------------------+
- * | Instan-|                                                   |
- * | ces    |   Selected instance details                       |
- * | list   |   (badge, name, versions, game directory,        |
- * |        |    JVM arguments, last played)                    |
- * | + New  |                                                   |
- * |        |   [ Play ]  [Folder] [Edit] [Delete]              |
- * +--------+---------------------------------------------------+
+ * +--------+--------------------------------------------------+
+ * | Nav    | Top bar: view title + search + account pill      |
+ * | rail   +--------------------------------------------------+
+ * | Inst.  | Views (center stack):                            |
+ * | Prof.  |  My Instances — filter chips + instance cards    |
+ * | Sett.  |  Profiles — accounts management                  |
+ * |        |  Settings — folders, Java, server, about         |
+ * |        +--------------------------------------------------+
+ * |        | Footer: status + launcher info                   |
+ * +--------+--------------------------------------------------+
  * </pre>
  * <p>
  * Everything is an instance (vanilla or modded), each with its own
  * game directory. New instances are created via a single simple
- * dialog (loader chips → version list → loader version list, like
- * Modrinth); the Mojang manifest is only fetched in the background
+ * dialog (name → loader chips → version list → loader version
+ * list); the Mojang manifest is only fetched in the background
  * to feed that dialog.
  */
 public class MainView {
-
-    private static final DateTimeFormatter TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
 
     private static final String APP_VERSION = "v1.0";
 
@@ -124,9 +109,7 @@ public class MainView {
     private final LauncherPreferences preferences;
     private final ElyAuthService elyAuthService;
     private final SkinService skinService;
-    private final VersionTypeRegistry typeRegistry;
     private final ModLoaderRegistry modLoaderRegistry;
-    private final ModdedVersionService moddedVersionService;
     private final ModdedProfileService moddedProfileService;
     private final ModdedProfileVerificationService profileVerificationService;
 
@@ -136,7 +119,7 @@ public class MainView {
 
     // Navigation rail + views
     private enum View {
-        INSTANCES, VERSIONS, PROFILES, SETTINGS
+        INSTANCES, PROFILES, SETTINGS
     }
 
     private View currentView = View.INSTANCES;
@@ -156,7 +139,6 @@ public class MainView {
 
     // Other views
     private VBox instancesView;
-    private VBox versionsView;
     private VBox profilesView;
     private VBox profilesBox;
     private VBox settingsView;
@@ -164,27 +146,11 @@ public class MainView {
     private Label serverSessionLabel;
     private Label footerVersionLabel;
 
-    // Version browser (center): all versions incl. modded variants
-    private TextField versionSearchField;
-    private FlowPane versionFilterChips;
-    private Label versionBrowserTitle;
-    private ListView<VersionEntry> versionListView;
-    private List<VersionEntry> versionEntries = List.of();
-
-    // Version browser: actions for the selected entry
-    private Label selectedVersionLabel;
-    private Button loaderVersionButton;
-    private ComboBox<ModdedProfile> instanceChooser;
-    private Button playVersionButton;
-    private Button folderVersionButton;
+    // Single-launch gate: a launch attempt blocks every Play button
     private boolean versionPlayInFlight = false;
-
-    // Loader versions for the selected modded entry (newest first)
-    private ModLoaderVersion selectedLoaderVersion;
-    private List<ModLoaderVersion> selectedLoaderVersions = List.of();
-    private ModLoaderType loaderVersionsFamily;
-    private String loaderVersionsMcId;
-    private boolean loaderVersionChanged = false;
+    /** Instance currently going through launch, if any (single launch). */
+    private String launchingProfileId;
+    private String launchingStatusText = "Launching...";
 
     // Instances (cards grid)
     private List<ModdedProfile> moddedProfiles = List.of();
@@ -208,25 +174,15 @@ public class MainView {
     // Account
     private ComboBox<GameProfile> accountCombo;
     private Button createAccountButton;
+    private Button deleteAccountButton;
     private Button elyLoginButton;
     private ImageView avatarView;
     private GameProfile selectedProfile;
     private boolean suppressSelectionListener = false;
     private java.util.Timer elyRefreshTimer;
 
-    /** Versions of the Mojang manifest — basis of the version browser. */
+    /** Versions of the Mojang manifest — feeds the creation dialog. */
     private List<MinecraftVersion> manifestVersions = List.of();
-
-    /**
-     * Minecraft versions each registered loader exists for, as
-     * reported by the loader's own metadata service. Loaded once in
-     * the background; a loader's variants appear in the version
-     * browser only after its set arrived (never showing variants
-     * that do not exist — e.g. NeoForge below 1.20.1 or Fabric
-     * below 1.14).
-     */
-    private final Map<ModLoaderType, Set<String>> loaderSupportedVersions =
-            new EnumMap<>(ModLoaderType.class);
 
     public MainView(VersionService versionService,
                     VersionMetadataService metadataService,
@@ -234,9 +190,8 @@ public class MainView {
                     MinecraftLaunchService launchService,
                     JavaResolutionService javaResolutionService,
                     JavaRuntimeInstaller javaRuntimeInstaller,
-                    ProfileService profileService,
-                    VersionTypeRegistry typeRegistry,
-                    LauncherPreferences preferences,
+                     ProfileService profileService,
+                     LauncherPreferences preferences,
                     ElyAuthService elyAuthService,
                     SkinService skinService,
                     ModLoaderRegistry modLoaderRegistry,
@@ -250,17 +205,14 @@ public class MainView {
         this.javaResolutionService = javaResolutionService;
         this.javaRuntimeInstaller = javaRuntimeInstaller;
         this.profileService = profileService;
-        this.typeRegistry = typeRegistry;
         this.preferences = preferences;
         this.elyAuthService = elyAuthService;
         this.skinService = skinService;
         this.modLoaderRegistry = modLoaderRegistry;
-        this.moddedVersionService = moddedVersionService;
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
         serverSession = serverAuthService.restoreSession().orElse(null);
         buildView();
-        loadLoaderSupport();
     }
 
     public BorderPane getView() {
@@ -276,11 +228,10 @@ public class MainView {
         root.getStyleClass().add("root-pane");
 
         instancesView = buildInstancesView();
-        versionsView = buildVersionBrowser();
         profilesView = buildProfilesView();
         settingsView = buildSettingsView();
-        viewStack = new StackPane(instancesView, versionsView,
-                profilesView, settingsView);
+        viewStack = new StackPane(instancesView, profilesView,
+                settingsView);
 
         root.setTop(buildTopBar());
         root.setLeft(buildNavRail());
@@ -362,6 +313,19 @@ public class MainView {
         createAccountButton.getStyleClass().add("browse-java-button");
         createAccountButton.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
         createAccountButton.setOnAction(e -> onCreateAccount());
+        createAccountButton.setTooltip(new Tooltip("Create an offline account"));
+
+        deleteAccountButton = new Button("Delete");
+        deleteAccountButton.getStyleClass().add("account-delete-button");
+        deleteAccountButton.setTooltip(
+                new Tooltip("Delete the selected account"));
+        deleteAccountButton.setOnAction(e -> {
+            if (selectedProfile != null) {
+                onDeleteAccount(selectedProfile);
+            } else {
+                statusLabel.setText("No account selected");
+            }
+        });
 
         elyLoginButton = new Button("Ely.by");
         elyLoginButton.getStyleClass().add("browse-java-button");
@@ -375,7 +339,8 @@ public class MainView {
         updateServerButtonText();
 
         HBox accountBox = new HBox(8, avatarView, accountCombo,
-                createAccountButton, elyLoginButton, serverButton);
+                createAccountButton, deleteAccountButton, elyLoginButton,
+                serverButton);
         accountBox.setAlignment(Pos.CENTER);
         accountBox.getStyleClass().add("account-pill");
 
@@ -395,7 +360,6 @@ public class MainView {
         rail.setPadding(new Insets(16, 10, 16, 10));
         rail.getStyleClass().add("nav-rail");
         addNavButton(rail, "My Instances", View.INSTANCES);
-        addNavButton(rail, "Game Versions", View.VERSIONS);
         addNavButton(rail, "Profiles", View.PROFILES);
         addNavButton(rail, "Settings", View.SETTINGS);
         return rail;
@@ -438,6 +402,13 @@ public class MainView {
         for (ModLoaderType loader : ModLoaderType.values()) {
             addInstanceFilterChip(loader.displayName(), loader);
         }
+        Region filterSpacer = new Region();
+        HBox.setHgrow(filterSpacer, Priority.ALWAYS);
+        Button quickBuildButton = new Button("+ Build");
+        quickBuildButton.getStyleClass().add("quick-select-button");
+        quickBuildButton.setOnAction(e -> onQuickSaveBuild());
+        instanceFilterChips.getChildren().addAll(filterSpacer,
+                quickBuildButton);
 
         instanceCards = new FlowPane();
         instanceCards.setHgap(14);
@@ -481,15 +452,12 @@ public class MainView {
         currentView = view;
         instancesView.setVisible(view == View.INSTANCES);
         instancesView.setManaged(view == View.INSTANCES);
-        versionsView.setVisible(view == View.VERSIONS);
-        versionsView.setManaged(view == View.VERSIONS);
         profilesView.setVisible(view == View.PROFILES);
         profilesView.setManaged(view == View.PROFILES);
         settingsView.setVisible(view == View.SETTINGS);
         settingsView.setManaged(view == View.SETTINGS);
         viewTitleLabel.setText(switch (view) {
             case INSTANCES -> "My Instances";
-            case VERSIONS -> "Game Versions";
             case PROFILES -> "Profiles";
             case SETTINGS -> "Settings";
         });
@@ -512,17 +480,6 @@ public class MainView {
         } else if (view == View.SETTINGS) {
             refreshSettingsView();
         }
-    }
-
-    /** CSS badge style per loader family. */
-    private static String loaderBadgeStyle(ModLoaderType type) {
-        return switch (type) {
-            case VANILLA -> "loader-badge-vanilla";
-            case FABRIC -> "loader-badge-fabric";
-            case FORGE -> "loader-badge-forge";
-            case NEOFORGE -> "loader-badge-neoforge";
-            case QUILT -> "loader-badge-quilt";
-        };
     }
 
     private static final DateTimeFormatter DATE_FORMATTER =
@@ -599,7 +556,17 @@ public class MainView {
      */
     private void refreshLaunchButtons() {
         versionPlayInFlight = false;
-        updateVersionActionBar();
+        launchingProfileId = null;
+        refreshInstanceCards();
+    }
+
+    /**
+     * Shows the launch stage on the instance card (all calls happen
+     * on the FX thread).
+     */
+    private void setLaunchStatus(String profileId, String text) {
+        launchingProfileId = profileId;
+        launchingStatusText = text;
         refreshInstanceCards();
     }
 
@@ -648,6 +615,10 @@ public class MainView {
         if (selected) {
             card.getStyleClass().add("instance-card-selected");
         }
+        boolean launching = profile.id().equals(launchingProfileId);
+        if (launching) {
+            card.getStyleClass().add("instance-card-launching");
+        }
 
         Label icon = new Label(iconText(profile.loaderType()));
         icon.getStyleClass().addAll("instance-icon",
@@ -667,18 +638,11 @@ public class MainView {
         HBox.setHgrow(titles, Priority.ALWAYS);
         card.getChildren().add(top);
 
-        if (!profile.isVanilla()) {
-            Label buildLine = new Label(activeBuildText(profile));
-            buildLine.getStyleClass().add("instance-card-build");
-            buildLine.setWrapText(true);
-            card.getChildren().add(buildLine);
-        }
-
-        Button play = new Button("Play");
+        Button play = new Button(launching ? launchingStatusText : "Play");
         play.getStyleClass().add("card-play");
         play.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(play, Priority.ALWAYS);
-        play.setDisable(versionPlayInFlight);
+        play.setDisable(versionPlayInFlight || launching);
         play.setOnAction(e -> {
             selectInstance(profile.id());
             startInstanceLaunch(profile);
@@ -692,11 +656,7 @@ public class MainView {
         edit.getStyleClass().add("card-ghost-button");
         edit.setOnAction(e -> onEditProfile(profile));
 
-        Button more = new Button("...");
-        more.getStyleClass().add("card-ghost-button");
-        more.setOnAction(e -> showCardMenu(more, profile));
-
-        HBox actions = new HBox(6, play, folder, edit, more);
+        HBox actions = new HBox(6, play, folder, edit);
         actions.setAlignment(Pos.CENTER_LEFT);
         card.getChildren().add(actions);
 
@@ -739,11 +699,6 @@ public class MainView {
                 + profile.createdTime().map(MainView::formatDate).orElse("—")));
 
         if (!profile.isVanilla()) {
-            Button selectBuild = new Button("Select Build");
-            selectBuild.getStyleClass().add("card-small-button");
-            selectBuild.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(selectBuild, Priority.ALWAYS);
-            selectBuild.setOnAction(e -> onSelectBuild(profile));
             Button saveBuild = new Button("Save Build");
             saveBuild.getStyleClass().add("card-small-button");
             saveBuild.setMaxWidth(Double.MAX_VALUE);
@@ -754,11 +709,11 @@ public class MainView {
             serverBuilds.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(serverBuilds, Priority.ALWAYS);
             serverBuilds.setOnAction(e -> onServerBuilds(profile));
-            HBox buildsRow = new HBox(6, selectBuild, saveBuild, serverBuilds);
+            HBox buildsRow = new HBox(6, saveBuild, serverBuilds);
             details.getChildren().add(buildsRow);
         }
 
-        Button delete = new Button("Delete");
+        Button delete = new Button("Delete Instance");
         delete.getStyleClass().add("card-danger-button");
         delete.setMaxWidth(Double.MAX_VALUE);
         delete.setOnAction(e -> onDeleteProfile(profile));
@@ -771,24 +726,6 @@ public class MainView {
         line.getStyleClass().add("instance-card-detail-line");
         line.setWrapText(true);
         return line;
-    }
-
-    private void showCardMenu(Button anchor, ModdedProfile profile) {
-        ContextMenu menu = new ContextMenu();
-        if (!profile.isVanilla()) {
-            MenuItem selectBuild = new MenuItem("Select Build");
-            selectBuild.setOnAction(e -> onSelectBuild(profile));
-            MenuItem saveBuild = new MenuItem("Save Build");
-            saveBuild.setOnAction(e -> onSaveBuild(profile));
-            MenuItem serverBuilds = new MenuItem("Server Builds");
-            serverBuilds.setOnAction(e -> onServerBuilds(profile));
-            menu.getItems().addAll(selectBuild, saveBuild, serverBuilds);
-        }
-        MenuItem delete = new MenuItem("Delete Instance");
-        delete.getStyleClass().add("menu-item-danger");
-        delete.setOnAction(e -> onDeleteProfile(profile));
-        menu.getItems().add(delete);
-        menu.show(anchor, javafx.geometry.Side.BOTTOM, 0, 0);
     }
 
     private VBox buildAddInstanceCard() {
@@ -817,6 +754,10 @@ public class MainView {
         };
     }
 
+    /**
+     * Icon letters: the first letter, two letters where it collides
+     * (Fabric/Forge share "F").
+     */
     private static String iconText(ModLoaderType type) {
         return switch (type) {
             case VANILLA -> "V";
@@ -866,13 +807,6 @@ public class MainView {
         }
     }
 
-    private String activeBuildText(ModdedProfile profile) {
-        Path dir = moddedProfileService.resolveGameDir(profile);
-        String active = buildService.selectedBuild(dir).orElse(null);
-        return active == null ? "No build selected"
-                : "Active build: " + active;
-    }
-
     private static String shortGameDir(Path dir) {
         Path root = GameDirectory.defaultDirectory().root();
         try {
@@ -911,707 +845,8 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Center: version browser — ALL versions (vanilla + modded
-    //  variants), filterable by text, version type and loader
+    //  Profiles view: accounts management
     // ------------------------------------------------------------------
-
-    /**
-     * One row of the version browser: a vanilla manifest version or
-     * a modded variant of one ({@code 1.20.1 Fabric}). Modded
-     * variants exist for release versions only; their concrete
-     * loader version is chosen at instance creation (newest by
-     * default, changeable).
-     */
-    private record VersionEntry(MinecraftVersion version,
-                                ModLoaderType variant) {
-
-        boolean isVanilla() {
-            return variant == ModLoaderType.VANILLA;
-        }
-
-        /** Row title, e.g. {@code "1.20.1"} or {@code "1.20.1 Fabric"}. */
-        String displayId() {
-            return isVanilla() ? version.id()
-                    : version.id() + " " + variant.displayName();
-        }
-
-        /** The type badge label (Release/Snapshot/…/Fabric/…). */
-        String typeLabel() {
-            return isVanilla() ? version.type().displayName()
-                    : variant.displayName();
-        }
-
-        String badgeStyle() {
-            return isVanilla() ? typeBadgeStyle(version.type())
-                    : loaderBadgeStyle(variant);
-        }
-    }
-
-    /** CSS badge style per vanilla version type. */
-    private static String typeBadgeStyle(VersionType type) {
-        if (type == StandardVersionType.RELEASE) {
-            return "type-badge-release";
-        }
-        if (type == StandardVersionType.SNAPSHOT) {
-            return "type-badge-snapshot";
-        }
-        if (type == StandardVersionType.OLD_BETA) {
-            return "type-badge-old-beta";
-        }
-        if (type == StandardVersionType.OLD_ALPHA) {
-            return "type-badge-old-alpha";
-        }
-        return "type-badge-old-alpha"; // unknown custom type
-    }
-
-    private VBox buildVersionBrowser() {
-        versionBrowserTitle = new Label("Versions");
-        versionBrowserTitle.getStyleClass().add("section-title");
-
-        versionSearchField = new TextField();
-        versionSearchField.setPromptText(
-                "Filter (e.g. 1.20.1, fabric, snapshot)...");
-        versionSearchField.getStyleClass().add("search-field");
-        versionSearchField.textProperty().addListener(
-                (obs, old, val) -> applyVersionFilter());
-
-        // Filters combine freely: several version types, several
-        // loader families, or both at once (Fabric + Forge + Snapshot
-        // …). No chip selected = every version is shown.
-        versionFilterChips = new FlowPane(5, 5);
-        for (StandardVersionType type : List.of(StandardVersionType.RELEASE,
-                StandardVersionType.SNAPSHOT, StandardVersionType.OLD_BETA,
-                StandardVersionType.OLD_ALPHA)) {
-            addVersionFilterChip(type.displayName(), type);
-        }
-        for (ModLoaderType loader : ModLoaderType.values()) {
-            if (loader != ModLoaderType.VANILLA
-                    && modLoaderRegistry.get(loader).isPresent()) {
-                addVersionFilterChip(loader.displayName(), loader);
-            }
-        }
-
-        versionListView = new ListView<>();
-        versionListView.getStyleClass().add("profile-list");
-        versionListView.setPlaceholder(new Label("No versions match."));
-        VBox.setVgrow(versionListView, Priority.ALWAYS);
-        versionListView.setCellFactory(list -> {
-            ListCell<VersionEntry> cell = new ListCell<>() {
-                @Override
-                protected void updateItem(VersionEntry item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                        setGraphic(null);
-                    } else {
-                        Label badge = new Label(item.typeLabel());
-                        badge.getStyleClass().add(item.badgeStyle());
-                        Label id = new Label(item.displayId());
-                        id.getStyleClass().add("profile-name");
-                        Label date = new Label(
-                                item.version().formattedReleaseTime());
-                        date.getStyleClass().add("profile-summary");
-                        Region spacer = new Region();
-                        HBox.setHgrow(spacer, Priority.ALWAYS);
-                        HBox row = new HBox(8, badge, id, spacer, date);
-                        row.setAlignment(Pos.CENTER_LEFT);
-                        setText(null);
-                        setGraphic(row);
-                    }
-                }
-            };
-            // Double-click a version (or modded variant) to create an
-            // instance of it right away
-            cell.setOnMouseClicked(event -> {
-                if (event.getClickCount() == 2 && !cell.isEmpty()) {
-                    onEntryActivated(cell.getItem());
-                }
-            });
-            return cell;
-        });
-
-        versionListView.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, val) -> onVersionSelected(val));
-
-        Label hint = new Label(
-                "Filters combine freely (Fabric + Forge + Snapshot…); "
-                        + "none selected shows all versions.");
-        hint.getStyleClass().add("quick-select-label");
-
-        // -- Actions for the selected version: pick the instance to
-        //    play (named automatically after the version), open its
-        //    directory, and for modded entries pick the loader
-        //    version (newest by default, changeable). Mods sets are
-        //    managed as builds in the instance panel --
-        selectedVersionLabel = new Label("Select a version to play");
-        selectedVersionLabel.getStyleClass().add("details-info");
-
-        loaderVersionButton = new Button("Loader version");
-        loaderVersionButton.getStyleClass().add("quick-select-button");
-        loaderVersionButton.setOnAction(e -> onChangeLoaderVersion());
-
-        Region actionSpacer = new Region();
-        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
-        HBox versionActionTop = new HBox(8, selectedVersionLabel,
-                actionSpacer, loaderVersionButton);
-        versionActionTop.setAlignment(Pos.CENTER_LEFT);
-
-        instanceChooser = new ComboBox<>();
-        instanceChooser.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(instanceChooser, Priority.ALWAYS);
-        instanceChooser.setPromptText("Not installed yet — Play creates it");
-        instanceChooser.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(ModdedProfile profile) {
-                if (profile == null) {
-                    return "";
-                }
-                return profile.name() + " · last played "
-                        + profile.lastPlayedTime().map(TIME_FORMATTER::format)
-                                .orElse("never");
-            }
-
-            @Override
-            public ModdedProfile fromString(String string) {
-                return null;
-            }
-        });
-        // Choosing an instance also selects its card, so its
-        // details (incl. builds) show up expanded
-        instanceChooser.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, val) -> {
-                    if (val != null) {
-                        selectInstance(val.id());
-                    }
-                });
-
-        playVersionButton = new Button("Play");
-        playVersionButton.getStyleClass().add("play-button-compact");
-        playVersionButton.setDisable(true);
-        playVersionButton.setOnAction(e -> onPlaySelectedVersion());
-
-        folderVersionButton = new Button("Folder");
-        folderVersionButton.getStyleClass().add("quick-select-button");
-        folderVersionButton.setDisable(true);
-        folderVersionButton.setOnAction(e -> onOpenSelectedVersionFolder());
-
-        HBox versionActionBar = new HBox(8, instanceChooser,
-                playVersionButton, folderVersionButton);
-        versionActionBar.setAlignment(Pos.CENTER_LEFT);
-
-        VBox browser = new VBox(8, versionBrowserTitle, versionSearchField,
-                versionFilterChips, versionListView, versionActionTop,
-                versionActionBar, hint);
-        browser.setPadding(new Insets(16));
-        browser.getStyleClass().add("center-panel");
-        versionsView = browser;
-        return browser;
-    }
-
-    /**
-     * Adds an independently toggleable filter chip: several chips can
-     * be active at once (e.g. Fabric + Forge), combining their
-     * results.
-     */
-    private void addVersionFilterChip(String label, Object filter) {
-        ToggleButton chip = new ToggleButton(label);
-        chip.getStyleClass().add("filter-button");
-        chip.setUserData(filter);
-        chip.selectedProperty().addListener((obs, old, sel) -> {
-            if (sel) {
-                chip.getStyleClass().add("filter-button-active");
-            } else {
-                chip.getStyleClass().remove("filter-button-active");
-            }
-            applyVersionFilter();
-        });
-        versionFilterChips.getChildren().add(chip);
-    }
-
-    /** Builds every browser row: vanilla versions + modded variants. */
-    private void buildVersionEntries() {
-        List<ModLoaderType> families = new ArrayList<>();
-        for (ModLoaderType loader : ModLoaderType.values()) {
-            if (loader != ModLoaderType.VANILLA
-                    && modLoaderRegistry.get(loader).isPresent()) {
-                families.add(loader);
-            }
-        }
-        List<VersionEntry> entries = new ArrayList<>();
-        for (MinecraftVersion v : manifestVersions) {
-            entries.add(new VersionEntry(v, ModLoaderType.VANILLA));
-            if (v.type() == StandardVersionType.RELEASE) {
-                for (ModLoaderType family : families) {
-                    Set<String> supported = loaderSupportedVersions.get(family);
-                    // Unknown set (still loading / offline) or the
-                    // loader does not exist for this MC version → no
-                    // variant row; only real, installable combinations
-                    // are ever listed
-                    if (supported == null || !supported.contains(v.id())) {
-                        continue;
-                    }
-                    entries.add(new VersionEntry(v, family));
-                }
-            }
-        }
-        versionEntries = entries;
-    }
-
-    /**
-     * Loads each registered loader's set of supported Minecraft
-     * versions in the background (one lightweight call per loader)
-     * and refreshes the version browser as the sets arrive — the
-     * authoritative source of which modded variants actually exist.
-     */
-    private void loadLoaderSupport() {
-        for (ModLoaderType type : ModLoaderType.values()) {
-            if (type == ModLoaderType.VANILLA) {
-                continue;
-            }
-            var entry = modLoaderRegistry.get(type).orElse(null);
-            if (entry == null) {
-                continue;
-            }
-            Thread fetch = new Thread(() -> {
-                Set<String> supported;
-                try {
-                    supported = entry.provider()
-                            .fetchSupportedMinecraftVersions();
-                } catch (Exception ex) {
-                    return; // stays unknown → that loader's variants
-                            // are not listed (offline: no wrong rows)
-                }
-                if (supported == null) {
-                    return;
-                }
-                Platform.runLater(() -> {
-                    loaderSupportedVersions.put(type, supported);
-                    if (!manifestVersions.isEmpty()) {
-                        buildVersionEntries();
-                        applyVersionFilter();
-                    }
-                });
-            }, "loader-support-" + type.name().toLowerCase());
-            fetch.setDaemon(true);
-            fetch.start();
-        }
-    }
-
-    /**
-     * Applies the active chip filters — any combination of version
-     * types and loader families, combined with OR — plus the
-     * free-text filter, newest versions first; the modded variants
-     * cluster right below their vanilla version.
-     */
-    private void applyVersionFilter() {
-        if (versionListView == null) return;
-        Set<StandardVersionType> types = EnumSet.noneOf(StandardVersionType.class);
-        Set<ModLoaderType> loaders = EnumSet.noneOf(ModLoaderType.class);
-        for (var node : versionFilterChips.getChildren()) {
-            if (node instanceof ToggleButton btn && btn.isSelected()) {
-                if (btn.getUserData() instanceof StandardVersionType type) {
-                    types.add(type);
-                } else if (btn.getUserData() instanceof ModLoaderType loader) {
-                    loaders.add(loader);
-                }
-            }
-        }
-        boolean noFilter = types.isEmpty() && loaders.isEmpty();
-        String query = versionSearchField.getText() == null ? ""
-                : versionSearchField.getText().trim().toLowerCase();
-
-        List<VersionEntry> filtered = new ArrayList<>();
-        for (VersionEntry entry : versionEntries) {
-            if (!noFilter) {
-                // Type chips match vanilla entries, loader chips match
-                // modded variants — several active chips combine
-                boolean matches = entry.isVanilla()
-                        ? types.contains(entry.version().type())
-                        : loaders.contains(entry.variant());
-                if (!matches) {
-                    continue;
-                }
-            }
-            if (!query.isEmpty()) {
-                String haystack = (entry.displayId() + " "
-                        + entry.typeLabel()).toLowerCase();
-                if (!haystack.contains(query)) {
-                    continue;
-                }
-            }
-            filtered.add(entry);
-        }
-
-        filtered.sort(Comparator
-                .comparing((VersionEntry e) ->
-                                e.version().releaseTime().orElse(null),
-                        Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparingInt(e -> e.variant().ordinal())
-                .thenComparing(e -> e.version().id()));
-
-        versionListView.setItems(FXCollections.observableArrayList(filtered));
-        if (versionBrowserTitle != null && !versionEntries.isEmpty()) {
-            versionBrowserTitle.setText(
-                    filtered.size() == versionEntries.size() ? "Versions"
-                            : "Versions (" + filtered.size() + " of "
-                                    + versionEntries.size() + ")");
-        }
-    }
-
-    /** Creates an instance for the double-clicked browser entry. */
-    private void onEntryActivated(VersionEntry entry) {
-        NewInstanceDialog.Result result = NewInstanceDialog.showFor(
-                (Stage) root.getScene().getWindow(),
-                modLoaderRegistry, entry.version(), entry.variant());
-        if (result != null) {
-            createInstance(result);
-        }
-    }
-
-    // --- Selected version: loader version, play, folder ---
-
-    /**
-     * Reacts to a version browser selection: shows the action bar for
-     * it and, for modded entries, loads the loader versions (newest
-     * first) in the background — the newest one is the default.
-     */
-    private void onVersionSelected(VersionEntry entry) {
-        loaderVersionChanged = false;
-        selectedLoaderVersion = null;
-        if (entry == null || entry.isVanilla()) {
-            selectedLoaderVersions = List.of();
-            loaderVersionsFamily = null;
-            loaderVersionsMcId = null;
-            updateInstanceChooser();
-            updateVersionActionBar();
-            return;
-        }
-        ModLoaderType family = entry.variant();
-        String mcId = entry.version().id();
-        if (family == loaderVersionsFamily
-                && mcId.equals(loaderVersionsMcId)
-                && !selectedLoaderVersions.isEmpty()) {
-            selectedLoaderVersion = selectedLoaderVersions.get(0);
-            updateInstanceChooser();
-            updateVersionActionBar();
-            return;
-        }
-        loaderVersionsFamily = family;
-        loaderVersionsMcId = mcId;
-        selectedLoaderVersions = List.of();
-        updateInstanceChooser();
-        updateVersionActionBar();
-
-        var regEntry = modLoaderRegistry.get(family).orElse(null);
-        if (regEntry == null) {
-            updateVersionActionBar();
-            return;
-        }
-        statusLabel.setText("Loading " + family.displayName()
-                + " versions for MC " + mcId + "...");
-        Thread fetch = new Thread(() -> {
-            List<ModLoaderVersion> versions;
-            try {
-                versions = regEntry.provider().fetchVersions(mcId);
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    if (isCurrentEntry(family, mcId)) {
-                        statusLabel.setText("Failed to load "
-                                + family.displayName() + " versions: "
-                                + ex.getMessage());
-                        updateVersionActionBar();
-                    }
-                });
-                return;
-            }
-            Platform.runLater(() -> {
-                if (!isCurrentEntry(family, mcId)) {
-                    return; // selection changed meanwhile
-                }
-                selectedLoaderVersions = versions;
-                selectedLoaderVersion =
-                        versions.isEmpty() ? null : versions.get(0);
-                updateInstanceChooser();
-                updateVersionActionBar();
-            });
-        }, "browser-loader-versions");
-        fetch.setDaemon(true);
-        fetch.start();
-    }
-
-    /** True if {@code family} + {@code mcId} is still selected. */
-    private boolean isCurrentEntry(ModLoaderType family, String mcId) {
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        return entry != null && !entry.isVanilla()
-                && entry.variant() == family
-                && entry.version().id().equals(mcId);
-    }
-
-    /** Syncs the action bar with the selection + loader state. */
-    private void updateVersionActionBar() {
-        if (selectedVersionLabel == null) return;
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        boolean has = entry != null;
-        boolean modded = has && !entry.isVanilla();
-
-        if (has) {
-            selectedVersionLabel.setText(
-                    entry.isVanilla()
-                            ? entry.version().id() + " · "
-                                    + entry.typeLabel()
-                            : entry.displayId());
-        } else {
-            selectedVersionLabel.setText("Select a version to play");
-        }
-
-        playVersionButton.setDisable(!has || versionPlayInFlight);
-        folderVersionButton.setDisable(!has);
-
-        loaderVersionButton.setVisible(modded);
-        loaderVersionButton.setManaged(modded);
-        if (!modded) {
-            loaderVersionButton.setText("Loader version");
-            return;
-        }
-        ModLoaderType family = entry.variant();
-        if (selectedLoaderVersions.isEmpty()) {
-            loaderVersionButton.setDisable(true);
-            loaderVersionButton.setText(family.displayName()
-                    + " version: loading...");
-            return;
-        }
-        loaderVersionButton.setDisable(false);
-        String suffix = loaderVersionChanged ? "" : " (latest)";
-        if (selectedLoaderVersion == null) {
-            loaderVersionButton.setText(family.displayName()
-                    + " version: none" + suffix);
-        } else {
-            loaderVersionButton.setText(family.displayName()
-                    + " version: "
-                    + selectedLoaderVersion.loaderVersion() + suffix);
-        }
-    }
-
-    /**
-     * Opens the loader version picker for the selected modded entry:
-     * every listed version is compatible with the chosen Minecraft
-     * version; the newest one is preselected.
-     */
-    private void onChangeLoaderVersion() {
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        if (entry == null || entry.isVanilla()
-                || selectedLoaderVersions.isEmpty()) {
-            return;
-        }
-        ModLoaderVersion picked = LoaderVersionDialog.show(
-                (Stage) root.getScene().getWindow(),
-                entry.variant(), entry.version().id(),
-                selectedLoaderVersions, selectedLoaderVersion);
-        if (picked != null) {
-            selectedLoaderVersion = picked;
-            loaderVersionChanged = true;
-            // An instance with this loader version becomes the
-            // preferred choice in the instance chooser
-            updateInstanceChooser();
-            updateVersionActionBar();
-        }
-    }
-
-    /**
-     * Plays the selected version: the instance chosen in the instance
-     * chooser is launched (same principle as instance Play: verify →
-     * repair if needed → launch; a selected build replaces the mods
-     * and configs right before the game starts); with no instance
-     * yet, it is created first (installing the version if needed) and
-     * launched right after — with the newest loader version by
-     * default, or the one picked via the loader version button.
-     */
-    private void onPlaySelectedVersion() {
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        if (entry == null) return;
-
-        ModdedProfile chosen =
-                instanceChooser.getSelectionModel().getSelectedItem();
-        if (chosen != null) {
-            selectInstance(chosen.id());
-            startInstanceLaunch(chosen);
-            return;
-        }
-        ModdedProfile match = findPlayableInstance(entry);
-        if (match != null) {
-            selectInstance(match.id());
-            startInstanceLaunch(match);
-            return;
-        }
-        if (!entry.isVanilla() && selectedLoaderVersion == null) {
-            statusLabel.setText("Loader versions are still loading"
-                    + " — try again in a moment");
-            return;
-        }
-        versionPlayInFlight = true;
-        updateVersionActionBar();
-        NewInstanceDialog.Result result = new NewInstanceDialog.Result(
-                entry.variant(), entry.version(),
-                entry.isVanilla() ? null : selectedLoaderVersion,
-                List.of(), "");
-        createInstance(result, true);
-    }
-
-    /**
-     * Finds an existing instance that matches the browser selection:
-     * any instance of that Minecraft version for vanilla entries; for
-     * modded entries preferably one with the chosen loader version,
-     * otherwise any instance of that loader family (only when the
-     * user did not explicitly change the loader version).
-     */
-    private ModdedProfile findPlayableInstance(VersionEntry entry) {
-        String mcId = entry.version().id();
-        if (entry.isVanilla()) {
-            for (ModdedProfile p : moddedProfiles) {
-                if (p.isVanilla() && p.minecraftVersion().equals(mcId)) {
-                    return p;
-                }
-            }
-            return null;
-        }
-        ModdedProfile exact = null;
-        ModdedProfile any = null;
-        for (ModdedProfile p : moddedProfiles) {
-            if (p.isVanilla()
-                    || p.loaderType() != entry.variant()
-                    || !p.minecraftVersion().equals(mcId)) {
-                continue;
-            }
-            if (any == null) {
-                any = p;
-            }
-            if (selectedLoaderVersion != null
-                    && p.loaderVersion().equals(
-                            selectedLoaderVersion.loaderVersion())) {
-                exact = p;
-            }
-        }
-        if (loaderVersionChanged) {
-            return exact;
-        }
-        return exact != null ? exact : any;
-    }
-
-    /**
-     * Existing instances of the selected browser entry: vanilla
-     * entries match vanilla instances, modded entries match instances
-     * of the same loader family (each with its own game directory).
-     * Most recently played first.
-     */
-    private List<ModdedProfile> matchingInstances(VersionEntry entry) {
-        String mcId = entry.version().id();
-        List<ModdedProfile> matches = new ArrayList<>();
-        for (ModdedProfile p : moddedProfiles) {
-            if (!p.minecraftVersion().equals(mcId)) {
-                continue;
-            }
-            if (entry.isVanilla() ? p.isVanilla()
-                    : !p.isVanilla() && p.loaderType() == entry.variant()) {
-                matches.add(p);
-            }
-        }
-        matches.sort(Comparator
-                .comparing((ModdedProfile p) -> p.lastPlayedTime().orElse(null),
-                        Comparator.nullsFirst(Comparator.naturalOrder()))
-                .reversed()
-                .thenComparing(p -> p.name().toLowerCase()));
-        return matches;
-    }
-
-    /**
-     * Syncs the instance chooser with the current browser selection
-     * and the instance list. Preference: the instance with the chosen
-     * loader version, then the previously chosen one, then the most
-     * recently played.
-     */
-    private void updateInstanceChooser() {
-        if (instanceChooser == null) return;
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        List<ModdedProfile> matches =
-                entry == null ? List.of() : matchingInstances(entry);
-        ModdedProfile previous =
-                instanceChooser.getSelectionModel().getSelectedItem();
-        instanceChooser.getItems().setAll(matches);
-        if (matches.isEmpty()) {
-            instanceChooser.getSelectionModel().clearSelection();
-            return;
-        }
-        ModdedProfile pick = null;
-        if (entry != null && !entry.isVanilla()
-                && selectedLoaderVersion != null) {
-            for (ModdedProfile p : matches) {
-                if (p.loaderVersion().equals(
-                        selectedLoaderVersion.loaderVersion())) {
-                    pick = p;
-                    break;
-                }
-            }
-        }
-        if (pick == null && previous != null) {
-            for (ModdedProfile p : matches) {
-                if (p.id().equals(previous.id())) {
-                    pick = p;
-                    break;
-                }
-            }
-        }
-        if (pick == null) {
-            pick = matches.get(0);
-        }
-        instanceChooser.getSelectionModel().select(pick);
-    }
-
-    /**
-     * Opens the selected version's directory in the system file
-     * manager: the instance's game directory if one exists, otherwise
-     * the version's folder under {@code versions/} (or the versions
-     * root while it is not installed yet).
-     */
-    private void onOpenSelectedVersionFolder() {
-        VersionEntry entry =
-                versionListView.getSelectionModel().getSelectedItem();
-        if (entry == null) return;
-        try {
-            ModdedProfile chosen =
-                    instanceChooser.getSelectionModel().getSelectedItem();
-            ModdedProfile match = chosen != null ? chosen
-                    : findPlayableInstance(entry);
-            if (match != null) {
-                Path dir = moddedProfileService.resolveGameDir(match);
-                ModdedProfileService.ensureProfileFolders(dir);
-                java.awt.Desktop.getDesktop().open(dir.toFile());
-                statusLabel.setText("Opened " + dir);
-                return;
-            }
-            GameDirectory storage = GameDirectory.defaultDirectory();
-            Path dir = entry.isVanilla()
-                    ? storage.versionDir(entry.version().id())
-                    : (selectedLoaderVersion != null
-                            ? storage.versionDir(
-                                    selectedLoaderVersion.installedVersionId())
-                            : null);
-            if (dir == null || !Files.isDirectory(dir)) {
-                dir = storage.versionsDir();
-            }
-            java.awt.Desktop.getDesktop().open(dir.toFile());
-            statusLabel.setText("Opened " + dir);
-        } catch (Exception ex) {
-            statusLabel.setText("Failed to open folder: " + ex.getMessage());
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Open Folder",
-                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
-        }
-    }
 
     // ------------------------------------------------------------------
     //  Profiles view: accounts management
@@ -1859,42 +1094,9 @@ public class MainView {
     }
 
     /**
-     * Opens the build picker for the selected modded instance: the
-     * chosen build (or none) replaces the instance's mods/config
-     * folders at launch.
-     */
-    private void onSelectBuild(ModdedProfile profile) {
-        if (profile == null || profile.isVanilla()) return;
-        Path dir = moddedProfileService.resolveGameDir(profile);
-        String active = buildService.selectedBuild(dir).orElse(null);
-
-        SelectBuildDialog.Result result = SelectBuildDialog.show(
-                (Stage) root.getScene().getWindow(), profile.name(),
-                active, buildService, dir);
-        if (result == null) return; // cancelled
-
-        try {
-            buildService.selectBuild(dir, result.buildName());
-            statusLabel.setText(result.buildName() == null
-                    ? "Build cleared — " + profile.name()
-                            + " launches with its current folders"
-                    : "Build selected: " + result.buildName()
-                            + " — applied at launch");
-            refreshInstanceCards();
-        } catch (java.io.IOException e) {
-            statusLabel.setText("Failed to select build: " + e.getMessage());
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Select Build",
-                    e.getClass().getSimpleName() + ": " + e.getMessage());
-        }
-    }
-
-    /**
      * Saves the current mods/configs of the selected modded instance
-     * as a new build: the user names it, chooses the contents (mods
-     * only, or mods together with configs) and whether to activate it
-     * right away — the checkbox is off by default, so saving alone
-     * never changes the active build.
+     * as a new build: the user names it and chooses the contents
+     * (mods only, or mods together with configs).
      */
     private void onSaveBuild(ModdedProfile profile) {
         if (profile == null || profile.isVanilla()) return;
@@ -1908,19 +1110,48 @@ public class MainView {
             ModdedProfileService.ensureProfileFolders(dir);
             BuildService.BuildInfo saved = buildService.saveBuild(
                     dir, result.name(), result.mods(), result.configs());
-            // Activating is the user's explicit choice; all other
-            // builds stay saved and untouched either way
-            if (result.activate()) {
-                buildService.selectBuild(dir, saved.name());
-                statusLabel.setText("Build saved and activated: "
-                        + saved.name() + " (" + saved.description()
-                        + ") — applied at launch");
-            } else {
-                statusLabel.setText("Build saved: " + saved.name()
-                        + " (" + saved.description() + ")"
-                        + " — choose it via Select Build");
-            }
+            statusLabel.setText("Build saved: " + saved.name()
+                    + " (" + saved.description() + ")");
             refreshInstanceCards();
+        } catch (java.io.IOException e) {
+            statusLabel.setText("Failed to save build: " + e.getMessage());
+            ErrorDialog.show((Stage) root.getScene().getWindow(),
+                    "Cannot Save Build",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Fast build saving without scrolling the cards: the instance is
+     * picked by typing right in the dialog.
+     */
+    private void onQuickSaveBuild() {
+        boolean anyModded = false;
+        for (ModdedProfile p : moddedProfiles) {
+            if (!p.isVanilla()) {
+                anyModded = true;
+                break;
+            }
+        }
+        if (!anyModded) {
+            statusLabel.setText(
+                    "Create a modded instance first — builds need mods");
+            return;
+        }
+        QuickSaveBuildDialog.Result result = QuickSaveBuildDialog.show(
+                (Stage) root.getScene().getWindow(), moddedProfiles,
+                selectedInstanceId);
+        if (result == null) return; // cancelled
+
+        Path dir = moddedProfileService.resolveGameDir(result.profile());
+        try {
+            ModdedProfileService.ensureProfileFolders(dir);
+            BuildService.BuildInfo saved = buildService.saveBuild(
+                    dir, result.name(), result.mods(), result.configs());
+            statusLabel.setText("Build saved: " + saved.name()
+                    + " (" + saved.description() + ") for "
+                    + result.profile().name());
+            selectInstance(result.profile().id());
         } catch (java.io.IOException e) {
             statusLabel.setText("Failed to save build: " + e.getMessage());
             ErrorDialog.show((Stage) root.getScene().getWindow(),
@@ -1967,8 +1198,7 @@ public class MainView {
      * Opens the catalog of builds the administrator published and
      * installs the chosen one into the selected modded instance. Each
      * build gets its own folder — saved builds and other server
-     * builds are never touched; afterwards it is activated via Select
-     * Build like any local build. Requires a signed-in session (the
+     * builds are never touched. Requires a signed-in session (the
      * sign-in dialog opens automatically when none exists).
      */
     private void onServerBuilds(ModdedProfile profile) {
@@ -1990,8 +1220,7 @@ public class MainView {
         if (outcome != null) {
             statusLabel.setText((outcome.wasUpdate() ? "Build updated: "
                     : "Build installed: ")
-                    + outcome.displayName() + " " + outcome.version()
-                    + " — activate it via Select Build");
+                    + outcome.displayName() + " " + outcome.version());
             refreshInstanceCards();
         }
     }
@@ -2114,15 +1343,10 @@ public class MainView {
     private void onVersionsLoaded(VersionManifest manifest) {
         manifestVersions = manifest.versions();
         versionsLoadFailed = false;
-        if (versionListView != null) {
-            versionListView.setPlaceholder(new Label("No versions match."));
-        }
-        buildVersionEntries();
-        applyVersionFilter();
-        statusLabel.setText(versionEntries.size()
-                + " versions available (vanilla + modded variants)");
+        statusLabel.setText(manifestVersions.size()
+                + " versions available for new instances");
         footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  All "
-                + versionEntries.size() + " versions available");
+                + manifestVersions.size() + " versions available");
         refreshModdedProfiles(null);
     }
 
@@ -2130,16 +1354,6 @@ public class MainView {
         versionsLoadFailed = true;
         statusLabel.setText("Version list load failed ("
                 + cause.getMessage() + ")");
-        if (versionListView != null) {
-            Hyperlink retry = new Hyperlink(
-                    "Couldn't load versions — click to retry");
-            retry.setOnAction(e -> {
-                statusLabel.setText("Retrying version list...");
-                loadVersions();
-            });
-            versionListView.setPlaceholder(retry);
-            versionListView.getItems().clear();
-        }
     }
 
     /** Whether the version's metadata requires Java 8 or older. */
@@ -2326,10 +1540,10 @@ public class MainView {
     // ------------------------------------------------------------------
 
     /**
-     * Opens the New Instance dialog — one simple screen with loader
-     * chips, the version list and the loader version list — and
-     * creates the instance on confirmation. The version browser's
-     * double-click offers a shortcut with a fixed version/loader.
+     * Opens the New Instance dialog — one simple screen with the
+     * instance name, loader chips, the version list and the loader
+     * version list — and creates the instance on confirmation.
+     * Version picking lives here, on the main tab.
      */
     private void onNewInstance() {
         if (manifestVersions.isEmpty()) {
@@ -2362,8 +1576,7 @@ public class MainView {
 
     /**
      * @param playWhenReady launch the instance right after creating
-     *                      it (playing straight from the version
-     *                      browser)
+     *                      it
      */
     private void createInstance(NewInstanceDialog.Result result,
                                 boolean playWhenReady) {
@@ -2462,7 +1675,6 @@ public class MainView {
                 selectedInstanceId = null;
             }
             refreshInstanceCards();
-            updateInstanceChooser();
         } catch (java.io.IOException e) {
             statusLabel.setText("Failed to load instances: " + e.getMessage());
         }
@@ -2553,19 +1765,26 @@ public class MainView {
     // --- Instance launch (verify → repair if needed → launch) ---
 
     /**
-     * Common launch entry for every Play button (cards and version
-     * browser): account resolution, Ely.by refresh and then the
+     * Common launch entry for every Play button on the cards:
+     * account resolution, Ely.by refresh and then the
      * verify → repair-if-needed → launch chain.
      */
     private void startInstanceLaunch(ModdedProfile profile) {
+        // Only one game at a time per launcher window — a second
+        // attempt while anything is launching is ignored
+        if (versionPlayInFlight) {
+            statusLabel.setText("Already launching "
+                    + launchingStatusText.toLowerCase() + " — please wait");
+            return;
+        }
         GameProfile account = getOrCreateProfile();
         GameDirectory storage = GameDirectory.defaultDirectory();
 
-        // A launch attempt blocks both Play buttons until a terminal
-        // callback (launch end/failure, game exit) refreshes them
+        // A launch attempt blocks every Play button immediately
+        // (until a terminal callback refreshes them)
         versionPlayInFlight = true;
-        updateVersionActionBar();
         javaDownloadAttempted = false;
+        setLaunchStatus(profile.id(), "Verifying...");
         statusLabel.setText("Verifying " + profile.name() + "...");
 
         if (account.isElyBy()) {
@@ -2670,6 +1889,7 @@ public class MainView {
                                         ModdedProfileVerificationService.VerificationReport original) {
         statusLabel.setText("Repairing " + profile.name()
                 + " (downloading missing files)...");
+        setLaunchStatus(profile.id(), "Repairing...");
 
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
@@ -2747,6 +1967,7 @@ public class MainView {
                                  VersionMetadata metadata,
                                  GameDirectory storage) {
         statusLabel.setText("Launching " + profile.name() + "...");
+        setLaunchStatus(profile.id(), "Launching...");
         Path runtimeDir = storage.root().resolve(profile.gameDirPath());
 
         Task<LaunchResult> launchTask = new Task<>() {
@@ -2755,15 +1976,6 @@ public class MainView {
                 // The profile's game directory must exist before the
                 // process can run inside it
                 ModdedProfileService.ensureProfileFolders(runtimeDir);
-                // A selected build replaces the instance's mods and
-                // config folders right before the game starts
-                if (!profile.isVanilla()) {
-                    String build = buildService.selectedBuild(runtimeDir)
-                            .orElse(null);
-                    if (build != null) {
-                        buildService.applyBuild(runtimeDir, build);
-                    }
-                }
                 return launchService.launch(metadata, storage, account,
                         runtimeDir,
                         ModdedProfileService.effectiveJvmArgs(profile));
@@ -2828,6 +2040,7 @@ public class MainView {
                                                     VersionMetadata meta) {
         statusLabel.setText("Java 8 required for " + profile.name()
                 + ". Downloading JRE 8...");
+        setLaunchStatus(profile.id(), "Installing Java...");
 
         Task<JavaRuntime> installTask = new Task<>() {
             @Override

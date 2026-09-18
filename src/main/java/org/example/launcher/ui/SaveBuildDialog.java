@@ -16,10 +16,7 @@ import javafx.stage.StageStyle;
 /**
  * Modal dialog for saving the current content of an instance as a
  * build: the user names the build and chooses what to include — mods
- * only, or mods together with configs. Optionally the new build can
- * be activated right away; leaving the checkbox off keeps the
- * currently active build (saving never changes the selection by
- * itself).
+ * only, or mods together with configs.
  */
 public class SaveBuildDialog extends Stage {
 
@@ -29,12 +26,8 @@ public class SaveBuildDialog extends Stage {
      * @param name     build name (non-blank)
      * @param mods     snapshot the mods folder
      * @param configs  snapshot the config folder
-     * @param activate make the new build the active one (applied at
-     *                 launch); {@code false} leaves the current
-     *                 selection unchanged
      */
-    public record Result(String name, boolean mods, boolean configs,
-                         boolean activate) {
+    public record Result(String name, boolean mods, boolean configs) {
     }
 
     private Result result;
@@ -42,8 +35,6 @@ public class SaveBuildDialog extends Stage {
     private final TextField nameField = new TextField();
     private final CheckBox modsCheck = new CheckBox("Mods");
     private final CheckBox configsCheck = new CheckBox("Configs");
-    private final CheckBox activateCheck = new CheckBox(
-            "Activate this build (applied at launch)");
     private final Button saveButton = new Button("Save");
 
     public SaveBuildDialog(Stage owner) {
@@ -62,16 +53,14 @@ public class SaveBuildDialog extends Stage {
         contentsLabel.getStyleClass().add("section-title");
         modsCheck.setSelected(true);
         configsCheck.setSelected(false);
-        activateCheck.setSelected(false);
         HBox checks = new HBox(12, modsCheck, configsCheck);
         checks.setAlignment(Pos.CENTER_LEFT);
         checks.setPadding(new Insets(2, 0, 2, 0));
 
         Label hint = new Label(
                 "The build is a snapshot of the instance's current mods and "
-                        + "config folders. A selected build replaces those "
-                        + "folders at launch; every saved build is kept "
-                        + "separately and switching never deletes one.");
+                        + "config folders, kept in the instance's builds "
+                        + "folder.");
         hint.getStyleClass().add("quick-select-label");
         hint.setWrapText(true);
 
@@ -87,8 +76,7 @@ public class SaveBuildDialog extends Stage {
         saveButton.setDisable(true);
         saveButton.setOnAction(e -> {
             result = new Result(nameField.getText().trim(),
-                    modsCheck.isSelected(), configsCheck.isSelected(),
-                    activateCheck.isSelected());
+                    modsCheck.isSelected(), configsCheck.isSelected());
             close();
         });
         Button cancelButton = new Button("Cancel");
@@ -101,7 +89,7 @@ public class SaveBuildDialog extends Stage {
         buttons.setPadding(new Insets(6, 0, 0, 0));
 
         VBox content = new VBox(6, nameLabel, nameField, contentsLabel,
-                checks, activateCheck, hint, buttons);
+                checks, hint, buttons);
         content.setPadding(new Insets(18));
         content.setPrefWidth(420);
 

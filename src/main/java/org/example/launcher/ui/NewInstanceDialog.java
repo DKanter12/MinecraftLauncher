@@ -49,10 +49,6 @@ import org.example.launcher.version.StandardVersionType;
  * Extra JVM arguments (e.g. {@code -Xmx4G}) can be given; the
  * instance name is typed in freely and defaults to the loader and
  * the Minecraft version when left empty.
- *
- * <p>There is also a <b>fixed-entry mode</b> (double-clicked version
- * browser row): loader family and Minecraft version are preset and
- * only the name, the loader version and JVM arguments are chosen.</p>
  */
 public class NewInstanceDialog extends Stage {
 
@@ -79,11 +75,6 @@ public class NewInstanceDialog extends Stage {
     private final ModLoaderRegistry registry;
     private final List<MinecraftVersion> manifestVersions;
 
-    /** Fixed version (double-clicked browser entry) or null = full picker. */
-    private final MinecraftVersion fixedVersion;
-    /** Fixed loader family for the fixed version, or null. */
-    private final ModLoaderType fixedLoader;
-
     private final ToggleGroup loaderGroup = new ToggleGroup();
     private final HBox loaderChips = new HBox(6);
     private final ToggleGroup categoryGroup = new ToggleGroup();
@@ -99,7 +90,6 @@ public class NewInstanceDialog extends Stage {
     private final VBox loaderChipsBox;
     private final VBox categoryBox;
     private final VBox versionListBox;
-    private final VBox fixedInfoBox;
     private final VBox loaderBox;
 
     /** Last requested loader-version fetch (deduplicates requests). */
@@ -113,40 +103,16 @@ public class NewInstanceDialog extends Stage {
     public NewInstanceDialog(Stage owner,
                              ModLoaderRegistry registry,
                              List<MinecraftVersion> manifestVersions) {
-        this(owner, registry, manifestVersions, null, null);
-    }
-
-    /**
-     * Fixed-entry mode (double-clicked version browser row): the
-     * Minecraft version and loader family are already chosen; only
-     * the loader version (newest by default, changeable) and JVM
-     * arguments are picked here.
-     */
-    private NewInstanceDialog(Stage owner,
-                              ModLoaderRegistry registry,
-                              MinecraftVersion fixedVersion,
-                              ModLoaderType fixedLoader) {
-        this(owner, registry, null, fixedVersion, fixedLoader);
-    }
-
-    private NewInstanceDialog(Stage owner,
-                              ModLoaderRegistry registry,
-                              List<MinecraftVersion> manifestVersions,
-                              MinecraftVersion fixedVersion,
-                              ModLoaderType fixedLoader) {
         this.registry = registry;
         this.manifestVersions = manifestVersions;
-        this.fixedVersion = fixedVersion;
-        this.fixedLoader = fixedLoader;
 
         initStyle(StageStyle.UTILITY);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
         MinecraftVersion shownVersion =
-                fixedVersion != null ? fixedVersion
-                        : (manifestVersions != null && !manifestVersions.isEmpty()
-                                ? manifestVersions.get(0) : null);
+                (manifestVersions != null && !manifestVersions.isEmpty()
+                        ? manifestVersions.get(0) : null);
         setTitle("New Instance"
                 + (shownVersion != null ? ": " + shownVersion.id() : ""));
 
@@ -274,31 +240,6 @@ public class NewInstanceDialog extends Stage {
         loaderBox = new VBox(4, loaderVersionTitle, loaderCombo,
                 loaderStatusRow);
 
-        // -- Fixed entry (double-clicked browser row): version + type --
-        VBox fixedBox;
-        if (fixedVersion != null) {
-            Label fixedTitle = new Label("Version");
-            fixedTitle.getStyleClass().add("section-title");
-            Label idLabel = new Label(fixedVersion.id());
-            idLabel.getStyleClass().add("profile-name");
-            String familyText = fixedLoader != null
-                    && fixedLoader != ModLoaderType.VANILLA
-                            ? fixedLoader.displayName()
-                            : fixedVersion.type().displayName();
-            Label detailsLabel = new Label(familyText + " · "
-                    + fixedVersion.formattedReleaseTime());
-            detailsLabel.getStyleClass().add("profile-summary");
-            Region fixedSpacer = new Region();
-            HBox.setHgrow(fixedSpacer, Priority.ALWAYS);
-            HBox versionRow = new HBox(8, idLabel, fixedSpacer, detailsLabel);
-            versionRow.setAlignment(Pos.CENTER_LEFT);
-            versionRow.getStyleClass().add("slot-box");
-            fixedBox = new VBox(4, fixedTitle, versionRow);
-        } else {
-            fixedBox = new VBox();
-        }
-        fixedInfoBox = fixedBox;
-
         // -- JVM args --
         Label jvmLabel = new Label(
                 "Extra JVM arguments (one per line, optional)");
@@ -313,7 +254,7 @@ public class NewInstanceDialog extends Stage {
         createButton.getStyleClass().add("install-close-button");
         createButton.setDefaultButton(true);
         createButton.setOnAction(e -> {
-            ModLoaderType type = effectiveLoader();
+            ModLoaderType type = selectedLoader();
             result = new Result(
                     type,
                     effectiveVersion(),
@@ -332,12 +273,8 @@ public class NewInstanceDialog extends Stage {
         buttons.setPadding(new Insets(8, 0, 0, 0));
 
         // -- Initial state: newest release preselected --
-        if (fixedVersion == null) {
-            refreshVersionList();
-            if (versionList.getSelectionModel().getSelectedItem() == null) {
-                onInputsChanged();
-            }
-        } else {
+        refreshVersionList();
+        if (versionList.getSelectionModel().getSelectedItem() == null) {
             onInputsChanged();
         }
 
@@ -346,7 +283,6 @@ public class NewInstanceDialog extends Stage {
                 loaderChipsBox,
                 categoryBox,
                 versionListBox,
-                fixedInfoBox,
                 loaderBox,
                 jvmLabel, jvmArgsArea,
                 buttons);
@@ -371,23 +307,8 @@ public class NewInstanceDialog extends Stage {
         return ModLoaderType.VANILLA;
     }
 
-    /**
-     * The loader family of the instance to create: fixed in
-     * fixed-entry mode, otherwise the picked chip.
-     */
-    private ModLoaderType effectiveLoader() {
-        if (fixedLoader != null) {
-            return fixedLoader;
-        }
-        return fixedVersion != null ? ModLoaderType.VANILLA
-                : selectedLoader();
-    }
-
     /** The MC version of the instance to create. */
     private MinecraftVersion effectiveVersion() {
-        if (fixedVersion != null) {
-            return fixedVersion;
-        }
         return versionList.getSelectionModel().getSelectedItem();
     }
 
@@ -462,13 +383,7 @@ public class NewInstanceDialog extends Stage {
      * in sync.
      */
     private void onInputsChanged() {
-        boolean fixed = fixedVersion != null;
-        setVisibleManaged(loaderChipsBox, !fixed);
-        setVisibleManaged(categoryBox, !fixed);
-        setVisibleManaged(versionListBox, !fixed);
-        setVisibleManaged(fixedInfoBox, fixed);
-
-        ModLoaderType loader = effectiveLoader();
+        ModLoaderType loader = selectedLoader();
         boolean modded = loader != ModLoaderType.VANILLA;
         MinecraftVersion mc = effectiveVersion();
 
@@ -509,7 +424,7 @@ public class NewInstanceDialog extends Stage {
                 versions = regEntry.provider().fetchVersions(mc.id());
             } catch (Exception ex) {
                 Platform.runLater(() -> {
-                    if (effectiveLoader() == loader && isCurrent(mc)) {
+                    if (selectedLoader() == loader && isCurrent(mc)) {
                         loaderProgress.setVisible(false);
                         loaderStatusLabel.setText("Failed to load versions: "
                                 + ex.getMessage());
@@ -521,7 +436,7 @@ public class NewInstanceDialog extends Stage {
                 return;
             }
             Platform.runLater(() -> {
-                if (effectiveLoader() != loader || !isCurrent(mc)) {
+                if (selectedLoader() != loader || !isCurrent(mc)) {
                     return; // selection changed meanwhile
                 }
                 loaderProgress.setVisible(false);
@@ -551,7 +466,7 @@ public class NewInstanceDialog extends Stage {
 
     private void updateCreateButtonState() {
         MinecraftVersion mc = effectiveVersion();
-        boolean modded = effectiveLoader() != ModLoaderType.VANILLA;
+        boolean modded = selectedLoader() != ModLoaderType.VANILLA;
         createButton.setDisable(mc == null
                 || (modded && loaderCombo.getValue() == null));
     }
@@ -595,24 +510,6 @@ public class NewInstanceDialog extends Stage {
                               List<MinecraftVersion> manifestVersions) {
         NewInstanceDialog dialog = new NewInstanceDialog(
                 owner, registry, manifestVersions);
-        dialog.showAndWait();
-        return dialog.result;
-    }
-
-    /**
-     * Shows the dialog for a version (or modded variant of one)
-     * double-clicked in the version browser: loader family and
-     * Minecraft version are fixed, the loader version defaults to
-     * the newest (changeable). Returns the creation parameters, or
-     * {@code null} if it was cancelled.
-     */
-    public static Result showFor(Stage owner,
-                                 ModLoaderRegistry registry,
-                                 MinecraftVersion version,
-                                 ModLoaderType family) {
-        NewInstanceDialog dialog = new NewInstanceDialog(
-                owner, registry, version,
-                family != null ? family : ModLoaderType.VANILLA);
         dialog.showAndWait();
         return dialog.result;
     }

@@ -37,8 +37,8 @@ import org.example.launcher.model.ModdedProfile;
  * reflects the local state: install a build that is not present yet,
  * update one whose server version is newer, or shows the installed
  * version when it is current. Installing a build never touches other
- * builds — each build id gets its own folder, and afterwards it is
- * activated like any local build via "Select Build".</p>
+ * builds — each build id gets its own folder inside this
+ * instance.</p>
  */
 public class ServerBuildsDialog extends Stage {
 
@@ -83,8 +83,7 @@ public class ServerBuildsDialog extends Stage {
         Label hintLabel = new Label(
                 "Published by the administrator. Installing downloads the build "
                         + "into its own folder of this instance — other builds, "
-                        + "including your saved ones, are not touched. Activate "
-                        + "an installed build via Select Build.");
+                        + "including your saved ones, are not touched.");
         hintLabel.getStyleClass().add("quick-select-label");
         hintLabel.setWrapText(true);
 
@@ -192,7 +191,7 @@ public class ServerBuildsDialog extends Stage {
                             selected.version(), wasUpdate);
                     statusLabel.setText((wasUpdate ? "Updated " : "Installed ")
                             + selected.displayName() + " " + selected.version()
-                            + " — activate it via Select Build.");
+                            + ".");
                 });
             } catch (IOException | RuntimeException e) {
                 Platform.runLater(() ->

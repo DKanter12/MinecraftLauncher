@@ -133,7 +133,7 @@ public class LauncherApp extends Application {
         MainView view = new MainView(
                 versionService, metadataService, installationService,
                 launchService, javaResolutionService, javaRuntimeInstaller,
-                profileService, typeRegistry, preferences, elyAuthService, skinService,
+                profileService, preferences, elyAuthService, skinService,
                 modLoaderRegistry, moddedVersionService,
                 moddedProfileService, profileVerificationService);
 

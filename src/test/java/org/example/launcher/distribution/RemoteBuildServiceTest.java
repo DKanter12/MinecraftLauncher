@@ -10,8 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.service.BuildService;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,20 +51,19 @@ class RemoteBuildServiceTest {
     }
 
     @Test
-    void installedServerBuildAppearsInLocalBuildList() throws IOException {
+    void installedServerBuildIsListedWithItsManifest() throws IOException {
         api.build("bettersurvival", "1.0.0")
                 .file(BuildFileCategory.MODS, "sodium.jar", "sodium-bytes")
                 .file(BuildFileCategory.CONFIGS, "sodium.toml", "config-bytes")
                 .publish();
-        BuildService buildService = new BuildService();
 
         service.install(session, api.builds.get("bettersurvival").summary(), tempDir);
 
-        List<BuildService.BuildInfo> builds = buildService.listBuilds(tempDir);
-        assertEquals(1, builds.size());
-        assertEquals("bettersurvival", builds.get(0).name());
-        assertTrue(builds.get(0).mods());
-        assertTrue(builds.get(0).configs());
+        List<BuildDescriptor> installed = service.installedBuilds(tempDir);
+        assertEquals(1, installed.size());
+        assertEquals("bettersurvival", installed.get(0).id());
+        assertEquals("1.0.0", installed.get(0).version());
+        assertEquals(2, installed.get(0).files().size());
     }
 
     @Test

@@ -39,11 +39,10 @@ class ModdedProfileServiceTest {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfile profile = createFabricProfile(gameDir);
 
-        // The name is derived automatically and never editable:
-        // "Fabric 1.21.4" sanitized (dots/spaces collapse to dashes)
+        // The name is used as-is for the folder: "Fabric 1.21.4"
         assertEquals("Fabric 1.21.4", profile.name());
-        assertEquals("fabric-1-21-4", profile.id());
-        assertEquals("profiles/fabric-1-21-4", profile.gameDirPath());
+        assertEquals("Fabric 1.21.4", profile.id());
+        assertEquals("profiles/Fabric 1.21.4", profile.gameDirPath());
         assertEquals("fabric-loader-0.16.9-1.21.4", profile.versionId());
 
         // Profile metadata
@@ -73,8 +72,8 @@ class ModdedProfileServiceTest {
         ModdedProfile first = createFabricProfile(gameDir);
         ModdedProfile second = createFabricProfile(gameDir);
 
-        assertEquals("fabric-1-21-4", first.id());
-        assertEquals("fabric-1-21-4-2", second.id());
+        assertEquals("Fabric 1.21.4", first.id());
+        assertEquals("Fabric 1.21.4-2", second.id());
         // Same automatic display name, different directories
         assertEquals(first.name(), second.name());
         assertNotEqualsDirs(gameDir, first, second);
@@ -95,7 +94,7 @@ class ModdedProfileServiceTest {
                 "1.20.1-forge-47.4.23", List.of(), null, 0);
 
         assertEquals("Forge 1.20.1", profile.name());
-        assertEquals("forge-1-20-1", profile.id());
+        assertEquals("Forge 1.20.1", profile.id());
     }
 
     @Test
@@ -127,7 +126,7 @@ class ModdedProfileServiceTest {
                 ModLoaderType.VANILLA, "", "1.21.4", "1.21.4", List.of(),
                 null, 0);
 
-        assertEquals("vanilla-1-21-4", profile.id());
+        assertEquals("Vanilla 1.21.4", profile.id());
         assertEquals("Vanilla 1.21.4", profile.name());
         assertEquals(ModLoaderType.VANILLA, profile.loaderType());
         assertTrue(profile.isVanilla());
@@ -224,9 +223,9 @@ class ModdedProfileServiceTest {
                 updated.get().extraJvmArgs());
 
         // The folder follows the launcher name; the id follows the folder
-        assertEquals("my-renamed-pack", updated.get().id());
-        assertEquals("profiles/my-renamed-pack", updated.get().gameDirPath());
-        Path newDir = gameDir.moddedProfileDir("my-renamed-pack");
+        assertEquals("My Renamed Pack", updated.get().id());
+        assertEquals("profiles/My Renamed Pack", updated.get().gameDirPath());
+        Path newDir = gameDir.moddedProfileDir("My Renamed Pack");
         assertFalse(Files.exists(oldDir));
         assertEquals("fake",
                 Files.readString(newDir.resolve("mods").resolve("mymod.jar")));
@@ -240,7 +239,7 @@ class ModdedProfileServiceTest {
         List<ModdedProfile> reloaded = svc.loadProfiles();
         assertEquals(1, reloaded.size());
         assertEquals("My Renamed Pack", reloaded.get(0).name());
-        assertEquals("my-renamed-pack", reloaded.get(0).id());
+        assertEquals("My Renamed Pack", reloaded.get(0).id());
         assertEquals(6144, reloaded.get(0).memoryMb());
         assertEquals(1, reloaded.get(0).extraJvmArgs().size());
     }
@@ -260,14 +259,14 @@ class ModdedProfileServiceTest {
 
         assertTrue(updated.isPresent());
         assertEquals("Fabric 1.21.4", updated.get().name());
-        assertEquals("fabric-1-21-4-2", updated.get().id());
-        assertEquals("profiles/fabric-1-21-4-2", updated.get().gameDirPath());
+        assertEquals("Fabric 1.21.4-2", updated.get().id());
+        assertEquals("profiles/Fabric 1.21.4-2", updated.get().gameDirPath());
         assertTrue(Files.isDirectory(
-                gameDir.moddedProfileDir("fabric-1-21-4-2")));
+                gameDir.moddedProfileDir("Fabric 1.21.4-2")));
     }
 
     @Test
-    @DisplayName("updateProfile: same sanitized name keeps its folder")
+    @DisplayName("updateProfile: cosmetic rename keeps its folder")
     void updateProfileSameFolder(@TempDir Path tempDir) throws IOException {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfileService svc = service(gameDir);
@@ -275,9 +274,9 @@ class ModdedProfileServiceTest {
         Path dir = gameDir.moddedProfileDir(profile.id());
         Files.writeString(dir.resolve("mods").resolve("mymod.jar"), "fake");
 
-        // "Fabric-1.21.4" sanitizes to the same directory — no move
+        // Trailing space trims to the same directory — no move
         Optional<ModdedProfile> updated = svc.updateProfile(profile.id(),
-                List.of(), "Fabric-1.21.4", 0);
+                List.of(), "Fabric 1.21.4 ", 0);
 
         assertTrue(updated.isPresent());
         assertEquals(profile.id(), updated.get().id());
@@ -313,8 +312,8 @@ class ModdedProfileServiceTest {
                 List.of(), "My NeoForge Pack", 8192);
 
         assertEquals("My NeoForge Pack", profile.name());
-        assertEquals("my-neoforge-pack", profile.id());
-        assertEquals("profiles/my-neoforge-pack", profile.gameDirPath());
+        assertEquals("My NeoForge Pack", profile.id());
+        assertEquals("profiles/My NeoForge Pack", profile.gameDirPath());
         assertEquals(8192, profile.memoryMb());
 
         List<ModdedProfile> loaded = svc.loadProfiles();
@@ -332,8 +331,44 @@ class ModdedProfileServiceTest {
                 "fabric-loader-0.16.9-1.21.4", List.of(), "  ", -100);
 
         assertEquals("Fabric 1.21.4", profile.name());
-        assertEquals("fabric-1-21-4", profile.id());
+        assertEquals("Fabric 1.21.4", profile.id());
         assertEquals(0, profile.memoryMb());
+    }
+
+    @Test
+    @DisplayName("createProfile: a name with no usable characters falls back to loader + MC")
+    void createProfileUnusableNameFallback(@TempDir Path tempDir) throws IOException {
+        GameDirectory gameDir = new GameDirectory(tempDir);
+        ModdedProfile profile = service(gameDir).createProfile(
+                ModLoaderType.FORGE, "47.4.23", "1.20.1",
+                "1.20.1-forge-47.4.23", List.of(), "???", 0);
+
+        // The display name stays as typed, but the folder is meaningful
+        assertEquals("???", profile.name());
+        assertEquals("Forge 1.20.1", profile.id());
+        assertEquals("profiles/Forge 1.20.1", profile.gameDirPath());
+        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("Forge 1.20.1")));
+    }
+
+    @Test
+    @DisplayName("updateProfile: renaming to an unusable name moves to loader + MC")
+    void updateProfileUnusableNameFallback(@TempDir Path tempDir) throws IOException {
+        GameDirectory gameDir = new GameDirectory(tempDir);
+        ModdedProfileService svc = service(gameDir);
+        ModdedProfile profile = svc.createProfile(ModLoaderType.FABRIC,
+                "0.16.9", "1.21.4", "fabric-loader-0.16.9-1.21.4",
+                List.of(), "My Pack", 0);
+        Path oldDir = gameDir.moddedProfileDir("My Pack");
+        assertTrue(Files.isDirectory(oldDir));
+
+        Optional<ModdedProfile> updated = svc.updateProfile(profile.id(),
+                List.of(), "???", 0);
+
+        assertTrue(updated.isPresent());
+        assertEquals("???", updated.get().name());
+        assertEquals("Fabric 1.21.4", updated.get().id());
+        assertFalse(Files.exists(oldDir));
+        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("Fabric 1.21.4")));
     }
 
     @Test
@@ -380,7 +415,7 @@ class ModdedProfileServiceTest {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfile profile = createFabricProfile(gameDir);
 
-        assertEquals(tempDir.resolve("profiles/fabric-1-21-4"),
+        assertEquals(tempDir.resolve("profiles/Fabric 1.21.4"),
                 service(gameDir).resolveGameDir(profile));
     }
 
@@ -400,20 +435,21 @@ class ModdedProfileServiceTest {
     }
 
     @Test
-    @DisplayName("sanitize keeps only safe characters")
+    @DisplayName("sanitize keeps the name, cutting only forbidden characters")
     void sanitizeNames() {
-        assertEquals("my-pack", ModdedProfileService.sanitize("My Pack"));
-        assertEquals("a-b-c", ModdedProfileService.sanitize("a?b*c!"));
+        assertEquals("My Pack", ModdedProfileService.sanitize("My Pack"));
+        assertEquals("abc!", ModdedProfileService.sanitize("a?b*c!"));
         assertEquals("", ModdedProfileService.sanitize("///"));
         assertEquals("", ModdedProfileService.sanitize(null));
+        assertEquals("name", ModdedProfileService.sanitize("  name. "));
     }
 
     @Test
-    @DisplayName("sanitize transliterates Cyrillic")
+    @DisplayName("sanitize keeps Cyrillic and other Unicode as-is")
     void sanitizeCyrillic() {
-        assertEquals("moya-sborka",
+        assertEquals("Моя сборка",
                 ModdedProfileService.sanitize("Моя сборка"));
-        assertEquals("neoforge-test",
+        assertEquals("NeoForge тест!",
                 ModdedProfileService.sanitize("NeoForge тест!"));
     }
 

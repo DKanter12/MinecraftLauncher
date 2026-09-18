@@ -296,6 +296,7 @@
 /* Card Play buttons tinted with the loader accent, like the mockup. */
 
 .card-play {
+    -fx-background-color: #8b5cf6;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-font-size: 13px;
@@ -304,53 +305,23 @@
     -fx-cursor: hand;
 }
 
-.accent-vanilla .card-play {
-    -fx-background-color: #2f9e44;
-}
-
-.accent-vanilla .card-play:hover {
-    -fx-background-color: #3cb54f;
-}
-
-.accent-fabric .card-play {
-    -fx-background-color: #b39626;
-}
-
-.accent-fabric .card-play:hover {
-    -fx-background-color: #c9ab2e;
-}
-
-.accent-forge .card-play {
-    -fx-background-color: #cf6f27;
-}
-
-.accent-forge .card-play:hover {
-    -fx-background-color: #e07f35;
-}
-
-.accent-neoforge .card-play {
-    -fx-background-color: #3b78e0;
-}
-
-.accent-neoforge .card-play:hover {
-    -fx-background-color: #4f8ef7;
-}
-
-.accent-quilt .card-play {
-    -fx-background-color: #8348d6;
-}
-
-.accent-quilt .card-play:hover {
-    -fx-background-color: #9b5de5;
+.card-play:hover {
+    -fx-background-color: #9d71f7;
 }
 
 .card-play:pressed {
-    -fx-opacity: 0.85;
+    -fx-background-color: #7a4fe0;
 }
 
 .card-play:disabled {
     -fx-background-color: #3a3f55;
     -fx-text-fill: #6b7194;
+}
+
+.instance-card-launching {
+    -fx-border-color: #e8c832;
+    -fx-border-width: 2;
+    -fx-effect: dropshadow(three-pass-box, rgba(232, 200, 50, 0.35), 14, 0, 0, 0);
 }
 
 .card-ghost-button {
@@ -385,20 +356,21 @@
 }
 
 .card-danger-button {
-    -fx-background-color: #3a2330;
-    -fx-text-fill: #ff8585;
+    -fx-background-color: #c93a3e;
+    -fx-text-fill: #ffffff;
     -fx-font-size: 12px;
+    -fx-font-weight: bold;
     -fx-background-radius: 8;
-    -fx-border-color: #5c2b31;
-    -fx-border-radius: 8;
-    -fx-border-width: 1;
-    -fx-padding: 6 12 6 12;
+    -fx-padding: 8 12 8 12;
     -fx-cursor: hand;
 }
 
 .card-danger-button:hover {
-    -fx-background-color: #4c2b3a;
-    -fx-text-fill: #ffaaaa;
+    -fx-background-color: #e5484d;
+}
+
+.card-danger-button:pressed {
+    -fx-background-color: #a92e32;
 }
 
 /* Dashed "Add New Instance" tile. */
@@ -476,6 +448,44 @@
 .browse-java-button:disabled {
     -fx-background-color: #2a2e40;
     -fx-text-fill: #6b7194;
+}
+
+/* Explicit red account removal: impossible to confuse with login. */
+
+.account-delete-button {
+    -fx-background-color: #3a2330;
+    -fx-text-fill: #ff8585;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-border-color: #5c2b31;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 4 12 4 12;
+    -fx-cursor: hand;
+}
+
+.account-delete-button:hover {
+    -fx-background-color: #c93a3e;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #c93a3e;
+}
+
+.account-delete-button:pressed {
+    -fx-background-color: #a92e32;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #a92e32;
+}
+
+.tooltip {
+    -fx-background-color: #232839;
+    -fx-text-fill: #eef0f7;
+    -fx-font-size: 12px;
+    -fx-background-radius: 6;
+    -fx-border-color: #313853;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-padding: 6 10 6 10;
 }
 
 /* Filter chips: bracket pills, violet when active. */
@@ -694,10 +704,10 @@
 .type-badge-old-alpha {
     -fx-font-size: 9px;
     -fx-font-weight: bold;
-    -fx-padding: 1 5 1 5;
+    -fx-padding: 2 8 2 8;
     -fx-background-color: #12141b;
-    -fx-background-radius: 4;
-    -fx-border-radius: 4;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
     -fx-border-width: 1;
 }
 

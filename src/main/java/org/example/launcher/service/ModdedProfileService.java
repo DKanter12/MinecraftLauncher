@@ -7,11 +7,10 @@ import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -166,7 +165,15 @@ public class ModdedProfileService {
                 : displayName.trim();
 
         List<ModdedProfile> existing = loadProfiles();
-        String dirName = uniqueDirectoryName(name, existing);
+        // The folder follows the launcher name (Cyrillic is
+        // transliterated); when the name has no usable characters at
+        // all, the loader + MC version is used — so a meaningless
+        // "profile-N" folder almost never appears
+        String dirBase = sanitize(name);
+        if (dirBase.isBlank()) {
+            dirBase = defaultDisplayName(loaderType, minecraftVersion);
+        }
+        String dirName = uniqueDirectoryName(dirBase, existing);
         String now = OffsetDateTime.now().format(TIME_FORMAT);
 
         List<String> components = new ArrayList<>();
@@ -255,7 +262,14 @@ public class ModdedProfileService {
                 // Renaming also renames the folder, so it always
                 // matches the launcher name; the id follows the
                 // folder. Mods, saves and builds move along untouched.
-                String dirName = uniqueDirectoryName(name, profiles, p.id());
+                // A name with no usable characters falls back to
+                // loader + MC version instead of "profile-N".
+                String dirBase = sanitize(name);
+                if (dirBase.isBlank()) {
+                    dirBase = defaultDisplayName(p.loaderType(),
+                            p.minecraftVersion());
+                }
+                String dirName = uniqueDirectoryName(dirBase, profiles, p.id());
                 if (!dirName.equals(p.id())) {
                     Path source = storage.moddedProfileDir(p.id());
                     Path target = storage.moddedProfileDir(dirName);
@@ -332,10 +346,9 @@ public class ModdedProfileService {
     // ------------------------------------------------------------------
 
     /**
-     * Derives a filesystem-safe, unique directory name from the
-     * display name. Unsafe characters are replaced, a fallback name is
-     * used when nothing safe remains, and numeric suffixes ensure
-     * uniqueness against both existing profiles and existing
+     * Derives a unique directory name from the display name: the name
+     * itself when filesystem-safe (so the folder matches the launcher
+     * name), numeric suffixes against existing profiles and existing
      * directories on disk.
      */
     private String uniqueDirectoryName(String displayName,
@@ -380,48 +393,33 @@ public class ModdedProfileService {
     }
 
     /**
-     * Keeps only safe filename characters ([A-Za-z0-9_-]); Cyrillic
-     * letters are transliterated first (so "Моя сборка" becomes
-     * "moya-sborka"), everything else collapses to a single dash.
+     * Makes a display name safe for a folder: only filesystem-forbidden
+     * characters ({@code \ / : * ? " < > |} and controls) are removed,
+     * trailing dots/spaces are trimmed. Everything else — spaces,
+     * dots, upper case, Unicode — stays, so the folder matches the
+     * launcher name exactly ("Моя сборка" stays "Моя сборка").
+     * Returns {@code ""} when nothing usable remains.
      */
     static String sanitize(String name) {
         if (name == null) return "";
-        String lower = name.toLowerCase(Locale.ROOT);
-        StringBuilder latin = new StringBuilder(lower.length());
-        for (int i = 0; i < lower.length();) {
-            int codePoint = lower.codePointAt(i);
-            String mapped = TRANSLIT.get(codePoint);
-            if (mapped != null) {
-                latin.append(mapped);
-            } else {
-                latin.appendCodePoint(codePoint);
-            }
-            i += Character.charCount(codePoint);
+        String cleaned = name.strip().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]+", "");
+        cleaned = cleaned.strip().replaceAll("[. ]+$", "");
+        if (cleaned.isEmpty() || cleaned.equals(".") || cleaned.equals("..")) {
+            return "";
         }
-        return latin.toString().replaceAll("[^a-z0-9_-]+", "-")
-                .replaceAll("^-+|-+$", "");
+        if (RESERVED_NAMES.contains(cleaned.toLowerCase(Locale.ROOT))) {
+            cleaned += "_";
+        }
+        return cleaned;
     }
 
-    /** Cyrillic → Latin, so folders stay readable ASCII. */
-    private static final Map<Integer, String> TRANSLIT = buildTranslit();
-
-    private static Map<Integer, String> buildTranslit() {
-        Map<Integer, String> map = new HashMap<>();
-        String[][] pairs = {
-            {"а", "a"}, {"б", "b"}, {"в", "v"}, {"г", "g"}, {"д", "d"},
-            {"е", "e"}, {"ё", "yo"}, {"ж", "zh"}, {"з", "z"}, {"и", "i"},
-            {"й", "y"}, {"к", "k"}, {"л", "l"}, {"м", "m"}, {"н", "n"},
-            {"о", "o"}, {"п", "p"}, {"р", "r"}, {"с", "s"}, {"т", "t"},
-            {"у", "u"}, {"ф", "f"}, {"х", "h"}, {"ц", "ts"}, {"ч", "ch"},
-            {"ш", "sh"}, {"щ", "shch"}, {"ъ", ""}, {"ы", "y"}, {"ь", ""},
-            {"э", "e"}, {"ю", "yu"}, {"я", "ya"},
-            {"ґ", "g"}, {"є", "ye"}, {"і", "i"}, {"ї", "yi"},
-        };
-        for (String[] pair : pairs) {
-            map.put(pair[0].codePointAt(0), pair[1]);
-        }
-        return Map.copyOf(map);
-    }
+    /** Windows device names that cannot be folders. */
+    private static final Set<String> RESERVED_NAMES = Set.of(
+            "con", "prn", "aux", "nul",
+            "com1", "com2", "com3", "com4", "com5",
+            "com6", "com7", "com8", "com9",
+            "lpt1", "lpt2", "lpt3", "lpt4", "lpt5",
+            "lpt6", "lpt7", "lpt8", "lpt9");
 
     // ------------------------------------------------------------------
     //  JSON (de)serialization
