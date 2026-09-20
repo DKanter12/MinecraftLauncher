@@ -10,16 +10,16 @@
     -fx-background-color: #1d2130;
     -fx-border-color: #313853;
     -fx-border-width: 1;
-    -fx-focus-color: #8b5cf6;
-    -fx-faint-focus-color: rgba(139, 92, 246, 0.22);
+    -fx-focus-color: #6d5bff;
+    -fx-faint-focus-color: rgba(109, 91, 255, 0.22);
 }
 
 .root-pane {
     -fx-background-color: linear-gradient(to bottom, #191c27 0%, #14161e 100%);
     -fx-border-width: 0;
     -fx-padding: 0;
-    -fx-focus-color: #8b5cf6;
-    -fx-faint-focus-color: rgba(139, 92, 246, 0.22);
+    -fx-focus-color: #6d5bff;
+    -fx-faint-focus-color: rgba(109, 91, 255, 0.22);
 }
 
 /* ============================ Top bar ============================ */
@@ -69,13 +69,13 @@
 }
 
 .nav-button-active {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
 }
 
 .nav-button-active:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
     -fx-text-fill: #ffffff;
 }
 
@@ -296,7 +296,7 @@
 /* Card Play buttons tinted with the loader accent, like the mockup. */
 
 .card-play {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-font-size: 13px;
@@ -306,11 +306,11 @@
 }
 
 .card-play:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
 }
 
 .card-play:pressed {
-    -fx-background-color: #7a4fe0;
+    -fx-background-color: #5a4bd8;
 }
 
 .card-play:disabled {
@@ -385,7 +385,7 @@
 }
 
 .add-instance-card:hover {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
 }
 
 .add-instance-plus {
@@ -409,7 +409,7 @@
 /* ===================== Primary buttons ===================== */
 
 .quick-select-button {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
     -fx-font-weight: bold;
@@ -419,11 +419,11 @@
 }
 
 .quick-select-button:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
 }
 
 .quick-select-button:pressed {
-    -fx-background-color: #7a4fe0;
+    -fx-background-color: #5a4bd8;
 }
 
 .quick-select-button:disabled {
@@ -503,14 +503,14 @@
 }
 
 .filter-button:hover {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
     -fx-text-fill: #ffffff;
 }
 
 .filter-button:selected,
 .filter-button-active {
-    -fx-background-color: #8b5cf6;
-    -fx-border-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
+    -fx-border-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
 }
@@ -568,7 +568,7 @@
 }
 
 .install-close-button {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-font-size: 14px;
@@ -578,11 +578,11 @@
 }
 
 .install-close-button:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
 }
 
 .install-close-button:pressed {
-    -fx-background-color: #7a4fe0;
+    -fx-background-color: #5a4bd8;
 }
 
 .install-close-button:disabled {
@@ -591,7 +591,7 @@
 }
 
 .retry-button {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-font-size: 14px;
@@ -601,7 +601,7 @@
 }
 
 .retry-button:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
 }
 
 /* ===================== Inputs ===================== */
@@ -618,7 +618,7 @@
 }
 
 .search-field:focused {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
 }
 
 .profile-jvm-args {
@@ -633,7 +633,7 @@
 }
 
 .profile-jvm-args:focused {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
 }
 
 /* ===================== Lists ===================== */
@@ -834,11 +834,11 @@
 }
 
 .check-box:selected > .box > .mark {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
 }
 
 .check-box:hover .box {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
 }
 
 /* ===================== Context menus ===================== */
@@ -893,7 +893,7 @@
 }
 
 .dialog-pane .button {
-    -fx-background-color: #8b5cf6;
+    -fx-background-color: #6d5bff;
     -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-background-radius: 8;
@@ -902,7 +902,7 @@
 }
 
 .dialog-pane .button:hover {
-    -fx-background-color: #9d71f7;
+    -fx-background-color: #8372ff;
 }
 
 /* ===================== Scroll bars ===================== */
@@ -947,7 +947,7 @@
 }
 
 .progress-bar > .bar {
-    -fx-background-color: linear-gradient(to right, #8b5cf6 0%, #6ea8ff 100%);
+    -fx-background-color: linear-gradient(to right, #6d5bff 0%, #6ea8ff 100%);
     -fx-background-radius: 4;
     -fx-background-insets: 0;
     -fx-padding: 4;
@@ -958,7 +958,7 @@
 }
 
 .progress-indicator {
-    -fx-progress-color: #8b5cf6;
+    -fx-progress-color: #6d5bff;
 }
 
 /* ===================== Dialog text ===================== */
@@ -1011,7 +1011,7 @@
 }
 
 .account-row-active {
-    -fx-border-color: #8b5cf6;
+    -fx-border-color: #6d5bff;
     -fx-border-width: 2;
 }
 

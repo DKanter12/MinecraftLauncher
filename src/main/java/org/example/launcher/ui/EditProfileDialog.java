@@ -12,6 +12,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -44,7 +45,7 @@ public class EditProfileDialog extends Stage {
 
     private final TextField nameField = new TextField();
     private final TextField memoryField = new TextField();
-    private final HBox memoryChips = new HBox(6);
+    private final FlowPane memoryChips = new FlowPane();
     private final ToggleGroup memoryGroup = new ToggleGroup();
     private final TextArea jvmArgsArea = new TextArea();
     private final Label errorLabel = new Label();
@@ -68,8 +69,11 @@ public class EditProfileDialog extends Stage {
         nameField.getStyleClass().add("search-field");
         nameField.setMaxWidth(Double.MAX_VALUE);
 
-        Label memoryLabel = new Label("Memory (RAM, megabytes)");
+        Label memoryLabel = new Label("Maximum memory (RAM)");
         memoryLabel.getStyleClass().add("section-title");
+        memoryChips.setHgap(8);
+        memoryChips.setVgap(8);
+        // Compact preset row — 2 / 4 / 8 etc. without ellipsis (FlowPane prevents "2...")
         addMemoryChip("Auto", 0);
         addMemoryChip("2 GB", 2048);
         addMemoryChip("4 GB", 4096);
@@ -77,9 +81,10 @@ public class EditProfileDialog extends Stage {
         addMemoryChip("8 GB", 8192);
         addMemoryChip("12 GB", 12288);
         addMemoryChip("16 GB", 16384);
+        addMemoryChip("32 GB", 32768);
         memoryField.setText(profile.memoryMb() > 0
                 ? String.valueOf(profile.memoryMb()) : "");
-        memoryField.setPromptText("Custom MB (e.g. 10240 for 10 GB)");
+        memoryField.setPromptText("or custom MB — e.g. 10240 for 10 GB");
         memoryField.getStyleClass().add("search-field");
         memoryField.setMaxWidth(Double.MAX_VALUE);
 
@@ -141,6 +146,9 @@ public class EditProfileDialog extends Stage {
     private void addMemoryChip(String text, int megabytes) {
         ToggleButton chip = new ToggleButton(text);
         chip.getStyleClass().add("filter-button");
+        // Ensure text never ellipsizes to "2..." — keep natural width
+        chip.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        chip.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         chip.setToggleGroup(memoryGroup);
         chip.setUserData(megabytes);
         chip.setOnAction(e -> {

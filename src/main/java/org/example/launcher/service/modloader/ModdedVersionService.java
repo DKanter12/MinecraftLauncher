@@ -126,25 +126,40 @@ public class ModdedVersionService {
                 && root.get("inheritsFrom").isJsonPrimitive()
                         ? root.get("inheritsFrom").getAsString() : null;
 
-        VersionMetadata vanilla = fetchVanillaMetadata(vanillaId);
+        VersionMetadata vanilla = fetchVanillaMetadata(vanillaId, gameDir);
         return merger.merge(vanilla, loaderJson);
     }
 
-    private VersionMetadata fetchVanillaMetadata(String vanillaId)
+    private VersionMetadata fetchVanillaMetadata(String vanillaId, GameDirectory gameDir)
             throws IOException {
         if (vanillaId == null || vanillaId.isBlank()) {
             throw new IOException(
                     "Version JSON has no inheritsFrom — cannot resolve vanilla base");
         }
 
-        MinecraftVersion vanillaVersion = versionService.fetchVersions().versions()
-                .stream()
-                .filter(v -> v.id().equals(vanillaId))
-                .findFirst()
-                .orElseThrow(() -> new IOException("Vanilla version " + vanillaId
-                        + " not found in the Mojang manifest"));
-
-        return metadataService.fetchMetadata(vanillaVersion);
+        try {
+            MinecraftVersion vanillaVersion = versionService.fetchVersions().versions()
+                    .stream()
+                    .filter(v -> v.id().equals(vanillaId))
+                    .findFirst()
+                    .orElseThrow(() -> new IOException("Vanilla version " + vanillaId
+                            + " not found in the Mojang manifest"));
+            return metadataService.fetchMetadata(vanillaVersion);
+        } catch (IOException network) {
+            // Offline fallback: use cached vanilla JSON if present
+            Path local = gameDir.versionMetadata(vanillaId);
+            if (Files.isRegularFile(local)) {
+                try {
+                    String json = Files.readString(local, StandardCharsets.UTF_8);
+                    return metadataService.parseMetadata(json, vanillaId);
+                } catch (Exception parseEx) {
+                    String pMsg = parseEx.getMessage() != null ? parseEx.getMessage() : parseEx.toString();
+                    String nMsg = network.getMessage() != null ? network.getMessage() : network.toString();
+                    throw new IOException("Offline fallback failed for " + vanillaId + ": " + pMsg + " (network: " + nMsg + ")", network);
+                }
+            }
+            throw network;
+        }
     }
 
     /**

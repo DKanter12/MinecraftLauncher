@@ -69,7 +69,18 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                 throw new IOException("Unexpected HTTP status " + response.statusCode()
                         + " fetching metadata for " + version.id());
             }
-            return parseMetadata(response.body(), version.id());
+            String body = response.body();
+            // Cache raw version JSON for offline launch of already-downloaded versions (vanilla 1.20.1 etc.)
+            try {
+                java.nio.file.Path cached = org.example.launcher.install.GameDirectory.defaultDirectory()
+                        .versionMetadata(version.id());
+                if (!java.nio.file.Files.isRegularFile(cached)) {
+                    java.nio.file.Files.createDirectories(cached.getParent());
+                    java.nio.file.Files.writeString(cached, body, java.nio.charset.StandardCharsets.UTF_8);
+                }
+            } catch (Exception ignored) {
+            }
+            return parseMetadata(body, version.id());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while fetching metadata for " + version.id(), e);

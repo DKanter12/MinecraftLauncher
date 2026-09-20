@@ -118,6 +118,9 @@ public class ModdedProfileVerificationService {
     /**
      * Vanilla instance verification: metadata from the Mojang manifest,
      * dependency integrity, launch command and game directory.
+     * Offline fallback: if the manifest/metadata cannot be fetched
+     * but the version JSON is already cached locally (previous install),
+     * that cached file is used so already-downloaded versions launch offline.
      */
     private VerificationReport verifyVanilla(ModdedProfile profile,
                                              GameDirectory storage) {
@@ -126,24 +129,46 @@ public class ModdedProfileVerificationService {
 
         MinecraftVersion vanillaVersion = findManifestVersion(
                 profile.minecraftVersion());
+        // Offline fallback: manifest unavailable but version JSON exists locally
+        boolean offlineVanilla = false;
         if (vanillaVersion == null) {
-            errors.add("Minecraft version " + profile.minecraftVersion()
-                    + " was not found in the Mojang manifest");
-            errors.add("Cause: the version may be very old, a local build, "
-                    + "or the manifest could not be fetched");
-            return new VerificationReport(false, errors, warnings,
-                    Optional.empty());
+            Path localJson = storage.versionMetadata(profile.minecraftVersion());
+            if (Files.isRegularFile(localJson)) {
+                vanillaVersion = new MinecraftVersion(profile.minecraftVersion(),
+                        org.example.launcher.version.StandardVersionType.RELEASE, null, null);
+                offlineVanilla = true;
+                warnings.add("Offline mode: using cached version metadata for " + profile.minecraftVersion());
+            } else {
+                errors.add("Minecraft version " + profile.minecraftVersion()
+                        + " was not found in the Mojang manifest");
+                errors.add("Cause: the version may be very old, a local build, "
+                        + "or the manifest could not be fetched");
+                return new VerificationReport(false, errors, warnings,
+                        Optional.empty());
+            }
         }
 
         VersionMetadata metadata;
         try {
             metadata = metadataService.fetchMetadata(vanillaVersion);
         } catch (IOException e) {
-            errors.add("Failed to fetch version metadata: " + e.getMessage());
-            errors.add("Cause: MC " + profile.minecraftVersion()
-                    + " metadata could not be downloaded");
-            return new VerificationReport(false, errors, warnings,
-                    Optional.empty());
+            String netMsg = e.getMessage() != null ? e.getMessage() : e.toString();
+            // Offline: try cached version JSON directly
+            Optional<VersionMetadata> local = tryLoadLocalMetadata(profile.minecraftVersion(), storage);
+            if (local.isPresent()) {
+                metadata = local.get();
+                warnings.add("Offline mode: using cached metadata (network: " + netMsg + ")");
+            } else {
+                errors.add("Failed to fetch version metadata: " + netMsg);
+                errors.add("Cause: MC " + profile.minecraftVersion()
+                        + " metadata could not be downloaded. Expected cache: "
+                        + storage.versionMetadata(profile.minecraftVersion()));
+                if (offlineVanilla) {
+                    errors.add("Cached file also unavailable or corrupt");
+                }
+                return new VerificationReport(false, errors, warnings,
+                        Optional.empty());
+            }
         }
 
         // Dependencies present and intact (client JAR, libraries,
@@ -230,11 +255,30 @@ public class ModdedProfileVerificationService {
         try {
             merged = moddedVersionService.resolveMetadata(profile.versionId(), storage);
         } catch (IOException e) {
-            errors.add("Failed to resolve launch metadata: " + e.getMessage());
-            errors.add("Cause: the vanilla metadata for MC "
-                    + profile.minecraftVersion() + " could not be fetched "
-                    + "or merged with the loader configuration");
-            return new VerificationReport(false, errors, warnings, Optional.empty());
+            String netMsg = e.getMessage() != null ? e.getMessage() : e.toString();
+            // Offline fallback: merge cached vanilla JSON with loader JSON locally
+            Optional<VersionMetadata> offline = tryResolveOfflineModdedMetadata(profile, storage, e);
+            if (offline.isPresent()) {
+                merged = offline.get();
+                warnings.add("Offline mode: using cached merged metadata (network: " + netMsg + ")");
+            } else {
+                // If cache missing, give actionable hint instead of "null"
+                Path vanillaCache = storage.versionMetadata(profile.minecraftVersion());
+                boolean hasVanillaCache = Files.isRegularFile(vanillaCache);
+                errors.add("Failed to resolve launch metadata: " + netMsg);
+                if (!hasVanillaCache) {
+                    errors.add("Cause: vanilla metadata for MC " + profile.minecraftVersion()
+                            + " is not cached locally and could not be fetched (offline). "
+                            + "Connect once online and launch/verify the instance to cache it, "
+                            + "or reinstall the instance. Expected cache: " + vanillaCache);
+                } else {
+                    errors.add("Cause: the vanilla metadata for MC "
+                            + profile.minecraftVersion() + " could not be fetched "
+                            + "or merged with the loader configuration. Check " + vanillaCache
+                            + " for corruption and the loader JSON " + storage.versionMetadata(profile.versionId()));
+                }
+                return new VerificationReport(false, errors, warnings, Optional.empty());
+            }
         }
 
         // 4. Dependencies present and intact (client JAR, libraries,
@@ -400,6 +444,37 @@ public class ModdedProfileVerificationService {
         return new ModLoaderVersion(
                 profile.loaderType(), profile.loaderVersion(),
                 profile.minecraftVersion(), true, null);
+    }
+
+    private Optional<VersionMetadata> tryLoadLocalMetadata(String versionId, GameDirectory storage) {
+        Path local = storage.versionMetadata(versionId);
+        if (!Files.isRegularFile(local)) return Optional.empty();
+        try {
+            String json = Files.readString(local, StandardCharsets.UTF_8);
+            return Optional.of(metadataService.parseMetadata(json, versionId));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<VersionMetadata> tryResolveOfflineModdedMetadata(ModdedProfile profile,
+                                                                     GameDirectory storage,
+                                                                     Exception cause) {
+        Path loaderJsonPath = storage.versionMetadata(profile.versionId());
+        if (!Files.isRegularFile(loaderJsonPath)) return Optional.empty();
+        try {
+            String loaderJson = Files.readString(loaderJsonPath, StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(loaderJson).getAsJsonObject();
+            String vanillaId = root.has("inheritsFrom") && root.get("inheritsFrom").isJsonPrimitive()
+                    ? root.get("inheritsFrom").getAsString() : profile.minecraftVersion();
+            Optional<VersionMetadata> vanillaOpt = tryLoadLocalMetadata(vanillaId, storage);
+            if (vanillaOpt.isEmpty()) return Optional.empty();
+            // Merge vanilla + loader locally using same parser
+            ModLoaderMetadataMerger merger = new ModLoaderMetadataMerger(metadataService);
+            return Optional.of(merger.merge(vanillaOpt.get(), loaderJson));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
     }
 
     private MinecraftVersion findManifestVersion(String minecraftVersion) {

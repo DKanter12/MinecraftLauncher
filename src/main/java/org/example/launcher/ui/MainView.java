@@ -19,8 +19,10 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
@@ -173,9 +175,7 @@ public class MainView {
 
     // Account
     private ComboBox<GameProfile> accountCombo;
-    private Button createAccountButton;
-    private Button deleteAccountButton;
-    private Button elyLoginButton;
+    private Button addAccountButton;
     private ImageView avatarView;
     private GameProfile selectedProfile;
     private boolean suppressSelectionListener = false;
@@ -247,7 +247,7 @@ public class MainView {
         viewTitleLabel.getStyleClass().add("view-title");
 
         instanceSearchField = new TextField();
-        instanceSearchField.setPromptText("Search Instances...");
+        instanceSearchField.setPromptText("Search instances...");
         instanceSearchField.getStyleClass().add("search-field");
         instanceSearchField.setPrefWidth(260);
         instanceSearchField.textProperty().addListener((obs, old, val) -> {
@@ -290,47 +290,80 @@ public class MainView {
                         updateAvatar(val);
                     }
                 });
-        // Right-click a row asks whether to delete that account
-        accountCombo.setCellFactory(list -> new ListCell<>() {
+        accountCombo.setTooltip(new Tooltip("Select account • Right-click an entry to delete"));
+        // Dropdown rows: right-click shows "Use / Delete" like most launchers
+        accountCombo.setCellFactory(list -> {
+            ListCell<GameProfile> cell = new ListCell<>() {
+                private ContextMenu menu;
+
+                @Override
+                protected void updateItem(GameProfile item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setGraphic(null);
+                        setContextMenu(null);
+                        setOnContextMenuRequested(null);
+                        menu = null;
+                    } else {
+                        String type = item.isElyBy() ? "Ely.by" : "Offline";
+                        setText(item.name() + "  [" + type + "]");
+                        ContextMenu m = new ContextMenu();
+                        MenuItem useItem = new MenuItem("Use");
+                        useItem.setOnAction(e -> {
+                            accountCombo.getSelectionModel().select(item);
+                            onUseAccount(item);
+                        });
+                        MenuItem deleteItem = new MenuItem("Delete account");
+                        deleteItem.getStyleClass().add("menu-item-danger");
+                        deleteItem.setOnAction(e -> onDeleteAccount(item));
+                        m.getItems().addAll(useItem, deleteItem);
+                        menu = m;
+                        setContextMenu(m);
+                        setOnContextMenuRequested(ev -> {
+                            m.show(this, ev.getScreenX(), ev.getScreenY());
+                            ev.consume();
+                        });
+                    }
+                }
+            };
+            return cell;
+        });
+        // Selected value (button cell): right-click to delete without opening the dropdown
+        accountCombo.setButtonCell(new ListCell<>() {
+            private ContextMenu menu;
+
             @Override
             protected void updateItem(GameProfile item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
+                    setContextMenu(null);
                     setOnContextMenuRequested(null);
+                    menu = null;
                 } else {
-                    setText(item.name()
-                            + (item.isElyBy() ? " [Ely.by]" : " [Offline]"));
-                    setOnContextMenuRequested(e -> {
-                        onDeleteAccount(item);
-                        e.consume();
+                    String type = item.isElyBy() ? "Ely.by" : "Offline";
+                    setText(item.name() + "  [" + type + "]");
+                    ContextMenu m = new ContextMenu();
+                    MenuItem deleteItem = new MenuItem("Delete \"" + item.name() + "\"");
+                    deleteItem.getStyleClass().add("menu-item-danger");
+                    deleteItem.setOnAction(e -> onDeleteAccount(item));
+                    m.getItems().add(deleteItem);
+                    menu = m;
+                    setContextMenu(m);
+                    setOnContextMenuRequested(ev -> {
+                        m.show(this, ev.getScreenX(), ev.getScreenY());
+                        ev.consume();
                     });
                 }
             }
         });
 
-        createAccountButton = new Button("+");
-        createAccountButton.getStyleClass().add("browse-java-button");
-        createAccountButton.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        createAccountButton.setOnAction(e -> onCreateAccount());
-        createAccountButton.setTooltip(new Tooltip("Create an offline account"));
-
-        deleteAccountButton = new Button("Delete");
-        deleteAccountButton.getStyleClass().add("account-delete-button");
-        deleteAccountButton.setTooltip(
-                new Tooltip("Delete the selected account"));
-        deleteAccountButton.setOnAction(e -> {
-            if (selectedProfile != null) {
-                onDeleteAccount(selectedProfile);
-            } else {
-                statusLabel.setText("No account selected");
-            }
-        });
-
-        elyLoginButton = new Button("Ely.by");
-        elyLoginButton.getStyleClass().add("browse-java-button");
-        elyLoginButton.setStyle("-fx-font-size: 11px;");
-        elyLoginButton.setOnAction(e -> onElyLogin());
+        addAccountButton = new Button("+ Add Account");
+        addAccountButton.getStyleClass().add("quick-select-button");
+        addAccountButton.setStyle("-fx-font-size: 12px;");
+        addAccountButton.setOnAction(e -> onAddAccount());
+        addAccountButton.setTooltip(new Tooltip("Create offline or sign in with Ely.by — choose inside"));
 
         serverButton = new Button("Server");
         serverButton.getStyleClass().add("browse-java-button");
@@ -339,8 +372,7 @@ public class MainView {
         updateServerButtonText();
 
         HBox accountBox = new HBox(8, avatarView, accountCombo,
-                createAccountButton, deleteAccountButton, elyLoginButton,
-                serverButton);
+                addAccountButton, serverButton);
         accountBox.setAlignment(Pos.CENTER);
         accountBox.getStyleClass().add("account-pill");
 
@@ -404,11 +436,12 @@ public class MainView {
         }
         Region filterSpacer = new Region();
         HBox.setHgrow(filterSpacer, Priority.ALWAYS);
-        Button quickBuildButton = new Button("+ Build");
-        quickBuildButton.getStyleClass().add("quick-select-button");
-        quickBuildButton.setOnAction(e -> onQuickSaveBuild());
+        Button createBuildButton = new Button("+ Create Build");
+        createBuildButton.getStyleClass().add("quick-select-button");
+        createBuildButton.setTooltip(new Tooltip("Create a new instance — same as Add New Instance tile"));
+        createBuildButton.setOnAction(e -> onNewInstance());
         instanceFilterChips.getChildren().addAll(filterSpacer,
-                quickBuildButton);
+                createBuildButton);
 
         instanceCards = new FlowPane();
         instanceCards.setHgap(14);
@@ -853,27 +886,28 @@ public class MainView {
     // ------------------------------------------------------------------
 
     private VBox buildProfilesView() {
-        Button addOffline = new Button("+ Offline");
-        addOffline.getStyleClass().add("quick-select-button");
-        addOffline.setOnAction(e -> onCreateAccount());
-        Button ely = new Button("Ely.by");
-        ely.getStyleClass().add("quick-select-button");
-        ely.setOnAction(e -> onElyLogin());
+        Button addAccount = new Button("+ Add Account");
+        addAccount.getStyleClass().add("quick-select-button");
+        addAccount.setTooltip(new Tooltip("Offline or Ely.by — choose inside"));
+        addAccount.setOnAction(e -> onAddAccount());
         Button server = new Button("Server");
         server.getStyleClass().add("quick-select-button");
+        server.setTooltip(new Tooltip("Sign in to the builds server (publish / download)"));
         server.setOnAction(e -> {
             onServerLogin();
             refreshProfilesView();
         });
-        HBox buttons = new HBox(8, addOffline, ely, server);
+        Label manageHint = new Label("Right-click an account to delete • Active account launches the game");
+        manageHint.getStyleClass().add("quick-select-label");
+        HBox buttons = new HBox(8, addAccount, server, manageHint);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
         profilesBox = new VBox(10);
         VBox.setVgrow(profilesBox, Priority.ALWAYS);
 
         Label hint = new Label("The active account launches the game. "
-                + "Offline accounts need no password; Ely.by accounts "
-                + "bring skins and capes.");
+                + "Offline needs no password; Ely.by brings skins and capes. "
+                + "Delete an account with right-click in the top bar or with Delete here.");
         hint.getStyleClass().add("quick-select-label");
         hint.setWrapText(true);
 
@@ -926,7 +960,7 @@ public class MainView {
             subLabel.getStyleClass().add("account-row-sub");
             VBox texts = new VBox(2, name, subLabel);
             HBox.setHgrow(texts, Priority.ALWAYS);
-            Button use = new Button("Use");
+            Button use = new Button(active ? "Active" : "Use");
             use.getStyleClass().add("card-ghost-button");
             use.setDisable(active);
             use.setOnAction(e -> onUseAccount(account));
@@ -939,6 +973,22 @@ public class MainView {
             if (active) {
                 row.getStyleClass().add("account-row-active");
             }
+            // Right-click row — context menu like most launchers
+            ContextMenu rowMenu = new ContextMenu();
+            MenuItem rowUse = new MenuItem("Set active");
+            rowUse.setDisable(active);
+            rowUse.setOnAction(e -> onUseAccount(account));
+            MenuItem rowDelete = new MenuItem("Delete account");
+            rowDelete.getStyleClass().add("menu-item-danger");
+            rowDelete.setOnAction(e -> onDeleteAccount(account));
+            rowMenu.getItems().addAll(rowUse, rowDelete);
+            row.setOnContextMenuRequested(e -> {
+                rowMenu.show(row, e.getScreenX(), e.getScreenY());
+                e.consume();
+            });
+            row.setOnMouseClicked(e -> {
+                if (e.getClickCount() == 2 && !active) onUseAccount(account);
+            });
             profilesBox.getChildren().add(row);
         }
     }
@@ -1231,8 +1281,21 @@ public class MainView {
 
     public void loadVersions() {
         refreshAccounts();
+        // Instant offline support: show already-created instances/assemblies
+        // immediately, so they appear even when the manifest fetch later
+        // times out (15-30s) without internet.
+        refreshModdedProfiles(null);
+        try {
+            manifestVersions = loadCachedManifestVersions();
+            if (!manifestVersions.isEmpty()) {
+                versionsLoadFailed = false;
+            }
+        } catch (Exception ignored) {
+        }
         startElyByRefreshTimer();
-        statusLabel.setText("Loading versions...");
+        statusLabel.setText(manifestVersions.isEmpty()
+                ? "Loading versions..."
+                : "Offline: " + manifestVersions.size() + " cached versions • Loading latest...");
 
         Task<VersionManifest> task = new Task<>() {
             @Override
@@ -1352,8 +1415,55 @@ public class MainView {
 
     private void onLoadFailed(Throwable cause) {
         versionsLoadFailed = true;
-        statusLabel.setText("Version list load failed ("
+        statusLabel.setText("Offline mode — version list unavailable ("
                 + cause.getMessage() + ")");
+        // Offline fallback: show already-created instances and cached
+        // installed versions (e.g. Forge) so they can still be launched
+        // without internet. New instance creation will be limited to
+        // locally cached versions.
+        try {
+            manifestVersions = loadCachedManifestVersions();
+        } catch (Exception ignored) {
+            manifestVersions = List.of();
+        }
+        if (!manifestVersions.isEmpty()) {
+            footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  Offline — "
+                    + manifestVersions.size() + " cached versions");
+        } else {
+            footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  Offline");
+        }
+        refreshModdedProfiles(null);
+    }
+
+    private List<MinecraftVersion> loadCachedManifestVersions() {
+        List<MinecraftVersion> cached = new ArrayList<>();
+        Path versionsDir = GameDirectory.defaultDirectory().versionsDir();
+        if (!Files.isDirectory(versionsDir)) return cached;
+        try (var stream = Files.list(versionsDir)) {
+            for (Path dir : (Iterable<Path>) stream::iterator) {
+                if (!Files.isDirectory(dir)) continue;
+                String id = dir.getFileName().toString();
+                Path json = dir.resolve(id + ".json");
+                if (!Files.isRegularFile(json)) continue;
+                try {
+                    String text = Files.readString(json);
+                    com.google.gson.JsonObject obj = com.google.gson.JsonParser.parseString(text).getAsJsonObject();
+                    // Skip corrupt or non-vanilla? Include modded as well for offline visibility
+                    String typeStr = obj.has("type") && obj.get("type").isJsonPrimitive()
+                            ? obj.get("type").getAsString() : "release";
+                    org.example.launcher.version.VersionType type;
+                    try {
+                        type = new org.example.launcher.version.VersionTypeRegistry().resolve(typeStr);
+                    } catch (Exception e) {
+                        type = org.example.launcher.version.StandardVersionType.RELEASE;
+                    }
+                    cached.add(new MinecraftVersion(id, type, null, null));
+                } catch (Exception ignored) {
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return cached;
     }
 
     /** Whether the version's metadata requires Java 8 or older. */
@@ -1451,11 +1561,21 @@ public class MainView {
         }
     }
 
-    private void onCreateAccount() {
+    /** Unified entry: one button opens a dialog where the user picks Offline or Ely.by. */
+    private void onAddAccount() {
         Stage launcherStage = (Stage) root.getScene().getWindow();
-        String name = CreateAccountDialog.showDialog(launcherStage);
-        if (name == null || name.isBlank()) return;
+        AddAccountDialog.Result res = AddAccountDialog.showDialog(launcherStage);
+        if (res == null) return;
+        if (res.type() == AddAccountDialog.Type.OFFLINE) {
+            createOfflineAccount(res.offlineName());
+        } else {
+            authenticateElyBy(res.elyUser(), res.elyPass());
+        }
+    }
 
+    private void createOfflineAccount(String name) {
+        if (name == null || name.isBlank()) return;
+        Stage launcherStage = (Stage) root.getScene().getWindow();
         try {
             profileService.addOfflineProfile(name);
             refreshAccounts();
@@ -1468,25 +1588,30 @@ public class MainView {
                     break;
                 }
             }
-            statusLabel.setText("Account '" + name + "' created");
+            statusLabel.setText("Account '" + name + "' created (offline)");
         } catch (java.io.IOException e) {
             ErrorDialog.show(launcherStage, "Account Error",
                     "Failed to create account: " + e.getMessage());
         }
     }
 
-    private void onElyLogin() {
+    // Kept for internal reuse / legacy callers
+    private void onCreateAccount() {
         Stage launcherStage = (Stage) root.getScene().getWindow();
-        String[] creds = ElyLoginDialog.showDialog(launcherStage);
-        if (creds == null) return;
+        String name = CreateAccountDialog.showDialog(launcherStage);
+        if (name == null || name.isBlank()) return;
+        createOfflineAccount(name);
+    }
 
-        statusLabel.setText("Authenticating with Ely.by...");
-        elyLoginButton.setDisable(true);
+    private void authenticateElyBy(String user, String pass) {
+        Stage launcherStage = (Stage) root.getScene().getWindow();
+        statusLabel.setText("Signing in with Ely.by...");
+        if (addAccountButton != null) addAccountButton.setDisable(true);
 
         Task<GameProfile> authTask = new Task<>() {
             @Override
             protected GameProfile call() throws Exception {
-                return elyAuthService.authenticate(creds[0], creds[1]);
+                return elyAuthService.authenticate(user, pass);
             }
         };
         authTask.setOnSucceeded(e -> {
@@ -1517,18 +1642,25 @@ public class MainView {
             String skinInfo = profile.skinUrl().isPresent()
                     ? " (skin: " + profile.skinModel().orElse("classic") + ")"
                     : " (no skin)";
-            statusLabel.setText("Ely.by login: " + profile.name() + skinInfo);
-            elyLoginButton.setDisable(false);
+            statusLabel.setText("Ely.by: " + profile.name() + skinInfo);
+            if (addAccountButton != null) addAccountButton.setDisable(false);
         });
         authTask.setOnFailed(e -> {
             String msg = authTask.getException().getMessage();
-            statusLabel.setText("Ely.by login failed: " + msg);
-            elyLoginButton.setDisable(false);
-            ErrorDialog.show(launcherStage, "Ely.by Login Failed", msg);
+            statusLabel.setText("Ely.by sign-in failed: " + msg);
+            if (addAccountButton != null) addAccountButton.setDisable(false);
+            ErrorDialog.show(launcherStage, "Ely.by Sign-in Failed", msg);
         });
         var thread = new Thread(authTask, "ely-auth");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    private void onElyLogin() {
+        Stage launcherStage = (Stage) root.getScene().getWindow();
+        String[] creds = ElyLoginDialog.showDialog(launcherStage);
+        if (creds == null) return;
+        authenticateElyBy(creds[0], creds[1]);
     }
 
     // ------------------------------------------------------------------
