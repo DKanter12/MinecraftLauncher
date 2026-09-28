@@ -5,35 +5,35 @@ import org.example.launcher.model.JavaVersion;
 import org.example.launcher.model.VersionMetadata;
 
 /**
- * Resolves which Java runtime to use for launching a given Minecraft
- * version.
+ * Определяет, какой рантайм Java использовать для запуска заданной версии
+ * Minecraft.
  * <p>
- * Implementations query a {@link JavaDetector} for available runtimes
- * and select the best match based on the version's
- * {@link JavaVersion} requirements. If no suitable runtime is found,
- * the result indicates whether one is missing entirely or merely
- * incompatible, allowing the caller to decide whether to trigger
- * automatic installation via a {@code JavaRuntimeInstaller}.
+ * Реализации запрашивают у {@link JavaDetector} доступные рантаймы
+ * и выбирают лучшее соответствие по требованиям
+ * {@link JavaVersion} версии. Если подходящий рантайм не найден,
+ * результат указывает, отсутствует ли он полностью или лишь
+ * несовместим, позволяя вызывающему решить, запускать ли
+ * автоустановку через {@code JavaRuntimeInstaller}.
  */
 public interface JavaResolutionService {
 
     /**
-     * Resolves a Java runtime for the given Minecraft version metadata.
+     * Подбирает рантайм Java для заданных метаданных версии Minecraft.
      *
-     * @param metadata the version to launch
-     * @return resolution result (never {@code null})
+     * @param metadata запускаемая версия
+     * @return результат разрешения (никогда {@code null})
      */
     JavaResolutionResult resolve(VersionMetadata metadata);
 
     /**
-     * Resolves a Java runtime for the given minimum major version.
+     * Подбирает рантайм Java под заданную минимальную major-версию.
      * <p>
-     * This overload is useful when the version metadata does not
-     * specify a {@link JavaVersion} (legacy versions) and the caller
-     * supplies a sensible default (e.g. 8).
+     * Перегрузка полезна, когда метаданные версии не содержат
+     * {@link JavaVersion} (старые версии) и вызывающий передаёт
+     * разумное значение по умолчанию (например, 8).
      *
-     * @param requiredMajor the minimum major Java version required
-     * @return resolution result (never {@code null})
+     * @param requiredMajor минимальная требуемая major-версия Java
+     * @return результат разрешения (никогда {@code null})
      */
     JavaResolutionResult resolve(int requiredMajor);
 }

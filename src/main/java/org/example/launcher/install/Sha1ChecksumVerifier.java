@@ -8,10 +8,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 /**
- * {@link ChecksumVerifier} using the SHA1 algorithm.
+ * Реализация {@link ChecksumVerifier} на алгоритме SHA1.
  * <p>
- * Computes the SHA1 hash of the local file and compares it
- * (case-insensitively) to the expected hex string.
+ * Вычисляет SHA1-хэш локального файла и сравнивает его
+ * (без учёта регистра) с ожидаемой hex-строкой.
  */
 public class Sha1ChecksumVerifier implements ChecksumVerifier {
 
@@ -35,9 +35,9 @@ public class Sha1ChecksumVerifier implements ChecksumVerifier {
     }
 
     /**
-     * Computes the SHA1 hash of the given file.
+     * Вычисляет SHA1-хэш заданного файла.
      *
-     * @return lowercase hex string
+     * @return hex-строка в нижнем регистре
      */
     public static String computeSha1(Path path) throws IOException, NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance("SHA-1");

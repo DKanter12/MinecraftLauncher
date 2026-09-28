@@ -392,12 +392,24 @@ class ModdedProfileServiceTest {
     }
 
     @Test
-    @DisplayName("formatMemory renders GB, MB and Auto")
+    @DisplayName("formatMemory renders GB, MB and Auto in both languages")
     void formatMemory() {
-        assertEquals("Auto", ModdedProfileService.formatMemory(0));
-        assertEquals("Auto", ModdedProfileService.formatMemory(-5));
-        assertEquals("4 GB", ModdedProfileService.formatMemory(4096));
-        assertEquals("512 MB", ModdedProfileService.formatMemory(512));
+        org.example.launcher.i18n.Lang.setLanguage(
+                org.example.launcher.i18n.Lang.Language.ENGLISH);
+        try {
+            assertEquals("Auto", ModdedProfileService.formatMemory(0));
+            assertEquals("Auto", ModdedProfileService.formatMemory(-5));
+            assertEquals("4 GB", ModdedProfileService.formatMemory(4096));
+            assertEquals("512 MB", ModdedProfileService.formatMemory(512));
+            org.example.launcher.i18n.Lang.setLanguage(
+                    org.example.launcher.i18n.Lang.Language.RUSSIAN);
+            assertEquals("Авто", ModdedProfileService.formatMemory(0));
+            assertEquals("4 ГБ", ModdedProfileService.formatMemory(4096));
+            assertEquals("512 МБ", ModdedProfileService.formatMemory(512));
+        } finally {
+            org.example.launcher.i18n.Lang.setLanguage(
+                    org.example.launcher.i18n.Lang.Language.ENGLISH);
+        }
     }
 
     @Test

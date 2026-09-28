@@ -3,15 +3,15 @@ package org.example.launcher.distribution;
 import java.util.List;
 
 /**
- * The complete description of a distributed build: the summary plus
- * the full file list that makes the build reproducible on any
- * machine. This is what the launcher downloads from the server and
- * what it stores as the {@code build.json} manifest of an installed
- * build.
+ * Полное описание распространяемой сборки: краткое описание плюс
+ * полный список файлов, делающий сборку воспроизводимой на любой
+ * машине. Это то, что лаунчер скачивает с сервера и
+ * хранит как манифест {@code build.json} установленной
+ * сборки.
  *
- * @param summary the build's identity and description
- * @param files   every file the build consists of, with SHA-1 hashes
- * @param origin  where the build came from (SERVER for downloaded builds)
+ * @param summary краткое описание: идентичность и описание сборки
+ * @param files   каждый файл сборки, с хешами SHA-1
+ * @param origin  откуда пришла сборка (SERVER для скачанных сборок)
  */
 public record BuildDescriptor(
         BuildSummary summary,
@@ -40,12 +40,12 @@ public record BuildDescriptor(
         return summary.version();
     }
 
-    /** @return true when this manifest describes the same build id as {@code other}. */
+    /** @return true, если этот манифест описывает тот же id сборки, что и {@code other}. */
     public boolean sameBuild(BuildDescriptor other) {
         return other != null && id().equals(other.id());
     }
 
-    /** @return display form used in dialogs. */
+    /** @return отображаемая форма для диалогов. */
     @Override
     public String toString() {
         return summary.summaryLine();

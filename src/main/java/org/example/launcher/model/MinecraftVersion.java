@@ -9,8 +9,8 @@ import java.util.Optional;
 import org.example.launcher.version.VersionType;
 
 /**
- * Immutable description of a single Minecraft version as listed in the
- * official Mojang version manifest.
+ * Неизменяемое описание одной версии Minecraft из
+ * официального манифеста версий Mojang.
  */
 public final class MinecraftVersion {
 
@@ -29,27 +29,27 @@ public final class MinecraftVersion {
         this.metadataUrl = metadataUrl;
     }
 
-    /** Version identifier, e.g. {@code "1.21"} or {@code "1.21-rc1"}. */
+    /** Идентификатор версии, например {@code "1.21"} или {@code "1.21-rc1"}. */
     public String id() {
         return id;
     }
 
-    /** The version type (Release, Snapshot, …). */
+    /** Тип версии (релиз, снапшот, …). */
     public VersionType type() {
         return type;
     }
 
     /**
-     * Raw publication date string as returned by Mojang (ISO-8601 with
-     * offset), e.g. {@code "2024-06-13T10:30:00+00:00"}.
+     * Исходная строка даты публикации от Mojang (ISO-8601 со
+     * смещением), например {@code "2024-06-13T10:30:00+00:00"}.
      */
     public String releaseTimeRaw() {
         return releaseTimeRaw;
     }
 
     /**
-     * Parsed publication date, or {@link Optional#empty()} when the raw
-     * value is missing or not parseable.
+     * Разобранная дата публикации либо {@link Optional#empty()}, если исходное
+     * значение отсутствует или не разбирается.
      */
     public Optional<OffsetDateTime> releaseTime() {
         if (releaseTimeRaw == null || releaseTimeRaw.isBlank()) {
@@ -62,14 +62,14 @@ public final class MinecraftVersion {
         }
     }
 
-    /** Human-readable, formatted publication date for UI display. */
+    /** Человекочитаемая форматированная дата публикации для показа в интерфейсе. */
     public String formattedReleaseTime() {
         return releaseTime()
                 .map(dt -> dt.format(DISPLAY_FORMATTER))
                 .orElse("—");
     }
 
-    /** Direct link to the per-version metadata JSON on Mojang servers. */
+    /** Прямая ссылка на JSON метаданных версии на серверах Mojang. */
     public String metadataUrl() {
         return metadataUrl;
     }

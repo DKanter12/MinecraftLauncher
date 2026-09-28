@@ -1,7 +1,11 @@
 package org.example.launcher.ui;
 
+import java.util.Locale;
+
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -9,18 +13,18 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import javafx.scene.Scene;
 
 import org.example.launcher.install.DownloadResult;
 import org.example.launcher.install.DownloadTask;
 import org.example.launcher.install.InstallationProgress;
 import org.example.launcher.install.InstallationResult;
+import org.example.launcher.i18n.Lang;
 
 /**
- * Modal progress dialog shown during Minecraft version installation.
+ * Модальный диалог прогресса установки версии Minecraft.
  * <p>
- * Implements {@link InstallationProgress} to receive updates from the
- * installer and display a progress bar, current file, and statistics.
+ * Реализует {@link InstallationProgress} для получения обновлений от
+ * установщика и показывает полосу прогресса, текущий файл и статистику.
  */
 public class InstallProgressDialog extends Stage implements InstallationProgress {
 
@@ -42,13 +46,13 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        setTitle("Installing Minecraft");
+        setTitle(Lang.tr("install.title"));
 
         progressBar = new ProgressBar(0);
         progressBar.setPrefWidth(420);
         progressBar.setPrefHeight(22);
 
-        categoryLabel = new Label("Preparing...");
+        categoryLabel = new Label(Lang.tr("install.preparing"));
         categoryLabel.getStyleClass().add("install-category");
 
         fileLabel = new Label("");
@@ -59,10 +63,10 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         statsLabel = new Label("");
         statsLabel.getStyleClass().add("install-stats");
 
-        statusLabel = new Label("Initializing...");
+        statusLabel = new Label(Lang.tr("install.initializing"));
         statusLabel.getStyleClass().add("install-status");
 
-        closeButton = new Button("Close");
+        closeButton = new Button(Lang.tr("button.close"));
         closeButton.getStyleClass().add("install-close-button");
         closeButton.setDisable(true);
         closeButton.setOnAction(e -> close());
@@ -94,8 +98,8 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         this.skippedCount = 0;
         this.failedCount = 0;
 
-        javafx.application.Platform.runLater(() -> {
-            statusLabel.setText("Installing " + totalTasks + " files");
+        Platform.runLater(() -> {
+            statusLabel.setText(Lang.tr("install.files", totalTasks));
             progressBar.setProgress(0);
             updateStats();
         });
@@ -103,9 +107,9 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
 
     @Override
     public void onFileStart(int taskIndex, DownloadTask task) {
-        javafx.application.Platform.runLater(() -> {
-            categoryLabel.setText("[" + task.category() + "] "
-                    + (taskIndex + 1) + " / " + totalTasks);
+        Platform.runLater(() -> {
+            categoryLabel.setText(Lang.tr("install.row",
+                    task.category(), taskIndex + 1, totalTasks));
             fileLabel.setText(task.name());
         });
     }
@@ -117,7 +121,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         else if (result.isSkipped()) skippedCount++;
         else if (result.isFailed()) failedCount++;
 
-        javafx.application.Platform.runLater(() -> {
+        Platform.runLater(() -> {
             double progress = (double) completedTasks / totalTasks;
             progressBar.setProgress(progress);
             updateStats();
@@ -126,25 +130,46 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
 
     @Override
     public void onComplete(InstallationResult result) {
-        javafx.application.Platform.runLater(() -> {
+        Platform.runLater(() -> {
             progressBar.setProgress(1.0);
             if (result.isSuccess()) {
-                statusLabel.setText("Installation complete!");
+                statusLabel.setText(Lang.tr("install.complete"));
                 statusLabel.setStyle("-fx-text-fill: #a6e3a1;");
             } else {
-                statusLabel.setText("Installation finished with "
-                        + result.failed() + " errors");
+                statusLabel.setText(
+                        Lang.tr("install.errors", result.failed()));
                 statusLabel.setStyle("-fx-text-fill: #f38ba8;");
             }
-            categoryLabel.setText(result.summary());
+            categoryLabel.setText(Lang.tr("install.summary",
+                    result.downloaded(), result.skipped(), result.failed(),
+                    result.totalTasks(),
+                    formatBytes(result.totalBytesDownloaded())));
             fileLabel.setText("");
             closeButton.setDisable(false);
         });
     }
 
     private void updateStats() {
-        statsLabel.setText(String.format(
-                "Downloaded: %d  |  Skipped: %d  |  Failed: %d",
+        statsLabel.setText(Lang.tr("install.stats",
                 downloadedCount, skippedCount, failedCount));
+    }
+
+    private static final long BYTES_PER_KB = 1024L;
+    private static final long BYTES_PER_MB = BYTES_PER_KB * 1024L;
+    private static final long BYTES_PER_GB = BYTES_PER_MB * 1024L;
+
+    private static String formatBytes(long bytes) {
+        if (bytes < BYTES_PER_KB) {
+            return bytes + " B";
+        }
+        if (bytes < BYTES_PER_MB) {
+            return (bytes / BYTES_PER_KB) + " " + Lang.tr("unit.kb");
+        }
+        if (bytes < BYTES_PER_GB) {
+            return String.format(Locale.ROOT, "%.1f %s",
+                    bytes / (double) BYTES_PER_MB, Lang.tr("unit.mb"));
+        }
+        return String.format(Locale.ROOT, "%.2f %s",
+                bytes / (double) BYTES_PER_GB, Lang.tr("unit.gb"));
     }
 }

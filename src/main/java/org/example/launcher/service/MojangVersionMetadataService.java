@@ -5,11 +5,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -17,22 +20,25 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
+import org.example.launcher.install.GameDirectory;
 import org.example.launcher.model.AssetIndex;
 import org.example.launcher.model.DownloadInfo;
 import org.example.launcher.model.JavaVersion;
 import org.example.launcher.model.Library;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.util.Json;
 import org.example.launcher.util.OsDetector;
 
 /**
- * {@link VersionMetadataService} backed by the official Mojang per-version
- * metadata JSON.
+ * Реализация {@link VersionMetadataService} на официальном JSON
+ * метаданных отдельной версии Mojang.
  * <p>
- * JSON parsing is isolated in {@link #parseMetadata(String, String)} so it
- * can be unit-tested without network access. The parser handles both the
- * modern structured argument format (1.13+) and the legacy
- * {@code minecraftArguments} string (pre-1.13).
+ * Разбор JSON выделен в {@link #parseMetadata(String, String)}, чтобы его
+ * можно было юнит-тестировать без сети. Парсер поддерживает как современный
+ * структурированный формат аргументов (1.13+), так и старую строку
+ * {@code minecraftArguments} (до 1.13).
  */
 public class MojangVersionMetadataService implements VersionMetadataService {
 
@@ -40,15 +46,12 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     private final Gson gson;
 
     public MojangVersionMetadataService() {
-        this(HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(15))
-                        .build(),
-                new Gson());
+        this(HttpDefaults.newClient(), HttpDefaults.newGson());
     }
 
     public MojangVersionMetadataService(HttpClient httpClient, Gson gson) {
-        this.httpClient = httpClient;
-        this.gson = gson;
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        this.gson = Objects.requireNonNull(gson, "gson");
     }
 
     @Override
@@ -59,7 +62,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
         }
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(30))
+                .timeout(HttpDefaults.REQUEST_TIMEOUT)
                 .GET()
                 .build();
 
@@ -70,15 +73,16 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                         + " fetching metadata for " + version.id());
             }
             String body = response.body();
-            // Cache raw version JSON for offline launch of already-downloaded versions (vanilla 1.20.1 etc.)
+            // Кэшировать сырой JSON версии для офлайн-запуска уже скачанных версий.
+            // Только по возможности: ошибки кэша никогда не должны ломать получение метаданных.
             try {
-                java.nio.file.Path cached = org.example.launcher.install.GameDirectory.defaultDirectory()
-                        .versionMetadata(version.id());
-                if (!java.nio.file.Files.isRegularFile(cached)) {
-                    java.nio.file.Files.createDirectories(cached.getParent());
-                    java.nio.file.Files.writeString(cached, body, java.nio.charset.StandardCharsets.UTF_8);
+                Path cached = GameDirectory.defaultDirectory().versionMetadata(version.id());
+                if (!Files.isRegularFile(cached)) {
+                    Files.createDirectories(cached.getParent());
+                    Files.writeString(cached, body, StandardCharsets.UTF_8);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception cacheFailure) {
+                // игнорировать: офлайн-кэш необязателен
             }
             return parseMetadata(body, version.id());
         } catch (InterruptedException e) {
@@ -88,12 +92,12 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     /**
-     * Parses a raw per-version metadata JSON string.
+     * Разбирает сырую строку JSON метаданных отдельной версии.
      *
-     * @param json       the raw JSON body
-     * @param fallbackId id to use when the JSON does not contain one
-     * @return a fully populated {@link VersionMetadata}
-     * @throws IOException if the JSON is invalid or missing required fields
+     * @param json       сырое тело JSON
+     * @param fallbackId id для использования, если в JSON его нет
+     * @return полностью заполненные {@link VersionMetadata}
+     * @throws IOException если JSON невалиден или отсутствуют обязательные поля
      */
     public VersionMetadata parseMetadata(String json, String fallbackId) throws IOException {
         JsonObject root;
@@ -135,7 +139,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     // ------------------------------------------------------------------
-    //  Internal parsing helpers
+    //  Внутренние помощники разбора
     // ------------------------------------------------------------------
 
     private AssetIndex parseAssetIndex(JsonObject root) {
@@ -188,7 +192,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
             if (!elem.isJsonObject()) continue;
             JsonObject libObj = elem.getAsJsonObject();
 
-            // Skip libraries whose rules disallow the current OS
+            // Пропустить библиотеки, чьи правила запрещают текущую ОС
             if (!rulesAllow(libObj)) {
                 continue;
             }
@@ -198,7 +202,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
             Map<String, DownloadInfo> classifiers = new HashMap<>();
             Map<String, String> natives = new HashMap<>();
 
-            // Parse downloads.artifact + downloads.classifiers
+            // Разбор downloads.artifact + downloads.classifiers
             if (libObj.has("downloads") && libObj.get("downloads").isJsonObject()) {
                 JsonObject dl = libObj.getAsJsonObject("downloads");
 
@@ -217,7 +221,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                 }
             }
 
-            // Legacy libraries without "downloads" — combine root "url" + maven path
+            // Старые библиотеки без «downloads» — скомбинировать корневой «url» + maven-путь
             if (artifact == null) {
                 String libUrl = getStrOrNull(libObj, "url");
                 if (libUrl != null && !libUrl.isBlank()) {
@@ -225,9 +229,9 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                     if (libPath != null) {
                         String base = libUrl.endsWith("/") ? libUrl : libUrl + "/";
                         String fullUrl = base + libPath;
-                        // Fabric/Quilt-style libraries carry sha1/size at the
-                        // top level alongside "url" — pick them up for
-                        // hash-verified downloads
+                        // Библиотеки в стиле Fabric/Quilt несут sha1/size на
+                        // верхнем уровне рядом с «url» — подхватить их для
+                        // загрузок с проверкой хэша
                         String sha1 = getStrOrNull(libObj, "sha1");
                         long size = getLong(libObj, "size", 0);
                         artifact = new DownloadInfo(fullUrl, sha1, size, libPath);
@@ -235,7 +239,7 @@ public class MojangVersionMetadataService implements VersionMetadataService {
                 }
             }
 
-            // Parse natives map (OS -> classifier name)
+            // Разбор natives-карты (ОС -> имя классификатора)
             if (libObj.has("natives") && libObj.get("natives").isJsonObject()) {
                 JsonObject natObj = libObj.getAsJsonObject("natives");
                 for (var entry : natObj.entrySet()) {
@@ -260,10 +264,10 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     /**
-     * Converts a Maven coordinate name (e.g.
-     * {@code "com.mojang:logging:1.1.1"}) to a relative file path
+     * Преобразует Maven-координату (например,
+     * {@code "com.mojang:logging:1.1.1"}) в относительный путь к файлу
      * ({@code "com/mojang/logging/1.1.1/logging-1.1.1.jar"}).
-     * Used for legacy libraries that only have a root {@code url} field.
+     * Используется для старых библиотек с одним корневым полем {@code url}.
      */
     private static String mavenNameToPath(String name) {
         if (name == null || name.isBlank()) return null;
@@ -278,11 +282,11 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     /**
-     * Parses an argument array from the "arguments" object. Each element
-     * can be either a plain string or an object with a "value" field
-     * and optional "rules". Rules are filtered by the current OS so
-     * that OS-specific arguments (e.g. Windows-only JVM flags) are
-     * only included on the matching platform.
+     * Разбирает массив аргументов из объекта «arguments». Каждый элемент
+     * может быть либо обычной строкой, либо объектом с полем «value»
+     * и необязательными «rules». Правила фильтруются по текущей ОС, чтобы
+     * ОС-специфичные аргументы (например, JVM-флаги только для Windows)
+     * включались только на подходящей платформе.
      */
     private List<String> parseArgumentList(JsonObject args, String key) {
         if (!args.has(key) || !args.get(key).isJsonArray()) {
@@ -315,17 +319,17 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     /**
-     * Evaluates the "rules" array of an argument object against the
-     * current OS. If no rules are present, the argument is always
-     * allowed. Otherwise all rules must pass.
+     * Вычисляет массив «rules» объекта аргумента для текущей
+     * ОС. Если правил нет, аргумент всегда разрешён. Иначе должны пройти
+     * все правила.
      * <p>
-     * A rule with {@code "action": "allow"} passes when its OS
-     * condition matches (or has no OS condition). A rule with
-     * {@code "action": "disallow"} passes when its OS condition
-     * does NOT match.
+     * Правило с {@code "action": "allow"} проходит, когда его ОС-условие
+     * совпадает (или ОС-условия нет). Правило с
+     * {@code "action": "disallow"} проходит, когда его ОС-условие
+     * НЕ совпадает.
      * <p>
-     * Feature-based rules (e.g. {@code is_demo_user}) are treated
-     * as not matching, since the launcher does not set those features.
+     * Правила на основе фич (например, {@code is_demo_user}) считаются
+     * несовпавшими, т.к. лаунчер эти фичи не выставляет.
      */
     private boolean rulesAllow(JsonObject argObj) {
         if (!argObj.has("rules") || !argObj.get("rules").isJsonArray()) {
@@ -342,8 +346,8 @@ public class MojangVersionMetadataService implements VersionMetadataService {
             boolean hasFeatures = rule.has("features") && rule.get("features").isJsonObject();
 
             if (hasFeatures) {
-                // Feature-based rules (is_demo_user, has_custom_resolution, etc.)
-                // are not applicable to our launcher — treat as not matching.
+                // Правила на основе фич (is_demo_user, has_custom_resolution и т.д.)
+                // к нашему лаунчеру неприменимы — считать несовпавшими.
                 if ("allow".equals(action)) {
                     return false;
                 }
@@ -367,21 +371,15 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     }
 
     // ------------------------------------------------------------------
-    //  JSON utility helpers
+    //  JSON-утилиты
     // ------------------------------------------------------------------
 
     private static String getStr(JsonObject obj, String key, String fallback) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive()) {
-            return obj.get(key).getAsString();
-        }
-        return fallback;
+        return Json.getStringOrDefault(obj, key, fallback);
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive() && !obj.get(key).isJsonNull()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 
     private static long getLong(JsonObject obj, String key, long fallback) {

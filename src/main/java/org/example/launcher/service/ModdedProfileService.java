@@ -18,6 +18,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.example.launcher.util.Json;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.install.GameDirectory;
@@ -25,25 +26,25 @@ import org.example.launcher.model.ModdedProfile;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * Manages game instances (vanilla and modded): creation, persistence,
- * deletion and the per-instance game directory layout.
+ * Управляет игровыми инстансами (ванильными и модовыми): создание, хранение,
+ * удаление и раскладка игровых каталогов каждого инстанса.
  * <p>
- * Instances are stored in {@code instances.json} in the storage root
- * (a legacy {@code modded_profiles.json} is read as a fallback). Each
- * instance owns a game directory under {@code profiles/{id}/} with
- * the standard pack layout ({@code mods}, {@code config},
+ * Инстансы хранятся в {@code instances.json} в корне хранилища
+ * (устаревший {@code modded_profiles.json} читается как запасной вариант). Каждый
+ * инстанс владеет игровым каталогом в {@code profiles/{id}/} со
+ * стандартной раскладкой сборки ({@code mods}, {@code config},
  * {@code resourcepacks}, {@code shaderpacks}, {@code saves},
- * {@code logs}), created automatically. Different instances never
- * share these directories and therefore never conflict; shared
- * resources (client JAR, libraries, assets) live in the storage root
- * and are reused.
+ * {@code logs}), создаваемой автоматически. Разные инстансы никогда
+ * не делят эти каталоги и потому не конфликтуют; общие
+ * ресурсы (клиентский JAR, библиотеки, ассеты) лежат в корне хранилища
+ * и переиспользуются.
  */
 public class ModdedProfileService {
 
     /**
-     * Standard directories every instance game directory contains.
-     * Users can drop mods, resource packs, shader packs and worlds
-     * into them manually.
+     * Стандартные каталоги в каждом игровом каталоге инстанса.
+     * Пользователи могут вручную складывать в них моды, ресурс-паки,
+     * шейдер-паки и миры.
      */
     public static final List<String> STANDARD_FOLDERS = List.of(
             "mods", "config", "resourcepacks", "shaderpacks", "saves", "logs");
@@ -64,13 +65,13 @@ public class ModdedProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  Persistence
+    //  Хранение
     // ------------------------------------------------------------------
 
     /**
-     * Loads all instances; an empty list if none exist yet. A legacy
-     * {@code modded_profiles.json} is read when {@code instances.json}
-     * does not exist yet.
+     * Загружает все инстансы; пустой список, если их пока нет. Устаревший
+     * {@code modded_profiles.json} читается, когда {@code instances.json}
+     * ещё не существует.
      */
     public List<ModdedProfile> loadProfiles() throws IOException {
         Path file = profilesFile;
@@ -108,7 +109,7 @@ public class ModdedProfileService {
     }
 
     /**
-     * Persists the full profile list.
+     * Сохраняет полный список профилей.
      */
     public void saveProfiles(List<ModdedProfile> profiles) throws IOException {
         JsonObject root = new JsonObject();
@@ -122,35 +123,34 @@ public class ModdedProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  Profile lifecycle
+    //  Жизненный цикл профиля
     // ------------------------------------------------------------------
 
     /**
-     * Creates a new game instance with its own game directory.
+     * Создаёт новый игровой инстанс с собственным игровым каталогом.
      * <p>
-     * The instance may be vanilla ({@code loaderType == VANILLA},
-     * {@code loaderVersion} empty) or a mod loader installation. The
-     * display name defaults to the loader and the Minecraft version
-     * but can be chosen freely and renamed later; the directory name
-     * is derived from it (sanitized) and made unique by appending a
-     * numeric suffix if needed. The standard folder layout is created
-     * immediately so the user can start dropping mods into
-     * {@code mods/} right away.
+     * Инстанс может быть ванильным ({@code loaderType == VANILLA},
+     * {@code loaderVersion} пуст) или установкой мод-загрузчика.
+     * Отображаемое имя по умолчанию состоит из загрузчика и версии Minecraft,
+     * но выбирается свободно и позже переименовывается; имя каталога
+     * выводится из него (очищенное) и делается уникальным добавлением
+     * числового суффикса при необходимости. Стандартная раскладка папок
+     * создаётся сразу, чтобы пользователь мог тут же складывать моды в
+     * {@code mods/}.
      *
-     * @param loaderType      the instance type (VANILLA or a loader)
-     * @param loaderVersion   the loader version (empty for vanilla)
-     * @param minecraftVersion the target Minecraft version
-     * @param versionId       the installed version id this instance
-     *                        launches
-     * @param extraJvmArgs    additional JVM launch parameters
-     *                        (may be empty)
-     * @param displayName     human-readable instance name; blank means
-     *                        the automatic "Loader MC" name
-     * @param memoryMb        dedicated RAM limit in megabytes;
-     *                        {@code <= 0} means automatic (no limit)
-     * @return the created, persisted instance
-     * @throws IOException if the instance cannot be persisted or the
-     *                     game directory cannot be created
+     * @param loaderType      тип инстанса (VANILLA или загрузчик)
+     * @param loaderVersion   версия загрузчика (пустая для ваниллы)
+     * @param minecraftVersion целевая версия Minecraft
+     * @param versionId       id установленной версии, которую запускает инстанс
+     * @param extraJvmArgs    дополнительные JVM-параметры запуска
+     *                        (могут быть пустыми)
+     * @param displayName     человекочитаемое имя инстанса; пустое означает
+     *                        автоматическое имя «Loader MC»
+     * @param memoryMb        лимит выделенной памяти в мегабайтах;
+     *                        {@code <= 0} означает авто (без лимита)
+     * @return созданный и сохранённый инстанс
+     * @throws IOException если инстанс нельзя сохранить или нельзя создать
+     *                     игровой каталог
      */
     public ModdedProfile createProfile(ModLoaderType loaderType,
                                        String loaderVersion,
@@ -165,10 +165,10 @@ public class ModdedProfileService {
                 : displayName.trim();
 
         List<ModdedProfile> existing = loadProfiles();
-        // The folder follows the launcher name (Cyrillic is
-        // transliterated); when the name has no usable characters at
-        // all, the loader + MC version is used — so a meaningless
-        // "profile-N" folder almost never appears
+        // Папка следует за именем в лаунчере (кириллица
+        // транслитерируется); когда в имени вообще нет пригодных символов,
+        // используется загрузчик + версия MC — поэтому бессмысленная
+        // папка «profile-N» почти никогда не появляется
         String dirBase = sanitize(name);
         if (dirBase.isBlank()) {
             dirBase = defaultDisplayName(loaderType, minecraftVersion);
@@ -197,7 +197,7 @@ public class ModdedProfileService {
                 now,
                 null);
 
-        // Create the profile's game directory with the standard layout
+        // Создать игровой каталог профиля со стандартной раскладкой
         ensureProfileFolders(storage.moddedProfileDir(dirName));
 
         existing.add(profile);
@@ -206,14 +206,14 @@ public class ModdedProfileService {
     }
 
     /**
-     * Deletes a profile from the registry.
+     * Удаляет профиль из реестра.
      * <p>
-     * The profile's game directory (with its mods and saves) is NOT
-     * deleted — only the registry entry is removed, so no user data
-     * is ever destroyed. The directory path is returned so callers
-     * can inform the user where their files remain.
+     * Игровой каталог профиля (с его модами и сохранениями) НЕ
+     * удаляется — убирается только запись реестра, поэтому пользовательские
+     * данные никогда не уничтожаются. Путь к каталогу возвращается, чтобы
+     * вызывающий мог сообщить пользователю, где остались его файлы.
      *
-     * @return the orphaned game directory, if the profile existed
+     * @return осиротевший игровой каталог, если профиль существовал
      */
     public Optional<Path> deleteProfile(String id) throws IOException {
         List<ModdedProfile> profiles = loadProfiles();
@@ -229,24 +229,23 @@ public class ModdedProfileService {
     }
 
     /**
-     * Updates a profile's display name, extra JVM launch arguments
-     * and memory limit.
+     * Обновляет отображаемое имя профиля, доп. JVM-аргументы запуска
+     * и лимит памяти.
      * <p>
-     * Renaming also renames the game directory (and the profile id,
-     * which follows the folder), so the folder always matches the
-     * launcher name; mods, saves and builds move along untouched. A
-     * blank name keeps the current one. When the target folder cannot
-     * be renamed (e.g. the game is running from it), nothing is
-     * persisted and an error is thrown.
+     * Переименование также переименовывает игровой каталог (и id профиля,
+     * который следует за папкой), поэтому папка всегда совпадает с
+     * именем в лаунчере; моды, сохранения и сборки переезжают нетронутыми.
+     * Пустое имя сохраняет текущее. Когда целевую папку переименовать
+     * нельзя (например, игра запущена из неё), ничего не сохраняется
+     * и выбрасывается ошибка.
      *
-     * @param id            the profile to update
-     * @param extraJvmArgs  new JVM launch parameters (may be empty)
-     * @param displayName   new display name (blank keeps the old one)
-     * @param memoryMb      new RAM limit in megabytes;
-     *                      {@code <= 0} means automatic (no limit)
-     * @return the updated profile, or empty if no profile with this id
-     *         exists
-     * @throws IOException if the profile list cannot be persisted
+     * @param id            обновляемый профиль
+     * @param extraJvmArgs  новые JVM-параметры запуска (могут быть пустыми)
+     * @param displayName   новое отображаемое имя (пустое сохраняет старое)
+     * @param memoryMb      новый лимит памяти в мегабайтах;
+     *                      {@code <= 0} означает авто (без лимита)
+     * @return обновлённый профиль либо пусто, если профиля с таким id нет
+     * @throws IOException если список профилей нельзя сохранить
      */
     public Optional<ModdedProfile> updateProfile(String id,
                                                  List<String> extraJvmArgs,
@@ -259,11 +258,11 @@ public class ModdedProfileService {
             if (p.id().equals(id)) {
                 String name = (displayName == null || displayName.isBlank())
                         ? p.name() : displayName.trim();
-                // Renaming also renames the folder, so it always
-                // matches the launcher name; the id follows the
-                // folder. Mods, saves and builds move along untouched.
-                // A name with no usable characters falls back to
-                // loader + MC version instead of "profile-N".
+                // Переименование также переименовывает папку, чтобы она всегда
+                // совпадала с именем в лаунчере; id следует за
+                // папкой. Моды, сохранения и сборки переезжают нетронутыми.
+                // Имя без пригодных символов откатывается на
+                // загрузчик + версию MC вместо «profile-N».
                 String dirBase = sanitize(name);
                 if (dirBase.isBlank()) {
                     dirBase = defaultDisplayName(p.loaderType(),
@@ -302,7 +301,7 @@ public class ModdedProfileService {
     }
 
     /**
-     * Records a launch in the profile's {@code lastPlayed} timestamp.
+     * Фиксирует запуск в метке {@code lastPlayed} профиля.
      */
     public void touchLastPlayed(String id) throws IOException {
         List<ModdedProfile> profiles = loadProfiles();
@@ -322,17 +321,17 @@ public class ModdedProfileService {
     }
 
     /**
-     * Resolves a profile's game directory against the storage root.
+     * Разрешает игровой каталог профиля относительно корня хранилища.
      */
     public Path resolveGameDir(ModdedProfile profile) {
         return storage.root().resolve(profile.gameDirPath());
     }
 
     /**
-     * Creates the standard modded-pack folder layout inside the given
-     * directory ({@code mods}, {@code config}, {@code resourcepacks},
-     * {@code shaderpacks}, {@code saves}, {@code logs}). Existing
-     * folders and any other user files are left untouched.
+     * Создаёт стандартную раскладку папок модовой сборки внутри заданного
+     * каталога ({@code mods}, {@code config}, {@code resourcepacks},
+     * {@code shaderpacks}, {@code saves}, {@code logs}). Существующие
+     * папки и прочие пользовательские файлы не трогаются.
      */
     public static void ensureProfileFolders(Path gameDir) throws IOException {
         Files.createDirectories(gameDir);
@@ -342,14 +341,14 @@ public class ModdedProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  Directory naming
+    //  Именование каталогов
     // ------------------------------------------------------------------
 
     /**
-     * Derives a unique directory name from the display name: the name
-     * itself when filesystem-safe (so the folder matches the launcher
-     * name), numeric suffixes against existing profiles and existing
-     * directories on disk.
+     * Выводит уникальное имя каталога из отображаемого имени: само имя,
+     * когда оно безопасно для файловой системы (чтобы папка совпадала с именем
+     * в лаунчере), числовые суффиксы против существующих профилей и
+     * существующих каталогов на диске.
      */
     private String uniqueDirectoryName(String displayName,
                                        List<ModdedProfile> existing) {
@@ -357,9 +356,9 @@ public class ModdedProfileService {
     }
 
     /**
-     * Derives a filesystem-safe, unique directory name from the
-     * display name. The profile being renamed ({@code excludeId}) does
-     * not block its own name, so cosmetic renames keep their folder.
+     * Выводит безопасное для файловой системы уникальное имя каталога из
+     * отображаемого имени. Переименовываемый профиль ({@code excludeId}) не
+     * блокирует собственное имя, поэтому косметические переименования сохраняют папку.
      */
     private String uniqueDirectoryName(String displayName,
                                        List<ModdedProfile> existing,
@@ -393,12 +392,12 @@ public class ModdedProfileService {
     }
 
     /**
-     * Makes a display name safe for a folder: only filesystem-forbidden
-     * characters ({@code \ / : * ? " < > |} and controls) are removed,
-     * trailing dots/spaces are trimmed. Everything else — spaces,
-     * dots, upper case, Unicode — stays, so the folder matches the
-     * launcher name exactly ("Моя сборка" stays "Моя сборка").
-     * Returns {@code ""} when nothing usable remains.
+     * Делает отображаемое имя безопасным для папки: удаляются только запрещённые
+     * в файловой системе символы ({@code \ / : * ? " < > |} и управляющие),
+     * концевые точки/пробелы обрезаются. Всё остальное — пробелы,
+     * точки, верхний регистр, Unicode — остаётся, чтобы папка точно совпадала с
+     * именем в лаунчере («Моя сборка» остаётся «Моя сборка»).
+     * Возвращает {@code ""}, когда ничего пригодного не осталось.
      */
     static String sanitize(String name) {
         if (name == null) return "";
@@ -413,7 +412,7 @@ public class ModdedProfileService {
         return cleaned;
     }
 
-    /** Windows device names that cannot be folders. */
+    /** Имена устройств Windows, которые не могут быть папками. */
     private static final Set<String> RESERVED_NAMES = Set.of(
             "con", "prn", "aux", "nul",
             "com1", "com2", "com3", "com4", "com5",
@@ -422,7 +421,7 @@ public class ModdedProfileService {
             "lpt6", "lpt7", "lpt8", "lpt9");
 
     // ------------------------------------------------------------------
-    //  JSON (de)serialization
+    //  JSON (сериализация/десериализация)
     // ------------------------------------------------------------------
 
     private JsonObject toJson(ModdedProfile p) {
@@ -465,7 +464,7 @@ public class ModdedProfileService {
                     minecraftVersion, versionId, gameDirPath, components,
                     extraJvmArgs, memoryMb, created, lastPlayed);
         } catch (Exception e) {
-            // Skip corrupt entries rather than failing the whole list
+            // Пропустить повреждённые записи, а не ронять весь список
             return null;
         }
     }
@@ -498,8 +497,7 @@ public class ModdedProfileService {
     }
 
     private static String optionalString(JsonObject obj, String key) {
-        return obj.has(key) && obj.get(key).isJsonPrimitive()
-                ? obj.get(key).getAsString() : null;
+        return Json.getStringOrNull(obj, key);
     }
 
     private static int optionalInt(JsonObject obj, String key) {
@@ -514,39 +512,40 @@ public class ModdedProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  Names, memory and effective launch arguments
+    //  Имена, память и итоговые аргументы запуска
     // ------------------------------------------------------------------
 
-    /** The automatic display name: "Loader MC" (e.g. "Forge 1.20.1"). */
+    /** Автоматическое отображаемое имя: «Loader MC» (например, «Forge 1.20.1»). */
     public static String defaultDisplayName(ModLoaderType loaderType,
                                             String minecraftVersion) {
         return loaderType.displayName() + " " + minecraftVersion;
     }
 
-    /** Normalizes a RAM limit: {@code <= 0} means automatic. */
+    /** Нормализует лимит памяти: {@code <= 0} означает авто. */
     public static int normalizeMemory(int memoryMb) {
         return Math.max(0, memoryMb);
     }
 
     /**
-     * Short human form of a RAM limit: "4 GB", "512 MB" or "Auto".
+     * Краткая человекочитаемая форма лимита памяти на текущем языке
+     * интерфейса («4 GB», «512 MB» или «Auto»).
      */
     public static String formatMemory(int memoryMb) {
         if (memoryMb <= 0) {
-            return "Auto";
+            return org.example.launcher.i18n.Lang.tr("memory.auto");
         }
         if (memoryMb >= 1024 && memoryMb % 1024 == 0) {
-            return (memoryMb / 1024) + " GB";
+            return org.example.launcher.i18n.Lang.tr("memory.gb",
+                    memoryMb / 1024);
         }
-        return memoryMb + " MB";
+        return org.example.launcher.i18n.Lang.tr("memory.mb", memoryMb);
     }
 
     /**
-     * The JVM arguments actually used at launch: the configured
-     * memory limit first (as {@code -Xmx}), then the profile's extra
-     * arguments with any conflicting {@code -Xmx}/{@code -Xms}
-     * removed. Without a configured limit the extra arguments are
-     * used as-is.
+     * JVM-аргументы, фактически используемые при запуске: сначала настроенный
+     * лимит памяти (как {@code -Xmx}), затем доп. аргументы профиля с удалёнными
+     * конфликтующими {@code -Xmx}/{@code -Xms}. Без настроенного лимита доп.
+     * аргументы используются как есть.
      */
     public static List<String> effectiveJvmArgs(ModdedProfile profile) {
         if (profile.memoryMb() <= 0) {

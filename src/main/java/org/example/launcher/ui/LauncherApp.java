@@ -37,23 +37,25 @@ import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
+import org.example.launcher.i18n.Lang;
+import org.example.launcher.net.HttpDefaults;
 import org.example.launcher.version.ModLoaderFamilyType;
 import org.example.launcher.version.VersionTypeRegistry;
 
 /**
- * JavaFX application entry point for the Minecraft Launcher.
+ * Точка входа JavaFX-приложения Minecraft Launcher.
  * <p>
- * Wires up all services (clean architecture composition root):
+ * Связывает все сервисы (корень композиции чистой архитектуры):
  * <ul>
- *   <li>{@link VersionService} — fetches the version manifest</li>
- *   <li>{@link VersionMetadataService} — fetches per-version metadata</li>
- *   <li>{@link AssetIndexService} — fetches and parses asset indexes</li>
- *   <li>{@link FileDownloader} — downloads individual files via HTTP</li>
- *   <li>{@link ChecksumVerifier} — verifies SHA1 hashes of local files</li>
- * <li>{@link InstallationService} — orchestrates full installation</li>
- * <li>{@link JavaResolutionService} — detects and selects a suitable Java runtime</li>
- * <li>{@link MinecraftLaunchService} — launches the game and monitors the process</li>
- * <li>{@link ProfileService} — manages player profiles</li>
+ *   <li>{@link VersionService} — загружает манифест версий</li>
+ *   <li>{@link VersionMetadataService} — загружает метаданные версий</li>
+ *   <li>{@link AssetIndexService} — загружает и разбирает индексы ассетов</li>
+ *   <li>{@link FileDownloader} — скачивает отдельные файлы по HTTP</li>
+ *   <li>{@link ChecksumVerifier} — проверяет SHA1-хэши локальных файлов</li>
+ * <li>{@link InstallationService} — управляет полной установкой</li>
+ * <li>{@link JavaResolutionService} — находит и выбирает подходящий Java-рантайм</li>
+ * <li>{@link MinecraftLaunchService} — запускает игру и следит за процессом</li>
+ * <li>{@link ProfileService} — управляет профилями игроков</li>
  * </ul>
  */ 
 public class LauncherApp extends Application {
@@ -63,8 +65,8 @@ public class LauncherApp extends Application {
         Platform.setImplicitExit(false);
 
         VersionTypeRegistry typeRegistry = new VersionTypeRegistry();
-        // Loader families as version types: installed modded versions
-        // appear in the unified version browser with their own filters
+        // Семейства загрузчиков как типы версий: установленные модовые версии
+        // показываются в общем каталоге версий со своими фильтрами
         for (ModLoaderType loaderType : ModLoaderType.values()) {
             if (loaderType != ModLoaderType.VANILLA) {
                 typeRegistry.register(ModLoaderFamilyType.of(loaderType));
@@ -94,8 +96,8 @@ public class LauncherApp extends Application {
         AuthlibInjectorManager authlibInjectorManager =
                 new AuthlibInjectorManager(defaultGameDir);
 
-        MinecraftLaunchArgumentBuilder argumentBuilder = new MinecraftLaunchArgumentBuilder();
-        argumentBuilder.setAuthlibInjectorManager(authlibInjectorManager);
+        MinecraftLaunchArgumentBuilder argumentBuilder =
+                new MinecraftLaunchArgumentBuilder(authlibInjectorManager);
 
         MinecraftLauncher launcher = new MinecraftLauncher(
                 argumentBuilder,
@@ -107,21 +109,22 @@ public class LauncherApp extends Application {
 
         LauncherPreferences preferences = new LauncherPreferences(
                 GameDirectory.defaultDirectory().preferencesFile());
+        Lang.load(preferences);
 
         ElyAuthService elyAuthService = new ElyAuthService();
 
         SkinService skinService = new SkinService(GameDirectory.defaultDirectory());
 
-        // Mod loader support (Fabric, Forge, NeoForge, Quilt)
+        // Поддержка модовых загрузчиков (Fabric, Forge, NeoForge, Quilt)
         ModLoaderMetadataMerger merger = new ModLoaderMetadataMerger(
                 mojangMetadataService);
         ModLoaderRegistry modLoaderRegistry = ModLoaderRegistry.createDefault(
-                java.net.http.HttpClient.newHttpClient(),
+                HttpDefaults.newClient(),
                 fileDownloader, javaResolutionService, merger, installationService);
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 mojangVersionService, mojangMetadataService, merger);
 
-        // Game instances (vanilla + modded, each with its own directory)
+        // Игровые инстансы (ванильные + модовые, у каждого свой каталог)
         ModdedProfileService moddedProfileService =
                 new ModdedProfileService(defaultGameDir);
         ModdedProfileVerificationService profileVerificationService =

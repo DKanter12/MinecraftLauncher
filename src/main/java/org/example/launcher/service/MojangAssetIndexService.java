@@ -5,9 +5,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -16,11 +16,13 @@ import com.google.gson.JsonSyntaxException;
 import org.example.launcher.model.AssetIndex;
 import org.example.launcher.model.AssetIndexContent;
 import org.example.launcher.model.AssetObject;
+import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.util.Json;
 
 /**
- * {@link AssetIndexService} backed by the official Mojang asset index JSON.
+ * Реализация {@link AssetIndexService} на официальном JSON asset-индекса Mojang.
  * <p>
- * JSON parsing is isolated in {@link #parseIndex(String)} for unit testing.
+ * Разбор JSON выделен в {@link #parseIndex(String)} для юнит-тестирования.
  */
 public class MojangAssetIndexService implements AssetIndexService {
 
@@ -28,16 +30,12 @@ public class MojangAssetIndexService implements AssetIndexService {
     private final Gson gson;
 
     public MojangAssetIndexService() {
-        this(HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(15))
-                        .followRedirects(HttpClient.Redirect.ALWAYS)
-                        .build(),
-                new Gson());
+        this(HttpDefaults.newClient(), HttpDefaults.newGson());
     }
 
     public MojangAssetIndexService(HttpClient httpClient, Gson gson) {
-        this.httpClient = httpClient;
-        this.gson = gson;
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        this.gson = Objects.requireNonNull(gson, "gson");
     }
 
     @Override
@@ -48,7 +46,7 @@ public class MojangAssetIndexService implements AssetIndexService {
         }
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(30))
+                .timeout(HttpDefaults.REQUEST_TIMEOUT)
                 .GET()
                 .build();
 
@@ -65,7 +63,7 @@ public class MojangAssetIndexService implements AssetIndexService {
     }
 
     /**
-     * Parses a raw asset index JSON string.
+     * Разбирает сырую строку JSON asset-индекса.
      */
     public AssetIndexContent parseIndex(String json) throws IOException {
         JsonObject root;
@@ -98,10 +96,7 @@ public class MojangAssetIndexService implements AssetIndexService {
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive() && !obj.get(key).isJsonNull()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 
     private static long getLong(JsonObject obj, String key, long fallback) {

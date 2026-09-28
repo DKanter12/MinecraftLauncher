@@ -1,13 +1,13 @@
 package org.example.launcher.service.modloader;
 
 /**
- * Identifies a supported game (instance) type.
+ * Определяет поддерживаемый тип игры (инстанса).
  * <p>
- * {@link #VANILLA} is a pseudo loader type used by the unified
- * instance model: an instance of type VANILLA plays the unmodified
- * game, while the other types are mod loaders requiring a matching
- * {@link ModLoaderVersionProvider} and {@link ModLoaderInstaller}
- * registered in {@link ModLoaderRegistry}.
+ * {@link #VANILLA} — псевдотип загрузчика для единой модели
+ * инстансов: инстанс типа VANILLA запускает немодифицированную
+ * игру, а остальные типы — мод-загрузчики, требующие совпадающих
+ * {@link ModLoaderVersionProvider} и {@link ModLoaderInstaller},
+ * зарегистрированных в {@link ModLoaderRegistry}.
  */
 public enum ModLoaderType {
 

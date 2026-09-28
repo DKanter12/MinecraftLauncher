@@ -1,8 +1,8 @@
 package org.example.launcher.util;
 
 /**
- * Detects the current operating system and maps it to the Mojang
- * identifier used in version metadata (library natives, asset rules).
+ * Определяет текущую операционную систему и отображает её на идентификатор
+ * Mojang, используемый в метаданных версий (нативные библиотеки, правила ресурсов).
  */
 public final class OsDetector {
 

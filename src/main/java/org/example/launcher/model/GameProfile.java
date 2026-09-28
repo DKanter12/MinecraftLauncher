@@ -4,10 +4,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A player profile stored locally by the launcher.
+ * Профиль игрока, хранимый локально лаунчером.
  * <p>
- * Profiles contain the player's display name, UUID (if authenticated),
- * access token for premium authentication, and optional skin data.
+ * Профили содержат отображаемое имя игрока, UUID (при аутентификации),
+ * токен доступа для премиум-аутентификации и необязательные данные скина.
  */
 public final class GameProfile {
 

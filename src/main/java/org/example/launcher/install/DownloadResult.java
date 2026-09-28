@@ -1,7 +1,7 @@
 package org.example.launcher.install;
 
 /**
- * Outcome of processing a single {@link DownloadTask}.
+ * Итог обработки одной {@link DownloadTask}.
  */
 public final class DownloadResult {
 
@@ -56,8 +56,8 @@ public final class DownloadResult {
     }
 
     /**
-     * Number of download attempts made (0 for skipped, 1+ for
-     * downloaded/failed).
+     * Число выполненных попыток загрузки (0 для пропущенных, 1+ для
+     * загруженных/неудачных).
      */
     public int attempts() {
         return attempts;

@@ -1,10 +1,10 @@
 package org.example.launcher.version;
 
 /**
- * Version type for locally installed modded versions (Fabric, Forge,
- * NeoForge, Quilt). These versions never appear in the Mojang manifest;
- * they are produced by the launcher's mod loader installation and
- * discovered by scanning the local {@code versions/} directory.
+ * Тип версии для локально установленных модовых версий (Fabric, Forge,
+ * NeoForge, Quilt). Эти версии никогда не встречаются в манифесте Mojang;
+ * они создаются установкой загрузчиков модов лаунчера и
+ * обнаруживаются сканированием локального каталога {@code versions/}.
  */
 public final class ModdedVersionType implements VersionType {
 

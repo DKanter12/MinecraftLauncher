@@ -1,19 +1,19 @@
 package org.example.launcher.distribution;
 
 /**
- * Role of an account on the launcher server. The role arrives with
- * every authorized session and gates what the launcher unlocks:
+ * Роль учётной записи на сервере лаунчера. Роль приходит с каждой
+ * авторизованной сессией и определяет доступные функции лаунчера:
  * <ul>
- *   <li>{@code USER} — a regular player: can browse and install the
- *       builds the administrator published, but never sees
- *       administrative functions.</li>
- *   <li>{@code ADMIN} — the administrator: additionally can create,
- *       upload, publish and remove builds (see
+ *   <li>{@code USER} — обычный игрок: может просматривать и устанавливать
+ *       сборки, опубликованные администратором, но не видит
+ *       административные функции.</li>
+ *   <li>{@code ADMIN} — администратор: дополнительно может создавать,
+ *       загружать, публиковать и удалять сборки (см.
  *       {@link api.AdminLauncherServerApi}).</li>
  * </ul>
- * A regular user never gains administrative access just by using the
- * same launcher — the server decides the role, the launcher only
- * follows it.
+ * Обычный пользователь не получает административный доступ просто
+ * используя тот же лаунчер — роль определяет сервер, лаунчер лишь
+ * следует ей.
  */
 public enum UserRole {
     USER, ADMIN

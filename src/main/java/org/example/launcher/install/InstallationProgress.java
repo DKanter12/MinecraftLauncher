@@ -1,46 +1,46 @@
 package org.example.launcher.install;
 
 /**
- * Callback interface for receiving installation progress updates.
+ * Интерфейс обратных вызовов для получения обновлений прогресса установки.
  * <p>
- * The UI implements this to show a progress bar, current file name,
- * and category during the installation process.
+ * Интерфейс реализует UI для показа полосы прогресса, имени текущего файла
+ * и категории в процессе установки.
  */
 public interface InstallationProgress {
 
     /**
-     * Called once the task list has been built, before any downloads start.
+     * Вызывается один раз после построения списка задач, до начала загрузок.
      *
-     * @param totalTasks  total number of files to process
-     * @param totalBytes  total expected download size in bytes (may be approximate)
+     * @param totalTasks общее число файлов для обработки
+     * @param totalBytes общий ожидаемый размер загрузки в байтах (может быть приблизительным)
      */
     void onStart(int totalTasks, long totalBytes);
 
     /**
-     * Called before a file is processed (either downloaded or skipped).
+     * Вызывается перед обработкой файла (загрузкой или пропуском).
      *
-     * @param taskIndex    0-based index of the current task
-     * @param task         the task about to be processed
+     * @param taskIndex 0-индекс текущей задачи
+     * @param task      задача, которая будет обработана
      */
     void onFileStart(int taskIndex, DownloadTask task);
 
     /**
-     * Called after a file has been processed.
+     * Вызывается после обработки файла.
      *
-     * @param taskIndex  0-based index of the completed task
-     * @param result     the download result
+     * @param taskIndex 0-индекс завершённой задачи
+     * @param result    результат загрузки
      */
     void onFileComplete(int taskIndex, DownloadResult result);
 
     /**
-     * Called when the entire installation finishes (successfully or not).
+     * Вызывается при завершении всей установки (успешно или нет).
      *
-     * @param result  aggregate installation result
+     * @param result сводный результат установки
      */
     void onComplete(InstallationResult result);
 
     /**
-     * No-op implementation for callers that don't need progress updates.
+     * Пустая реализация для вызывающих, которым не нужны обновления прогресса.
      */
     InstallationProgress NONE = new InstallationProgress() {
         @Override public void onStart(int totalTasks, long totalBytes) {}

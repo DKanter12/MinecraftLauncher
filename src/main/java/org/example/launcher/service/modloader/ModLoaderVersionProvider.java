@@ -6,39 +6,38 @@ import java.util.List;
 import org.example.launcher.model.ModLoaderVersion;
 
 /**
- * Provides the list of available mod loader versions that are
- * compatible with a given Minecraft version.
+ * Предоставляет список доступных версий мод-загрузчика, совместимых
+ * с заданной версией Minecraft.
  * <p>
- * Every implementation guarantees that each returned
- * {@link ModLoaderVersion} is installable for the requested Minecraft
- * version — the UI can therefore display the list unfiltered.
+ * Каждая реализация гарантирует, что каждый возвращённый
+ * {@link ModLoaderVersion} устанавливаем для запрошенной версии Minecraft,
+ * — поэтому UI может показывать список без фильтрации.
  * <p>
- * This is the main extension point for adding new mod loaders.
+ * Это главная точка расширения для добавления новых мод-загрузчиков.
  */
 public interface ModLoaderVersionProvider {
 
     /**
-     * Fetches all loader versions compatible with the given Minecraft
-     * version, newest first.
+     * Загружает все версии загрузчика, совместимые с заданной версией Minecraft,
+     * от новых к старым.
      *
-     * @param minecraftVersion the Minecraft version id (e.g. {@code "1.21.4"})
-     * @return compatible loader versions, never {@code null}
-     * @throws IOException if the version list could not be fetched
+     * @param minecraftVersion id версии Minecraft (например, {@code "1.21.4"})
+     * @return совместимые версии загрузчика, никогда {@code null}
+     * @throws IOException если список версий получить не удалось
      */
     List<ModLoaderVersion> fetchVersions(String minecraftVersion) throws IOException;
 
     /**
-     * Fetches the set of Minecraft versions this loader supports, as
-     * reported by the loader's own metadata service — the
-     * authoritative answer to "does this loader exist for that
-     * version" (e.g. NeoForge only exists for MC 1.20.1 and newer;
-     * Fabric and Quilt start at 1.14). One lightweight call, instead
-     * of one {@link #fetchVersions} call per version.
+     * Загружает множество версий Minecraft, поддерживаемых этим загрузчиком, как
+     * сообщает собственный metaservice загрузчика, — авторитетный ответ на вопрос
+     * «существует ли этот загрузчик под ту версию» (например, NeoForge существует
+     * только для MC 1.20.1 и новее; Fabric и Quilt начинаются с 1.14). Один лёгкий
+     * вызов вместо одного вызова {@link #fetchVersions} на версию.
      *
-     * @return the supported Minecraft version ids, or {@code null}
-     *         when the provider cannot determine the set — callers
-     *         then fall back to their own assumption
-     * @throws IOException if the set could not be fetched
+     * @return поддерживаемые id версий Minecraft либо {@code null},
+     *         когда провайдер не может определить множество, — вызывающие
+     *         тогда откатываются на собственное предположение
+     * @throws IOException если множество получить не удалось
      */
     default java.util.Set<String> fetchSupportedMinecraftVersions() throws IOException {
         return null;

@@ -10,27 +10,27 @@ import org.example.launcher.model.LaunchArguments;
 import org.example.launcher.model.VersionMetadata;
 
 /**
- * Builds the full launch command-line for a Minecraft version.
+ * Строит полную командную строку запуска версии Minecraft.
  * <p>
- * Takes version metadata, the local game directory layout, the
- * player's profile, and the resolved Java runtime, and produces
- * a {@link LaunchArguments} ready to be executed.
+ * Принимает метаданные версии, раскладку локального игрового каталога,
+ * профиль игрока и подобранный рантайм Java и выдаёт готовый к
+ * выполнению {@link LaunchArguments}.
  * <p>
- * The builder handles both the modern structured argument format
- * (1.13+) and the legacy {@code minecraftArguments} string (pre-1.13),
- * replacing all Mojang placeholders with concrete values.
+ * Билдер поддерживает как современный структурированный формат аргументов
+ * (1.13+), так и старую строку {@code minecraftArguments} (до 1.13),
+ * заменяя все плейсхолдеры Mojang конкретными значениями.
  */
 public interface LaunchArgumentBuilder {
 
     /**
-     * Builds launch arguments for the given context, running the game
-     * inside the storage root itself.
+     * Строит аргументы запуска для заданного контекста, запуская игру
+     * прямо внутри корня хранилища.
      *
-     * @param metadata  the version metadata
-     * @param gameDir   the game directory layout
-     * @param profile   the player profile
-     * @param javaRuntime the resolved Java runtime
-     * @return fully resolved launch arguments
+     * @param metadata  метаданные версии
+     * @param gameDir   раскладка игрового каталога
+     * @param profile   профиль игрока
+     * @param javaRuntime подобранный рантайм Java
+     * @return полностью разрешённые аргументы запуска
      */
     LaunchArguments build(VersionMetadata metadata,
                           GameDirectory gameDir,
@@ -38,27 +38,25 @@ public interface LaunchArgumentBuilder {
                           JavaRuntime javaRuntime);
 
     /**
-     * Builds launch arguments with a separate runtime directory and
-     * additional JVM arguments.
+     * Строит аргументы запуска с отдельным рабочим каталогом и
+     * дополнительными JVM-аргументами.
      * <p>
-     * Used for modded profiles: shared files (client JAR, libraries,
-     * assets, natives) are resolved from {@code gameDir} (the storage
-     * root), while the game process runs inside
-     * {@code runtimeDirectory} — the profile's own directory holding
-     * its {@code mods/}, {@code config/}, {@code saves/} etc. The
-     * {@code ${game_directory}} placeholder and the process working
-     * directory point at the runtime directory; profile-specific JVM
-     * arguments (e.g. {@code -Xmx4G}) are appended.
+     * Используется для модовых профилей: общие файлы (клиентский JAR, библиотеки,
+     * ассеты, нативы) разрешаются из {@code gameDir} (корня хранилища),
+     * а игровой процесс работает внутри {@code runtimeDirectory} — собственного
+     * каталога профиля с его {@code mods/}, {@code config/}, {@code saves/} и т.д.
+     * Плейсхолдер {@code ${game_directory}} и рабочий каталог процесса указывают
+     * на рабочий каталог; специфичные для профиля JVM-аргументы
+     * (например, {@code -Xmx4G}) добавляются в конец.
      *
-     * @param metadata        the version metadata
-     * @param gameDir         the storage game directory layout
-     * @param profile         the player profile
-     * @param javaRuntime     the resolved Java runtime
-     * @param runtimeDirectory the directory the game runs in (mods,
-     *                        saves, config live here)
-     * @param extraJvmArgs    profile-specific JVM arguments (may be
-     *                        empty)
-     * @return fully resolved launch arguments
+     * @param metadata        метаданные версии
+     * @param gameDir         раскладка игрового каталога хранилища
+     * @param profile         профиль игрока
+     * @param javaRuntime     подобранный рантайм Java
+     * @param runtimeDirectory каталог, в котором работает игра (моды,
+     *                        сохранения, конфиги находятся здесь)
+     * @param extraJvmArgs    JVM-аргументы профиля (могут быть пустыми)
+     * @return полностью разрешённые аргументы запуска
      */
     default LaunchArguments build(VersionMetadata metadata,
                                   GameDirectory gameDir,
@@ -66,7 +64,7 @@ public interface LaunchArgumentBuilder {
                                   JavaRuntime javaRuntime,
                                   Path runtimeDirectory,
                                   List<String> extraJvmArgs) {
-        // Default: ignore the extended context (backwards compatibility)
+        // По умолчанию расширенный контекст игнорируется (обратная совместимость)
         return build(metadata, gameDir, profile, javaRuntime);
     }
 }

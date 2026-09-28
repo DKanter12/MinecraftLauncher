@@ -5,10 +5,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Base64;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -17,48 +18,53 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import org.example.launcher.model.GameProfile;
+import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.util.Json;
 
 /**
- * Handles authentication and profile fetching via the Ely.by auth server.
+ * Обрабатывает авторизацию и получение профиля через сервер авторизации Ely.by.
  * <p>
- * Flow:
+ * Поток:
  * <ol>
- *   <li>POST to {@code https://authserver.ely.by/auth/authenticate} with
- *       username + password → returns accessToken, clientToken, selectedProfile</li>
+ *   <li>POST на {@code https://authserver.ely.by/auth/authenticate} с
+ *       username + password → возвращает accessToken, clientToken, selectedProfile</li>
  *   <li>GET {@code https://authserver.ely.by/session/profile/{uuid}}
- *       → returns profile with textures property (base64-encoded skin URL + model)</li>
+ *       → возвращает профиль со свойством textures (скин URL + модель в base64)</li>
  * </ol>
  */
 public class ElyAuthService {
 
+    private static final Logger LOG = Logger.getLogger(ElyAuthService.class.getName());
+
     private static final String AUTH_URL =
             "https://authserver.ely.by/auth/authenticate";
+    private static final String REFRESH_URL =
+            "https://authserver.ely.by/auth/refresh";
     private static final String SESSION_URL =
             "https://authserver.ely.by/session/profile/";
+    private static final String TEXTURES_PROPERTY = "textures";
+    private static final String SKIN_KEY = "SKIN";
 
     private final Gson gson;
     private final HttpClient httpClient;
 
     public ElyAuthService() {
-        this(new Gson(), HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                .build());
+        this(HttpDefaults.newGson(), HttpDefaults.newClient());
     }
 
     public ElyAuthService(Gson gson, HttpClient httpClient) {
-        this.gson = gson;
-        this.httpClient = httpClient;
+        this.gson = Objects.requireNonNull(gson, "gson");
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
     }
 
     /**
-     * Authenticates with Ely.by and returns a fully populated GameProfile
-     * including skin data.
+     * Авторизуется в Ely.by и возвращает полностью заполненный GameProfile,
+     * включая данные скина.
      *
-     * @param username Ely.by username or email
-     * @param password account password
-     * @return authenticated GameProfile with accessToken, uuid, skin
-     * @throws Exception if authentication fails
+     * @param username имя пользователя или email Ely.by
+     * @param password пароль учётной записи
+     * @return авторизованный GameProfile с accessToken, uuid, скином
+     * @throws Exception если авторизация не удалась
      */
     public GameProfile authenticate(String username, String password) throws Exception {
         String clientToken = UUID.randomUUID().toString().replace("-", "");
@@ -73,7 +79,7 @@ public class ElyAuthService {
         requestBody.addProperty("clientToken", clientToken);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(AUTH_URL))
-                .timeout(Duration.ofSeconds(30))
+                .timeout(HttpDefaults.REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestBody)))
                 .build();
@@ -110,18 +116,18 @@ public class ElyAuthService {
     }
 
     /**
-     * Refreshes the authorized session for an existing Ely.by account:
+     * Обновляет авторизованную сессию существующего аккаунта Ely.by:
      * <ol>
-     *   <li>{@code POST /auth/refresh} with the stored accessToken +
-     *       clientToken → new accessToken + current profile name</li>
-     *   <li>{@code GET /session/profile/{uuid}} → current skin data</li>
+     *   <li>{@code POST /auth/refresh} с сохранёнными accessToken +
+     *       clientToken → новый accessToken + текущее имя профиля</li>
+     *   <li>{@code GET /session/profile/{uuid}} → актуальные данные скина</li>
      * </ol>
-     * The account identity is the UUID; the nick is treated as a display
-     * field that can change at any time. As long as the launcher refreshes
-     * regularly, the stored accessToken stays alive indefinitely.
+     * Идентификатором аккаунта является UUID; ник считается отображаемым
+     * полем, которое может меняться в любой момент. Пока лаунчер регулярно
+     * обновляется, сохранённый accessToken остаётся активным неограниченно долго.
      *
-     * @param profile the existing Ely.by profile
-     * @return updated GameProfile, or the original if refresh fails
+     * @param profile существующий профиль Ely.by
+     * @return обновлённый GameProfile либо исходный, если обновление не удалось
      */
     public GameProfile refreshProfile(GameProfile profile) {
         if (profile == null || !profile.isElyBy() || profile.uuid().isEmpty()) {
@@ -139,9 +145,8 @@ public class ElyAuthService {
                     requestBody.addProperty("accessToken", accessToken);
                     requestBody.addProperty("clientToken", clientToken);
 
-                    HttpRequest request = HttpRequest.newBuilder(
-                            URI.create(AUTH_URL.replace("/authenticate", "/refresh")))
-                            .timeout(Duration.ofSeconds(15))
+                    HttpRequest request = HttpRequest.newBuilder(URI.create(REFRESH_URL))
+                            .timeout(HttpDefaults.CONNECT_TIMEOUT)
                             .header("Content-Type", "application/json")
                             .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestBody)))
                             .build();
@@ -162,15 +167,14 @@ public class ElyAuthService {
                             JsonObject selected = root.getAsJsonObject("selectedProfile");
                             String authName = getStr(selected, "name");
                             if (authName != null && !authName.isBlank()) {
-                                System.out.println("[ELY] auth refresh: current name='" + authName + "'");
+                                LOG.fine("Ely.by auth refresh: current name='" + authName + "'");
                             }
                         }
                     } else {
-                        System.out.println("[ELY] auth refresh failed: " + response.statusCode()
-                                + " — session may have expired, re-login required");
+                        LOG.info("Ely.by auth refresh failed: " + response.statusCode());
                     }
                 } catch (Exception e) {
-                    System.out.println("[ELY] auth refresh error: " + e.getMessage());
+                    LOG.log(Level.FINE, "Ely.by auth refresh error", e);
                 }
             }
 
@@ -178,7 +182,7 @@ public class ElyAuthService {
 
             HttpRequest request = HttpRequest.newBuilder(
                     URI.create(SESSION_URL + trimmedUuid))
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(HttpDefaults.CONNECT_TIMEOUT)
                     .GET()
                     .build();
 
@@ -186,14 +190,14 @@ public class ElyAuthService {
                     HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                System.out.println("[ELY] session returned status " + response.statusCode() + " for uuid=" + trimmedUuid);
+                LOG.fine("Ely.by session returned status " + response.statusCode());
                 return profile;
             }
 
             JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
 
             String currentName = getStr(root, "name");
-            System.out.println("[ELY] session name='" + currentName + "' | saved name='" + profile.name() + "'");
+            LOG.fine("Ely.by session name='" + currentName + "' | saved name='" + profile.name() + "'");
             if (currentName == null || currentName.isBlank()) {
                 currentName = profile.name();
             }
@@ -205,9 +209,11 @@ public class ElyAuthService {
             if (root.has("properties") && root.get("properties").isJsonArray()) {
                 propertiesJson = gson.toJson(root.get("properties"));
                 for (JsonElement elem : root.getAsJsonArray("properties")) {
-                    if (!elem.isJsonObject()) continue;
+                    if (!elem.isJsonObject()) {
+                        continue;
+                    }
                     JsonObject prop = elem.getAsJsonObject();
-                    if ("textures".equals(getStr(prop, "name"))) {
+                    if (TEXTURES_PROPERTY.equals(getStr(prop, "name"))) {
                         String encodedValue = getStr(prop, "value");
                         if (encodedValue != null) {
                             SkinData decoded = decodeTextures(encodedValue);
@@ -223,19 +229,19 @@ public class ElyAuthService {
                     clientToken != null ? clientToken : profile.clientToken().orElse(null),
                     skinUrl, skinModel, propertiesJson);
         } catch (Exception e) {
-            System.out.println("[ELY] refresh exception: " + e);
+            LOG.log(Level.FINE, "Ely.by refresh failed, keeping cached profile", e);
             return profile;
         }
     }
 
     /**
-     * Fetches skin URL and model from the Ely.by session server.
+     * Загружает URL и модель скина с сессионного сервера Ely.by.
      */
     SkinData fetchSkinData(String uuid) throws Exception {
         String trimmedUuid = uuid.replace("-", "");
         HttpRequest request = HttpRequest.newBuilder(
                 URI.create(SESSION_URL + trimmedUuid))
-                .timeout(Duration.ofSeconds(15))
+                .timeout(HttpDefaults.CONNECT_TIMEOUT)
                 .GET()
                 .build();
 
@@ -259,9 +265,11 @@ public class ElyAuthService {
 
         JsonArray properties = root.getAsJsonArray("properties");
         for (JsonElement elem : properties) {
-            if (!elem.isJsonObject()) continue;
+            if (!elem.isJsonObject()) {
+                continue;
+            }
             JsonObject prop = elem.getAsJsonObject();
-            if ("textures".equals(getStr(prop, "name"))) {
+            if (TEXTURES_PROPERTY.equals(getStr(prop, "name"))) {
                 String encodedValue = getStr(prop, "value");
                 if (encodedValue != null) {
                     SkinData decoded = decodeTextures(encodedValue);
@@ -289,8 +297,8 @@ public class ElyAuthService {
             String skinUrl = null;
             String skinModel = null;
 
-            if (texObj.has("SKIN") && texObj.get("SKIN").isJsonObject()) {
-                JsonObject skin = texObj.getAsJsonObject("SKIN");
+            if (texObj.has(SKIN_KEY) && texObj.get(SKIN_KEY).isJsonObject()) {
+                JsonObject skin = texObj.getAsJsonObject(SKIN_KEY);
                 skinUrl = getStr(skin, "url");
                 if (skin.has("metadata") && skin.get("metadata").isJsonObject()) {
                     JsonObject meta = skin.getAsJsonObject("metadata");
@@ -321,10 +329,7 @@ public class ElyAuthService {
     }
 
     private static String getStr(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 
     record SkinData(String url, String model, String propertiesJson) {}

@@ -11,14 +11,14 @@ import org.example.launcher.distribution.BuildSummary;
 import org.example.launcher.distribution.ServerSession;
 
 /**
- * The default implementation used when no launcher server is
- * configured: the launcher runs in pure local mode, exactly as it did
- * before the distribution architecture existed. Local builds,
- * installation and launching keep working untouched.
+ * Реализация по умолчанию, когда сервер лаунчера не настроен:
+ * лаунчер работает в чисто локальном режиме, ровно как до появления
+ * архитектуры распространения. Локальные сборки,
+ * установка и запуск продолжают работать без изменений.
  *
- * <p>Sign-in and every administrative function fail with a clear
- * message instead of silently doing nothing; the build catalog is
- * simply empty.</p>
+ * <p>Вход и все административные функции завершаются понятной
+ * ошибкой вместо молчаливого бездействия; каталог сборок
+ * просто пуст.</p>
  */
 public class OfflineLauncherServerApi implements AdminLauncherServerApi {
 

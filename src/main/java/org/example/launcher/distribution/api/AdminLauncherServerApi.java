@@ -9,77 +9,77 @@ import org.example.launcher.distribution.BuildSummary;
 import org.example.launcher.distribution.ServerSession;
 
 /**
- * The administrative part of the launcher server's API. A superset of
- * {@link LauncherServerApi}: it is the surface an administrator's
- * launcher uses to create, upload, publish and retire builds.
+ * Административная часть API сервера лаунчера. Надмножество над
+ * {@link LauncherServerApi}: поверхность, которую лаунчер администратора
+ * использует для создания, загрузки, публикации и снятия сборок.
  *
- * <p>Both the launcher and the server enforce the ADMIN role — a
- * regular user's session never reaches these functions.</p>
+ * <p>И лаунчер, и сервер принудительно требуют роль ADMIN —
+ * сессия обычного пользователя никогда не доходит до этих функций.</p>
  */
 public interface AdminLauncherServerApi extends LauncherServerApi {
 
     /**
-     * Registers a new build (or a new version of an existing build id)
-     * on the server, in draft state.
+     * Регистрирует новую сборку (или новую версию существующего id сборки)
+     * на сервере, в состоянии черновика.
      *
-     * @param session an ADMIN session
-     * @param draft   id, version, names and the Minecraft/loader
-     *                coordinates of the build
-     * @return the stored summary as the server accepted it
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session ADMIN-сессия
+     * @param draft   id, версия, имена и координаты Minecraft/загрузчика
+     *                сборки
+     * @return сохранённое описание, как его принял сервер
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     BuildSummary createBuild(ServerSession session, BuildSummary draft) throws IOException;
 
     /**
-     * Uploads one file of a draft build version.
+     * Загружает один файл черновой версии сборки.
      *
-     * @param session      an ADMIN session
-     * @param buildId      unique build id
-     * @param version      the draft version the file belongs to
-     * @param category     which part of the build the file is
-     * @param relativePath path inside the category folder
-     * @param file         local file to upload
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session      ADMIN-сессия
+     * @param buildId      уникальный id сборки
+     * @param version      черновая версия, к которой относится файл
+     * @param category     к какой части сборки относится файл
+     * @param relativePath путь внутри папки категории
+     * @param file         локальный файл для загрузки
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     void uploadBuildFile(ServerSession session, String buildId, String version,
                          BuildFileCategory category, String relativePath, Path file) throws IOException;
 
     /**
-     * Publishes a draft build version: from this moment regular users
-     * see it in their build list.
+     * Публикует черновую версию сборки: с этого момента обычные пользователи
+     * видят её в своём списке сборок.
      *
-     * @param session an ADMIN session
-     * @param buildId unique build id
-     * @param version the version to publish
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session ADMIN-сессия
+     * @param buildId уникальный id сборки
+     * @param version публикуемая версия
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     void publishBuild(ServerSession session, String buildId, String version) throws IOException;
 
     /**
-     * Hides a build from regular users without deleting it.
+     * Скрывает сборку от обычных пользователей без её удаления.
      *
-     * @param session an ADMIN session
-     * @param buildId unique build id
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session ADMIN-сессия
+     * @param buildId уникальный id сборки
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     void hideBuild(ServerSession session, String buildId) throws IOException;
 
     /**
-     * Removes a build from the server entirely.
+     * Полностью удаляет сборку с сервера.
      *
-     * @param session an ADMIN session
-     * @param buildId unique build id
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session ADMIN-сессия
+     * @param buildId уникальный id сборки
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     void deleteBuild(ServerSession session, String buildId) throws IOException;
 
     /**
-     * Lists the users registered on the launcher server, for
-     * administration.
+     * Перечисляет пользователей, зарегистрированных на сервере лаунчера, для
+     * администрирования.
      *
-     * @param session an ADMIN session
-     * @return login names with their roles, never {@code null}
-     * @throws IOException on network errors or when the session is not ADMIN
+     * @param session ADMIN-сессия
+     * @return логины с ролями, никогда {@code null}
+     * @throws IOException при сетевых ошибках или если сессия не ADMIN
      */
     List<String> listUsers(ServerSession session) throws IOException;
 }

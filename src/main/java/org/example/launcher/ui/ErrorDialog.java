@@ -14,8 +14,10 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import org.example.launcher.i18n.Lang;
+
 /**
- * Modal dialog showing a launch error message with a copy button.
+ * Модальный диалог с текстом ошибки запуска и кнопкой копирования.
  */
 public class ErrorDialog extends Stage {
 
@@ -36,16 +38,16 @@ public class ErrorDialog extends Stage {
         textArea.setPrefHeight(200);
         textArea.getStyleClass().add("error-text");
 
-        Button copyButton = new Button("Copy");
+        Button copyButton = new Button(Lang.tr("button.copy"));
         copyButton.getStyleClass().add("install-close-button");
         copyButton.setOnAction(e -> {
             ClipboardContent content = new ClipboardContent();
             content.putString(message);
             Clipboard.getSystemClipboard().setContent(content);
-            copyButton.setText("Copied!");
+            copyButton.setText(Lang.tr("button.copied"));
         });
 
-        Button closeButton = new Button("Close");
+        Button closeButton = new Button(Lang.tr("button.close"));
         closeButton.getStyleClass().add("install-close-button");
         closeButton.setOnAction(e -> close());
 

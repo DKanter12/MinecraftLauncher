@@ -6,40 +6,40 @@ import java.util.List;
 import org.example.launcher.model.JavaRuntime;
 
 /**
- * Detects Java runtime installations available on the host system.
+ * Обнаруживает установки Java, доступные в системе хоста.
  * <p>
- * Implementations scan environment variables, system paths, platform-specific
- * registries, and common installation directories to build a list of
- * available runtimes. This is the read-only "sensor" side of Java
- * resolution; the actual matching logic lives in
+ * Реализации сканируют переменные окружения, системные пути,
+ * платформенные реестры и типовые каталоги установок, строя список
+ * доступных рантаймов. Это «сенсорная» сторона разрешения Java
+ * только для чтения; собственно логика подбора находится в
  * {@link JavaResolutionService}.
  * <p>
- * This interface is designed to be testable — implementations that
- * shell out to {@code java -version} or query the Windows registry can
- * be replaced with stubs in tests.
+ * Интерфейс спроектирован для тестируемости — реализации, которые
+ * вызывают {@code java -version} или опрашивают реестр Windows, можно
+ * заменять заглушками в тестах.
  */
 public interface JavaDetector {
 
     /**
-     * Scans the system for all discoverable Java runtimes.
+     * Сканирует систему в поисках всех обнаруживаемых рантаймов Java.
      * <p>
-     * The returned list is not ordered by preference; the
-     * {@link JavaResolutionService} is responsible for selecting the
-     * best match.
+     * Возвращаемый список не упорядочен по приоритету;
+     * за выбор лучшего соответствия отвечает
+     * {@link JavaResolutionService}.
      *
-     * @return a list of discovered runtimes (may be empty, never {@code null})
+     * @return список обнаруженных рантаймов (может быть пустым, никогда {@code null})
      */
     List<JavaRuntime> detectInstalledRuntimes();
 
     /**
-     * Probes a single directory that is expected to be a JDK/JRE root
-     * (i.e. it contains a {@code bin/java} or {@code bin/java.exe}).
+     * Проверяет один каталог, который предполагается корнем JDK/JRE
+     * (т.е. содержит {@code bin/java} или {@code bin/java.exe}).
      *
-     * @param homeDir the candidate {@code JAVA_HOME}-style directory
-     * @param source  the discovery source to attach to the result
-     * @return a {@link JavaRuntime} if the directory is valid, or
-     *         {@code null} if no executable was found or the version
-     *         could not be determined
+     * @param homeDir кандидатный каталог в стиле {@code JAVA_HOME}
+     * @param source  источник обнаружения для привязки к результату
+     * @return {@link JavaRuntime}, если каталог корректен, или
+     *         {@code null}, если исполняемый файл не найден либо версию
+     *         определить не удалось
      */
     JavaRuntime detectFromPath(Path homeDir, JavaRuntime.Source source);
 }

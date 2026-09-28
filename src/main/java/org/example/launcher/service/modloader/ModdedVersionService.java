@@ -22,18 +22,18 @@ import org.example.launcher.version.ModLoaderFamilyType;
 import org.example.launcher.version.ModdedVersionType;
 
 /**
- * Discovers locally installed modded versions (Fabric, Forge,
- * NeoForge, Quilt) and resolves their launch metadata.
+ * Обнаруживает локально установленные модовые версии (Fabric, Forge,
+ * NeoForge, Quilt) и разрешает их метаданные запуска.
  * <p>
- * Installed modded versions follow the standard
- * {@code versions/{id}/{id}.json} layout with an {@code inheritsFrom}
- * field pointing at the vanilla version they extend. They never
- * appear in the Mojang manifest, so this service scans the local
- * {@code versions/} directory instead.
+ * Установленные модовые версии следуют стандартной раскладке
+ * {@code versions/{id}/{id}.json} с полем {@code inheritsFrom},
+ * указывающим на ванильную версию, которую они расширяют. В манифесте Mojang
+ * они никогда не появляются, поэтому сервис сканирует локальный
+ * каталог {@code versions/}.
  * <p>
- * At launch time {@link #resolveMetadata} re-resolves the inheritance
- * chain: the local loader JSON is merged with the vanilla metadata
- * fetched from Mojang (see {@link ModLoaderMetadataMerger}).
+ * При запуске {@link #resolveMetadata} переразрешает цепочку наследования:
+ * локальный JSON загрузчика сливается с ванильными метаданными,
+ * полученными от Mojang (см. {@link ModLoaderMetadataMerger}).
  */
 public class ModdedVersionService {
 
@@ -50,10 +50,10 @@ public class ModdedVersionService {
     }
 
     /**
-     * Lists all modded versions installed in the given game directory.
-     * A version counts as modded when its local JSON carries an
-     * {@code inheritsFrom} field (loader profiles) or matches a known
-     * loader id convention.
+     * Перечисляет все модовые версии, установленные в заданном игровом каталоге.
+     * Версия считается модовой, когда её локальный JSON несёт поле
+     * {@code inheritsFrom} (профили загрузчиков) или совпадает с известным
+     * соглашением об id загрузчика.
      */
     public List<MinecraftVersion> listInstalled(GameDirectory gameDir)
             throws IOException {
@@ -87,23 +87,23 @@ public class ModdedVersionService {
                             ModdedVersionType.INSTANCE, null, null));
                 }
             } catch (Exception ignored) {
-                // Corrupt or unrelated JSON in versions/ — not a modded version
+                // Повреждённый или посторонний JSON в versions/ — не модовая версия
             }
         }
         return result;
     }
 
     /**
-     * Resolves the complete launch metadata for an installed modded
-     * version: reads the local loader JSON, fetches the inherited
-     * vanilla metadata from the Mojang manifest and merges both.
+     * Разрешает полные метаданные запуска для установленной модовой
+     * версии: читает локальный JSON загрузчика, получает унаследованные
+     * ванильные метаданные из манифеста Mojang и сливает оба.
      *
-     * @param moddedVersionId the installed version id
-     *                         (e.g. {@code fabric-loader-0.16.9-1.21.4})
-     * @param gameDir         the game directory layout
-     * @return merged, self-contained launch metadata
-     * @throws IOException if the local JSON is missing/invalid or the
-     *                     vanilla metadata cannot be resolved
+     * @param moddedVersionId id установленной версии
+     *                         (например, {@code fabric-loader-0.16.9-1.21.4})
+     * @param gameDir         раскладка игрового каталога
+     * @return слитые самодостаточные метаданные запуска
+     * @throws IOException если локальный JSON отсутствует/невалиден либо
+     *                     ванильные метаданные неразрешимы
      */
     public VersionMetadata resolveMetadata(String moddedVersionId,
                                            GameDirectory gameDir)
@@ -146,7 +146,7 @@ public class ModdedVersionService {
                             + " not found in the Mojang manifest"));
             return metadataService.fetchMetadata(vanillaVersion);
         } catch (IOException network) {
-            // Offline fallback: use cached vanilla JSON if present
+            // Офлайн-запасной вариант: использовать кэшированный ванильный JSON, если есть
             Path local = gameDir.versionMetadata(vanillaId);
             if (Files.isRegularFile(local)) {
                 try {
@@ -163,8 +163,8 @@ public class ModdedVersionService {
     }
 
     /**
-     * Best-effort detection of the loader type behind a version id,
-     * based on the standard naming conventions
+     * Эвристически определяет тип загрузчика по id версии,
+     * по стандартным соглашениям об именовании
      * ({@code fabric-loader-…}, {@code quilt-loader-…},
      * {@code …-forge-…}, {@code neoforge-…}).
      */
@@ -179,25 +179,24 @@ public class ModdedVersionService {
     }
 
     /**
-     * A locally installed modded version with its loader family
-     * detected from the version id, the loader version parsed from
-     * the id and the vanilla base resolved from the local JSON's
-     * {@code inheritsFrom} field (authoritative — NeoForge ids do
-     * not contain the MC version).
+     * Локально установленная модовая версия с определённым по id версии
+     * семейством загрузчика, версией загрузчика, разобранной из
+     * id, и ванильной базой, разрешённой из поля {@code inheritsFrom}
+     * локального JSON (авторитетно — id NeoForge не содержат версию MC).
      *
-     * @param version          table entry for the installed version
-     * @param loaderType       the loader family (Fabric, Forge, …)
-     * @param loaderVersion    the loader's own version
-     *                         (e.g. {@code "0.16.9"}, {@code "47.4.23"})
-     * @param minecraftVersion the vanilla base version
-     *                         (e.g. {@code "1.21.4"})
+     * @param version          запись таблицы для установленной версии
+     * @param loaderType       семейство загрузчика (Fabric, Forge, …)
+     * @param loaderVersion    собственная версия загрузчика
+     *                         (например, {@code "0.16.9"}, {@code "47.4.23"})
+     * @param minecraftVersion базовая ванильная версия
+     *                         (например, {@code "1.21.4"})
      */
     public record InstalledModdedVersion(MinecraftVersion version,
                                          ModLoaderType loaderType,
                                          String loaderVersion,
                                          String minecraftVersion) {
 
-        /** The parsed info as a loader version entry. */
+        /** Разобранная информация как запись версии загрузчика. */
         public ModLoaderVersion toModLoaderVersion() {
             return new ModLoaderVersion(loaderType, loaderVersion,
                     minecraftVersion, true, null);
@@ -205,12 +204,12 @@ public class ModdedVersionService {
     }
 
     /**
-     * Lists installed modded versions together with their parsed
-     * loader family, loader version and vanilla base — for the
-     * unified version browser. Entries whose id cannot be attributed
-     * to a known loader, whose local JSON has no {@code inheritsFrom},
-     * or whose loader version cannot be parsed from the id are
-     * skipped.
+     * Перечисляет установленные модовые версии вместе с разобранными
+     * семейством загрузчика, версией загрузчика и ванильной базой — для
+     * единого браузера версий. Записи, чей id нельзя отнести к известному
+     * загрузчику, чей локальный JSON не имеет {@code inheritsFrom}
+     * либо чья версия загрузчика не разбирается из id,
+     * пропускаются.
      */
     public List<InstalledModdedVersion> listInstalledDetailed(GameDirectory gameDir)
             throws IOException {
@@ -250,15 +249,15 @@ public class ModdedVersionService {
                                 ModLoaderFamilyType.of(family), null, null),
                         family, loaderVersion, mcBase));
             } catch (Exception ignored) {
-                // Corrupt or unrelated JSON in versions/ — not a modded version
+                // Повреждённый или посторонний JSON в versions/ — не модовая версия
             }
         }
         return result;
     }
 
     /**
-     * Extracts the loader's own version from an installed version id,
-     * given the family and the (authoritative) vanilla base version.
+     * Извлекает собственную версию загрузчика из id установленной версии,
+     * зная семейство и (авторитетную) базовую ванильную версию.
      */
     private static String parseLoaderVersion(String id, ModLoaderType family,
                                              String mcBase) {

@@ -12,11 +12,11 @@ import java.time.Duration;
 import java.util.Objects;
 
 /**
- * {@link FileDownloader} backed by {@link HttpClient}.
+ * Реализация {@link FileDownloader} на основе {@link HttpClient}.
  * <p>
- * Downloads to a temporary file first, then atomically moves it to the
- * target path. This avoids leaving partial/corrupt files on disk when
- * a download is interrupted.
+ * Сначала загружает во временный файл, затем атомарно перемещает его в
+ * целевой путь. Это исключает частично повреждённые файлы на диске при
+ * прерывании загрузки.
  */
 public class HttpFileDownloader implements FileDownloader {
 

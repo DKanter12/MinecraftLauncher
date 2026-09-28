@@ -19,14 +19,15 @@ import javafx.stage.StageStyle;
 import org.example.launcher.distribution.ServerAuthService;
 import org.example.launcher.distribution.ServerSession;
 import org.example.launcher.distribution.UserRole;
+import org.example.launcher.i18n.Lang;
 
 /**
- * Modal dialog for signing in to (and out of) the launcher server.
+ * Модальный диалог входа на сервер лаунчера (и выхода из него).
  *
- * <p>Sign-in sends login and password to the server once — the server
- * answers with a bearer token and the account's role; from then on
- * only the token is used and stored. When a session is already active
- * the dialog shows it and offers signing out instead.</p>
+ * <p>Вход отправляет логин и пароль на сервер один раз — сервер
+ * отвечает bearer-токеном и ролью аккаунта; далее используется
+ * и хранится только токен. Если сессия уже активна,
+ * диалог показывает её и предлагает выйти.</p>
  */
 public class ServerLoginDialog extends Stage {
 
@@ -39,8 +40,8 @@ public class ServerLoginDialog extends Stage {
     private final TextField loginField = new TextField();
     private final PasswordField passwordField = new PasswordField();
     private final Label errorLabel = new Label();
-    private final Button signInButton = new Button("Sign In");
-    private final Button signOutButton = new Button("Sign Out");
+    private final Button signInButton = new Button(Lang.tr("button.signin"));
+    private final Button signOutButton = new Button(Lang.tr("button.signout"));
 
     public ServerLoginDialog(Stage owner, ServerAuthService authService, ServerSession current) {
         this.authService = authService;
@@ -50,7 +51,7 @@ public class ServerLoginDialog extends Stage {
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        setTitle("Launcher Server");
+        setTitle(Lang.tr("server.title"));
 
         errorLabel.getStyleClass().add("error-label");
         errorLabel.setWrapText(true);
@@ -66,16 +67,15 @@ public class ServerLoginDialog extends Stage {
     }
 
     private VBox signedInView() {
-        Label titleLabel = new Label("Signed in to the launcher server");
+        Label titleLabel = new Label(Lang.tr("server.signedin"));
         titleLabel.getStyleClass().add("section-title");
 
-        String role = current.isAdmin() ? "Administrator" : "User";
+        String role = current.isAdmin() ? Lang.tr("server.role.admin")
+                : Lang.tr("server.role.user");
         Label accountLabel = new Label(current.accountName() + " · " + role);
         accountLabel.getStyleClass().add("details-version");
 
-        Label hint = new Label("Your session token is stored locally and used for "
-                + "server requests; the password is never saved. Signing out discards "
-                + "the token — local builds and instances are not affected.");
+        Label hint = new Label(Lang.tr("server.hint"));
         hint.getStyleClass().add("quick-select-label");
         hint.setWrapText(true);
 
@@ -91,7 +91,7 @@ public class ServerLoginDialog extends Stage {
             }
             close();
         });
-        Button closeButton = new Button("Close");
+        Button closeButton = new Button(Lang.tr("button.close"));
         closeButton.getStyleClass().add("install-close-button");
         closeButton.setCancelButton(true);
         closeButton.setOnAction(e -> {
@@ -110,25 +110,25 @@ public class ServerLoginDialog extends Stage {
     }
 
     private VBox signedOutView() {
-        Label titleLabel = new Label("Sign in to the launcher server");
+        Label titleLabel = new Label(Lang.tr("server.signedout"));
         titleLabel.getStyleClass().add("section-title");
 
-        Label loginLabel = new Label("Login");
+        Label loginLabel = new Label(Lang.tr("server.login"));
         loginLabel.getStyleClass().add("quick-select-label");
         loginField.getStyleClass().add("search-field");
-        loginField.setPromptText("Account login");
+        loginField.setPromptText(Lang.tr("server.login.prompt"));
 
-        Label passwordLabel = new Label("Password");
+        Label passwordLabel = new Label(Lang.tr("server.password"));
         passwordLabel.getStyleClass().add("quick-select-label");
         passwordField.getStyleClass().add("search-field");
-        passwordField.setPromptText("Sent over HTTPS, never stored");
+        passwordField.setPromptText(Lang.tr("server.password.prompt"));
 
         signInButton.getStyleClass().add("install-close-button");
         signInButton.setDefaultButton(true);
         signInButton.disableProperty().bind(loginField.textProperty().isEmpty()
                 .or(passwordField.textProperty().isEmpty()));
         signInButton.setOnAction(e -> signIn());
-        Button cancelButton = new Button("Cancel");
+        Button cancelButton = new Button(Lang.tr("button.cancel"));
         cancelButton.getStyleClass().add("install-close-button");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> close());
@@ -148,7 +148,7 @@ public class ServerLoginDialog extends Stage {
         String login = loginField.getText().trim();
         String password = passwordField.getText();
         signInButton.setDisable(true);
-        errorLabel.setText("Signing in…");
+        errorLabel.setText(Lang.tr("server.signing"));
 
         Thread worker = new Thread(() -> {
             try {
@@ -160,7 +160,7 @@ public class ServerLoginDialog extends Stage {
             } catch (IOException | RuntimeException e) {
                 Platform.runLater(() -> {
                     errorLabel.setText(e.getMessage() != null ? e.getMessage()
-                            : "Sign-in failed");
+                            : Lang.tr("server.failed"));
                     signInButton.setDisable(false);
                 });
             }
@@ -170,10 +170,9 @@ public class ServerLoginDialog extends Stage {
     }
 
     /**
-     * Shows the dialog and returns the session that is active
-     * afterwards — a freshly created session, the unchanged current
-     * one, or {@code null} after signing out or cancelling while
-     * signed out.
+     * Показывает диалог и возвращает активную после него сессию
+     * — свежесозданную, неизменённую текущую
+     * или {@code null} после выхода либо отмены без входа.
      */
     public static ServerSession show(Stage owner, ServerAuthService authService,
                                      ServerSession current) {

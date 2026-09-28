@@ -5,12 +5,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Describes a single library dependency required by a Minecraft version.
+ * Описывает одну зависимость-библиотеку, требуемую версии Minecraft.
  * <p>
- * Each library has a main artifact (the JAR) and optionally a set of
- * classifier downloads used for natives (e.g. {@code natives-windows}).
- * The {@code natives} map links an OS name to the classifier name that
- * should be extracted for that platform.
+ * Каждая библиотека имеет основной артефакт (JAR) и необязательный набор
+ * загрузок классификаторов для нативных файлов (например, {@code natives-windows}).
+ * Отображение {@code natives} связывает имя ОС с именем классификатора,
+ * который следует распаковать для этой платформы.
  */
 public final class Library {
 
@@ -44,9 +44,9 @@ public final class Library {
     }
 
     /**
-     * Returns the native classifier download for the given OS name
-     * (e.g. {@code "windows"}, {@code "linux"}, {@code "osx"}), or
-     * empty if this library has no natives for that platform.
+     * Возвращает загрузку нативного классификатора для заданного имени ОС
+     * (например, {@code "windows"}, {@code "linux"}, {@code "osx"}) либо
+     * пустое значение, если у библиотеки нет нативных файлов для этой платформы.
      */
     public Optional<DownloadInfo> nativeDownload(String osName) {
         String classifier = natives.get(osName);

@@ -1,22 +1,27 @@
 package org.example.launcher.distribution;
 
 /**
- * One file of a distributed build, addressed by its category and a
- * path relative to that category's folder.
+ * Один файл распространяемой сборки, адресуемый категорией и путём
+ * относительно папки этой категории.
  *
- * <p>The SHA-1 lets the launcher detect which files it already has
- * (no re-download) and which files changed between build versions
- * (see {@link RemoteBuildService}).</p>
+ * <p>Хеши целостности: разные источники дают разные хеши
+ * (git-манифесты содержат SHA-1, Яндекс Диск сообщает MD5 и SHA-256).
+ * Должен присутствовать хотя бы один — проверка использует самый сильный
+ * доступный (см. {@link RemoteBuildService}).</p>
  *
- * @param relativePath path relative to the category folder, uses '/' separators
- * @param category     which part of the build this file belongs to
- * @param sha1         lowercase SHA-1 of the file content
- * @param size         file size in bytes
+ * @param relativePath путь относительно папки категории, разделитель '/'
+ * @param category     к какой части сборки относится файл
+ * @param sha1         SHA-1 содержимого файла в нижнем регистре, или {@code null}
+ * @param sha256       SHA-256 в hex нижнего регистра, или {@code null}
+ * @param md5          MD5 в hex нижнего регистра, или {@code null}
+ * @param size         размер файла в байтах
  */
 public record BuildFileEntry(
         String relativePath,
         BuildFileCategory category,
         String sha1,
+        String sha256,
+        String md5,
         long size) {
 
     public BuildFileEntry {
@@ -26,21 +31,32 @@ public record BuildFileEntry(
         if (category == null) {
             throw new IllegalArgumentException("category must not be null");
         }
-        if (sha1 == null || sha1.isBlank()) {
-            throw new IllegalArgumentException("sha1 must not be blank");
+        if (isBlank(sha1) && isBlank(sha256) && isBlank(md5)) {
+            throw new IllegalArgumentException(
+                    "at least one checksum (sha1/sha256/md5) is required");
         }
     }
 
+    /** Запись в стиле SHA-1 (git-манифесты, локальные снапшоты). */
+    public BuildFileEntry(String relativePath, BuildFileCategory category,
+                          String sha1, long size) {
+        this(relativePath, category, sha1, null, null, size);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     /**
-     * @return the category folder and relative path joined with '/',
-     *         the identity of a file within a build used for update
-     *         diffs (added / changed / removed).
+     * @return папка категории и относительный путь, соединённые через '/',
+     *         идентичность файла внутри сборки для диффов обновлений
+     *         (добавленные / изменённые / удалённые).
      */
     public String key() {
         return category.folder() + "/" + relativePath;
     }
 
-    /** @return display form, e.g. {@code mods/sodium.jar}. */
+    /** @return отображаемая форма, напр. {@code mods/sodium.jar}. */
     @Override
     public String toString() {
         return key();

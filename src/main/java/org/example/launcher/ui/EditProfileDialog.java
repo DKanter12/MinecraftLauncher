@@ -1,7 +1,8 @@
 package org.example.launcher.ui;
 
-import java.util.ArrayList;
 import java.util.List;
+
+import org.example.launcher.util.JvmArgs;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -21,21 +22,22 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 import org.example.launcher.model.ModdedProfile;
+import org.example.launcher.i18n.Lang;
 
 /**
- * Modal dialog for editing a game instance: its display name, the
- * dedicated memory (RAM) limit and extra JVM launch arguments.
+ * Модальный диалог редактирования игрового инстанса: отображаемое имя,
+ * лимит выделенной памяти (ОЗУ) и дополнительные аргументы запуска JVM.
  * <p>
- * Renaming also renames the instance folder, so it always matches
- * the launcher name (mods, saves and builds move along). The
- * loader/Minecraft versions are fixed properties of an instance.
+ * Переименование также переименовывает папку инстанса, чтобы она всегда
+ * совпадала с именем в лаунчере (моды, сохранения и сборки переезжают вместе).
+ * Версии загрузчика/Minecraft — фиксированные свойства инстанса.
  */
 public class EditProfileDialog extends Stage {
 
     /**
-     * The edited values. JVM arguments are given as a list of separate
-     * arguments in launch order; the memory limit is megabytes
-     * ({@code 0} means automatic).
+     * Отредактированные значения. JVM-аргументы задаются списком отдельных
+     * аргументов в порядке запуска; лимит памяти — в мегабайтах
+     * ({@code 0} означает автоматический).
      */
     public record Result(String name, List<String> extraJvmArgs,
                          int memoryMb) {
@@ -49,46 +51,46 @@ public class EditProfileDialog extends Stage {
     private final ToggleGroup memoryGroup = new ToggleGroup();
     private final TextArea jvmArgsArea = new TextArea();
     private final Label errorLabel = new Label();
-    private final Button saveButton = new Button("Save");
+    private final Button saveButton = new Button(Lang.tr("button.save"));
 
     public EditProfileDialog(Stage owner, ModdedProfile profile) {
         initStyle(StageStyle.UTILITY);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        setTitle("Edit Instance");
+        setTitle(Lang.tr("edit.title"));
 
         Label infoLabel = new Label(profile.name() + " \u00b7 "
                 + profile.summary() + " \u00b7 " + profile.versionId());
         infoLabel.getStyleClass().add("quick-select-label");
         infoLabel.setWrapText(true);
 
-        Label nameLabel = new Label("Instance name");
+        Label nameLabel = new Label(Lang.tr("edit.name"));
         nameLabel.getStyleClass().add("section-title");
         nameField.setText(profile.name());
         nameField.getStyleClass().add("search-field");
         nameField.setMaxWidth(Double.MAX_VALUE);
 
-        Label memoryLabel = new Label("Maximum memory (RAM)");
+        Label memoryLabel = new Label(Lang.tr("edit.memory"));
         memoryLabel.getStyleClass().add("section-title");
         memoryChips.setHgap(8);
         memoryChips.setVgap(8);
-        // Compact preset row — 2 / 4 / 8 etc. without ellipsis (FlowPane prevents "2...")
-        addMemoryChip("Auto", 0);
-        addMemoryChip("2 GB", 2048);
-        addMemoryChip("4 GB", 4096);
-        addMemoryChip("6 GB", 6144);
-        addMemoryChip("8 GB", 8192);
-        addMemoryChip("12 GB", 12288);
-        addMemoryChip("16 GB", 16384);
-        addMemoryChip("32 GB", 32768);
+        // Компактный ряд пресетов — 2 / 4 / 8 и т.д. без многоточия (FlowPane не даёт схлопнуться в «2...»)
+        addMemoryChip(Lang.tr("common.auto"), 0);
+        addMemoryChip("2 " + Lang.tr("unit.gb"), 2048);
+        addMemoryChip("4 " + Lang.tr("unit.gb"), 4096);
+        addMemoryChip("6 " + Lang.tr("unit.gb"), 6144);
+        addMemoryChip("8 " + Lang.tr("unit.gb"), 8192);
+        addMemoryChip("12 " + Lang.tr("unit.gb"), 12288);
+        addMemoryChip("16 " + Lang.tr("unit.gb"), 16384);
+        addMemoryChip("32 " + Lang.tr("unit.gb"), 32768);
         memoryField.setText(profile.memoryMb() > 0
                 ? String.valueOf(profile.memoryMb()) : "");
-        memoryField.setPromptText("or custom MB — e.g. 10240 for 10 GB");
+        memoryField.setPromptText(Lang.tr("edit.memory.prompt"));
         memoryField.getStyleClass().add("search-field");
         memoryField.setMaxWidth(Double.MAX_VALUE);
 
-        Label jvmLabel = new Label("Extra JVM arguments (one per line)");
+        Label jvmLabel = new Label(Lang.tr("edit.jvm"));
         jvmLabel.getStyleClass().add("section-title");
         jvmArgsArea.setText(String.join("\n", profile.extraJvmArgs()));
         jvmArgsArea.setPromptText("-XX:+UseG1GC");
@@ -116,7 +118,7 @@ public class EditProfileDialog extends Stage {
             close();
         });
 
-        Button cancelButton = new Button("Cancel");
+        Button cancelButton = new Button(Lang.tr("button.cancel"));
         cancelButton.getStyleClass().add("install-close-button");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> close());
@@ -146,7 +148,7 @@ public class EditProfileDialog extends Stage {
     private void addMemoryChip(String text, int megabytes) {
         ToggleButton chip = new ToggleButton(text);
         chip.getStyleClass().add("filter-button");
-        // Ensure text never ellipsizes to "2..." — keep natural width
+        // Текст не должен схлопываться в «2...» — сохраняем естественную ширину
         chip.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         chip.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         chip.setToggleGroup(memoryGroup);
@@ -161,7 +163,7 @@ public class EditProfileDialog extends Stage {
         memoryChips.getChildren().add(chip);
     }
 
-    /** Highlights the preset matching the field (none for custom). */
+    /** Подсвечивает пресет, совпадающий с полем (для произвольного — ни один). */
     private void syncMemoryChips() {
         int current = parseLenient(memoryField.getText());
         for (var node : memoryChips.getChildren()) {
@@ -174,13 +176,12 @@ public class EditProfileDialog extends Stage {
 
     private void updateSaveButton() {
         if (nameField.getText().isBlank()) {
-            errorLabel.setText("The instance needs a name.");
+            errorLabel.setText(Lang.tr("edit.error.noname"));
             saveButton.setDisable(true);
             return;
         }
         if (parseMemory(memoryField.getText()) < 0) {
-            errorLabel.setText(
-                    "Memory must be empty (auto) or at least 256 MB.");
+            errorLabel.setText(Lang.tr("edit.error.memory"));
             saveButton.setDisable(true);
             return;
         }
@@ -189,8 +190,8 @@ public class EditProfileDialog extends Stage {
     }
 
     /**
-     * Parses the memory field: empty means automatic ({@code 0}),
-     * otherwise megabytes; {@code -1} when invalid.
+     * Разбирает поле памяти: пустое означает автоматический режим ({@code 0}),
+     * иначе мегабайты; {@code -1} при некорректном вводе.
      */
     private static int parseMemory(String text) {
         int value = parseLenient(text);
@@ -200,7 +201,7 @@ public class EditProfileDialog extends Stage {
         return value < 256 ? -1 : value;
     }
 
-    /** Lenient parse for chip syncing: empty is 0, garbage is -1. */
+    /** Мягкий разбор для синхронизации чипов: пустое — 0, мусор — -1. */
     private static int parseLenient(String text) {
         if (text == null || text.isBlank()) {
             return 0;
@@ -213,24 +214,16 @@ public class EditProfileDialog extends Stage {
     }
 
     /**
-     * Splits the text area content into separate JVM arguments: one
-     * argument per non-blank line, trimmed.
+     * Разбивает содержимое текстового поля на отдельные JVM-аргументы: один
+     * аргумент на непустую строку, с обрезкой пробелов.
      */
     private static List<String> parseJvmArgs(String text) {
-        List<String> args = new ArrayList<>();
-        if (text == null) return List.of();
-        for (String line : text.split("\\R")) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty()) {
-                args.add(trimmed);
-            }
-        }
-        return List.copyOf(args);
+        return JvmArgs.parse(text);
     }
 
     /**
-     * Shows the dialog and returns the edited values, or {@code null}
-     * if the dialog was cancelled.
+     * Показывает диалог и возвращает отредактированные значения, либо {@code null},
+     * если диалог был отменён.
      */
     public static Result show(Stage owner, ModdedProfile profile) {
         EditProfileDialog dialog = new EditProfileDialog(owner, profile);

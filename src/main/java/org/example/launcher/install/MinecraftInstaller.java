@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.example.launcher.model.AssetIndex;
@@ -16,31 +17,32 @@ import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionMetadata;
 import org.example.launcher.service.AssetIndexService;
 import org.example.launcher.service.MojangAssetIndexService;
+import org.example.launcher.util.LibraryPaths;
 import org.example.launcher.util.OsDetector;
 
 /**
- * {@link InstallationService} implementation for Minecraft.
+ * Реализация {@link InstallationService} для Minecraft.
  * <p>
- * Uses {@link GameDirectory} for all path resolution, ensuring a
- * consistent local storage layout with shared libraries and assets
- * that are reused across versions without re-downloading.
+ * Использует {@link GameDirectory} для всего разрешения путей, обеспечивая
+ * единообразную раскладку локального хранилища с общими библиотеками и ресурсами,
+ * переиспользуемыми версиями без повторной загрузки.
  * <p>
- * Flow:
+ * Порядок работы:
  * <ol>
- *   <li>Builds the complete list of {@link DownloadTask}s from
- *       version metadata (client JAR, libraries, natives, assets).</li>
- *   <li>For each task: checks if the file exists locally and its SHA-1
- *       hash matches. If so, skips. Otherwise, downloads.</li>
- *   <li>After each download, verifies the SHA-1 hash. If the hash
- *       does not match, the corrupt file is deleted and the download
- *       is retried (up to {@link #maxRetries} times).</li>
- *   <li>Reports progress via {@link InstallationProgress}.</li>
+ *   <li>Строит полный список {@link DownloadTask} из
+ *       метаданных версии (клиентский JAR, библиотеки, нативные файлы, ресурсы).</li>
+ *   <li>Для каждой задачи: проверяет наличие файла локально и совпадение его SHA-1
+ *       хэша. При совпадении пропускает. Иначе загружает.</li>
+ *   <li>После каждой загрузки проверяет SHA-1 хэш. При несовпадении
+ *       повреждённый файл удаляется и загрузка
+ *       повторяется (до {@link #maxRetries} попыток).</li>
+ *   <li>Сообщает прогресс через {@link InstallationProgress}.</li>
  * </ol>
  * <p>
- * Shared libraries and assets are stored in common directories
- * ({@code libraries/}, {@code assets/objects/}) and are addressed by
- * their Maven path or SHA-1 hash respectively, so the same file is
- * never downloaded twice when multiple versions need it.
+ * Общие библиотеки и ресурсы хранятся в общих каталогах
+ * ({@code libraries/}, {@code assets/objects/}) и адресуются
+ * по Maven-пути или SHA-1 хэшу соответственно, поэтому один и тот же файл
+ * никогда не загружается дважды для разных версий.
  */
 public class MinecraftInstaller implements InstallationService {
 
@@ -67,14 +69,14 @@ public class MinecraftInstaller implements InstallationService {
                               ChecksumVerifier checksumVerifier,
                               AssetIndexService assetIndexService,
                               int maxRetries) {
-        this.fileDownloader = fileDownloader;
-        this.checksumVerifier = checksumVerifier;
-        this.assetIndexService = assetIndexService;
+        this.fileDownloader = Objects.requireNonNull(fileDownloader, "fileDownloader");
+        this.checksumVerifier = Objects.requireNonNull(checksumVerifier, "checksumVerifier");
+        this.assetIndexService = Objects.requireNonNull(assetIndexService, "assetIndexService");
         this.maxRetries = Math.max(1, maxRetries);
     }
 
     // ------------------------------------------------------------------
-    //  Installation orchestration
+    //  Оркестрация установки
     // ------------------------------------------------------------------
 
     @Override
@@ -121,14 +123,14 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Processes a single download task with hash verification and retry:
+     * Обрабатывает одну задачу загрузки с проверкой хэша и повторами:
      * <ol>
-     *   <li>If the file exists locally and its SHA-1 matches → SKIP.</li>
-     *   <li>If the file exists but hash mismatches → delete corrupt file.</li>
-     *   <li>Download the file.</li>
-     *   <li>Verify the downloaded file's SHA-1.</li>
-     *   <li>If hash mismatches → delete and retry (up to {@link #maxRetries}).</li>
-     *   <li>If all retries fail → FAILED.</li>
+     *   <li>Если файл есть локально и его SHA-1 совпадает → ПРОПУСК.</li>
+     *   <li>Если файл есть, но хэш не совпал → удалить повреждённый файл.</li>
+     *   <li>Загрузить файл.</li>
+     *   <li>Проверить SHA-1 загруженного файла.</li>
+     *   <li>При несовпадении хэша → удалить и повторить (до {@link #maxRetries}).</li>
+     *   <li>Если все попытки исчерпаны → ОШИБКА.</li>
      * </ol>
      */
     private DownloadResult processTask(DownloadTask task) {
@@ -179,17 +181,17 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     // ------------------------------------------------------------------
-    //  Task list construction (pure, testable)
+    //  Построение списка задач (чистое, тестируемое)
     // ------------------------------------------------------------------
 
     /**
-     * Builds the complete list of files that need to be available for
-     * the given version metadata, without downloading anything.
+     * Строит полный список файлов, необходимых для
+     * заданных метаданных версии, ничего не загружая.
      *
-     * @param metadata the version metadata
-     * @param gameDir  the game directory layout
-     * @return an ordered list of download tasks
-     * @throws IOException if the asset index cannot be fetched
+     * @param metadata метаданные версии
+     * @param gameDir  раскладка игрового каталога
+     * @return упорядоченный список задач загрузки
+     * @throws IOException если индекс ресурсов не удаётся получить
      */
     public List<DownloadTask> buildDownloadTasks(VersionMetadata metadata, GameDirectory gameDir)
             throws IOException {
@@ -205,7 +207,7 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Builds client JAR download task (version-specific, not shared).
+     * Строит задачу загрузки клиентского JAR (специфичен для версии, не общий).
      */
     public List<DownloadTask> buildClientJarTasks(VersionMetadata metadata, GameDirectory gameDir) {
         List<DownloadTask> tasks = new ArrayList<>();
@@ -219,9 +221,9 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Builds library JAR download tasks for all libraries that have
-     * an artifact download. Libraries are stored in a shared directory
-     * and reused across versions.
+     * Строит задачи загрузки JAR библиотек для всех библиотек с
+     * загрузкой артефакта. Библиотеки хранятся в общем каталоге
+     * и переиспользуются версиями.
      */
     public List<DownloadTask> buildLibraryTasks(VersionMetadata metadata, GameDirectory gameDir) {
         List<DownloadTask> tasks = new ArrayList<>();
@@ -239,9 +241,9 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Builds native library download tasks for the current OS.
-     * Native JARs are stored alongside other libraries but in a
-     * classifier-specific path.
+     * Строит задачи загрузки нативных библиотек для текущей ОС.
+     * Нативные JAR хранятся рядом с прочими библиотеками, но в
+     * пути, специфичном для классификатора.
      */
     public List<DownloadTask> buildNativeTasks(VersionMetadata metadata, GameDirectory gameDir) {
         List<DownloadTask> tasks = new ArrayList<>();
@@ -262,12 +264,12 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Builds asset download tasks by first fetching the asset index,
-     * then creating a task for every asset object. Assets are
-     * hash-addressed and shared across all versions.
+     * Строит задачи загрузки ресурсов: сначала получает индекс ресурсов,
+     * затем создаёт задачу для каждого объекта ресурсов. Ресурсы
+     * адресуются по хэшу и общие для всех версий.
      * <p>
-     * Also includes the asset index JSON itself as a task so it is
-     * cached locally.
+     * Также включает сам JSON индекса ресурсов как задачу для его
+     * локального кэширования.
      */
     public List<DownloadTask> buildAssetTasks(VersionMetadata metadata, GameDirectory gameDir)
             throws IOException {
@@ -302,10 +304,10 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Loads asset index content from the local cache if present and
-     * valid, otherwise fetches from the network. This avoids
-     * re-downloading the asset index on every install when it is
-     * already cached locally.
+     * Загружает содержимое индекса ресурсов из локального кэша, если он есть и
+     * валиден, иначе получает из сети. Это избавляет от
+     * повторной загрузки индекса ресурсов при каждой установке, если он
+     * уже закэширован локально.
      */
     private AssetIndexContent loadAssetIndexContent(AssetIndex assetIndex, Path indexFile)
             throws IOException {
@@ -315,7 +317,7 @@ public class MinecraftInstaller implements InstallationService {
                     String json = Files.readString(indexFile);
                     return new MojangAssetIndexService().parseIndex(json);
                 } catch (IOException e) {
-                    // Fall through to network fetch
+                    // Перейти к получению из сети
                 }
             }
         }
@@ -323,7 +325,7 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     // ------------------------------------------------------------------
-    //  Helpers
+    //  Помощники
     // ------------------------------------------------------------------
 
     private static void deleteFile(Path path) {
@@ -334,21 +336,11 @@ public class MinecraftInstaller implements InstallationService {
     }
 
     /**
-     * Resolves a library artifact to its local path using the
-     * {@code path} field from the download info when available,
-     * otherwise derives it from the URL.
+     * Разрешает артефакт библиотеки в локальный путь.
+     *
+     * @see LibraryPaths#resolve(GameDirectory, DownloadInfo)
      */
     private static Path resolveLibraryPath(GameDirectory gameDir, DownloadInfo dl) {
-        Optional<String> pathOpt = dl.path();
-        if (pathOpt.isPresent()) {
-            return gameDir.library(pathOpt.get());
-        }
-        String url = dl.url();
-        if (url != null && !url.isBlank()) {
-            int idx = url.lastIndexOf('/');
-            String fileName = (idx >= 0) ? url.substring(idx + 1) : url;
-            return gameDir.librariesDir().resolve(fileName);
-        }
-        return gameDir.librariesDir().resolve("unknown.jar");
+        return LibraryPaths.resolve(gameDir, dl);
     }
 }

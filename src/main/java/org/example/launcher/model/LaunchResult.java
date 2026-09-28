@@ -3,7 +3,7 @@ package org.example.launcher.model;
 import java.util.Optional;
 
 /**
- * Outcome of a launch attempt.
+ * Итог попытки запуска.
  */
 public final class LaunchResult {
 

@@ -22,14 +22,14 @@ import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
 
 /**
- * Downloads and caches player skin textures, extracting the face
- * (head front layer) for display in the launcher UI.
+ * Скачивает и кэширует текстуры скинов игроков, извлекая лицо
+ * (передний слой головы) для отображения в UI лаунчера.
  * <p>
- * Minecraft skin textures are 64×64 (or 64×32 legacy) PNG files.
- * The face is the 8×8 region at (8, 8), scaled up to the desired size.
+ * Текстуры скинов Minecraft — это PNG 64×64 (или 64×32 для старых).
+ * Лицо — область 8×8 в точке (8, 8), масштабируемая до нужного размера.
  * <p>
- * Skins are cached locally under {@code assets/skins/<hash>.png} to
- * avoid re-downloading on every launcher start.
+ * Скины кэшируются локально в {@code assets/skins/<hash>.png}, чтобы
+ * не скачивать их при каждом старте лаунчера.
  */
 public class SkinService {
 
@@ -49,12 +49,12 @@ public class SkinService {
     }
 
     /**
-     * Asynchronously loads the face avatar for the given profile.
+     * Асинхронно загружает аватар-лицо для заданного профиля.
      *
-     * @param profile  the player profile (must have a skin URL for Ely.by accounts)
-     * @param size     target avatar size in pixels (e.g. 32)
-     * @return a CompletableFuture that resolves to the avatar Image,
-     *         or empty if the profile has no skin
+     * @param profile  профиль игрока (для аккаунтов Ely.by должен иметь URL скина)
+     * @param size     целевой размер аватара в пикселях (например, 32)
+     * @return CompletableFuture с изображением аватара
+     *         либо пусто, если у профиля нет скина
      */
     public CompletableFuture<Optional<Image>> loadAvatarAsync(GameProfile profile, int size) {
         if (profile.skinUrl().isEmpty()) {
@@ -71,12 +71,12 @@ public class SkinService {
     }
 
     /**
-     * Synchronously loads (or retrieves from cache) the face avatar.
+     * Синхронно загружает (либо берёт из кэша) аватар-лицо.
      * <p>
-     * The cache is read via {@code ImageIO.read} (synchronous, validated):
-     * a corrupt or truncated cached file is detected, deleted, and the
-     * skin is re-downloaded. This self-heals broken avatars instead of
-     * requiring a re-login.
+     * Кэш читается через {@code ImageIO.read} (синхронно, с проверкой):
+     * повреждённый или обрезанный кэшированный файл обнаруживается, удаляется, а
+     * скин скачивается заново. Это самовосстанавливает битые аватары без
+     * необходимости повторного логина.
      */
     public Image loadAvatar(String skinUrl, int size) throws IOException {
         String hash = urlToHash(skinUrl);
@@ -125,19 +125,19 @@ public class SkinService {
     }
 
     /**
-     * Extracts the 8×8 face region from a skin texture and scales it.
+     * Извлекает область лица 8×8 из текстуры скина и масштабирует её.
      */
     private BufferedImage extractFace(BufferedImage skin, int targetSize) {
         int w = skin.getWidth();
         int h = skin.getHeight();
 
-        // Legacy 64×32 skins: face is at (8,8) on the top row
-        // Modern 64×64 skins: same position, but there's also an overlay
-        // We use the base layer only
+        // Старые скины 64×32: лицо находится в (8,8) верхнего ряда
+        // Современные скины 64×64: позиция та же, но есть ещё оверлей
+        // Используем только базовый слой
         int srcX = FACE_X;
         int srcY = FACE_Y;
 
-        // Also extract the face overlay (hat layer) if skin is 64×64
+        // Также извлечь оверлей лица (слой шапки), если скин 64×64
         int overlaySrcX = 40;
         int overlaySrcY = 8;
 
@@ -147,7 +147,7 @@ public class SkinService {
         g.drawImage(skin, 0, 0, targetSize, targetSize,
                 srcX, srcY, srcX + FACE_SIZE, srcY + FACE_SIZE, null);
 
-        // Overlay the hat layer if available (64×64 skins only)
+        // Наложить слой шапки, если доступен (только для скинов 64×64)
         if (w >= 64 && h >= 64) {
             g.drawImage(skin, 0, 0, targetSize, targetSize,
                     overlaySrcX, overlaySrcY,

@@ -1,8 +1,10 @@
 package org.example.launcher.distribution;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -17,32 +19,31 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.distribution.api.LauncherServerApi;
-import org.example.launcher.install.Sha1ChecksumVerifier;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * Installs and updates the builds the administrator distributes via
- * the launcher server, and exposes what is installed locally.
+ * Устанавливает и обновляет сборки, распространяемые администратором через
+ * сервер лаунчера, и показывает установленные локально.
  *
- * <p>Server builds live in the same {@code builds} folder of an
- * instance as locally saved builds — one sub-folder per build id —
- * but additionally carry a {@code build.json} manifest (origin
- * SERVER). Installing one build never touches another build: they
- * stay separate and switchable, and switching never re-downloads
- * anything.</p>
+ * <p>Серверные сборки лежат в той же папке {@code builds} инстанса,
+ * что и локально сохранённые сборки — по одному подкаталогу на id сборки —
+ * но дополнительно содержат манифест {@code build.json} (источник
+ * SERVER). Установка одной сборки никогда не затрагивает другую: они
+ * остаются раздельными и переключаемыми, а переключение ничего
+ * повторно не скачивает.</p>
  *
- * <p>Updates use the build id + version scheme: the same id with a
- * higher version re-uses the existing folder and syncs it with a
- * diff — files whose SHA-1 matches are kept as-is, changed or new
- * files are downloaded, files that disappeared from the manifest are
- * removed.</p>
+ * <p>Обновления используют схему id сборки + версия: тот же id с более
+ * высокой версией переиспользует существующую папку и синхронизирует её
+ * по диффу — файлы с совпадающим SHA-1 остаются как есть, изменённые или новые
+ * файлы скачиваются, файлы, исчезнувшие из манифеста,
+ * удаляются.</p>
  */
 public class RemoteBuildService {
 
-    /** Manifest file that marks a build folder as server-distributed. */
+    /** Файл манифеста, помечающий папку сборки как распространённую с сервера. */
     public static final String MANIFEST_FILE_NAME = "build.json";
 
-    /** Must stay in sync with {@link org.example.launcher.service.BuildService}. */
+    /** Должен соответствовать раскладке локальной папки {@code builds}. */
     private static final String BUILDS_DIR = "builds";
 
     private final LauncherServerApi api;
@@ -58,11 +59,11 @@ public class RemoteBuildService {
     }
 
     /**
-     * Lists the builds the administrator published, sorted by display name.
+     * Перечисляет опубликованные администратором сборки, отсортировав по отображаемому имени.
      *
-     * @param session the signed-in session
-     * @return build summaries, never {@code null}
-     * @throws IOException on network errors
+     * @param session вошедшая сессия
+     * @return краткие описания сборок, никогда {@code null}
+     * @throws IOException при сетевых ошибках
      */
     public List<BuildSummary> catalog(ServerSession session) throws IOException {
         List<BuildSummary> builds = api.listBuilds(session);
@@ -72,49 +73,73 @@ public class RemoteBuildService {
     }
 
     /**
-     * Installs a build into an instance: fetches the descriptor and
-     * syncs the build folder. Safe to call again for the same version
-     * (idempotent — matching files are skipped) or a newer version
-     * (acts as an update).
+     * Устанавливает сборку в инстанс: получает дескриптор и
+     * синхронизирует папку сборки. Безопасно вызывать повторно для той же версии
+     * (идемпотентно — совпадающие файлы пропускаются) или для более новой версии
+     * (работает как обновление).
      *
-     * @param session the signed-in session
-     * @param summary the build to install, e.g. from the catalog
-     * @param gameDir the instance's game directory
-     * @return the installed descriptor
-     * @throws IOException on network errors or corrupt downloads
+     * @param session вошедшая сессия
+     * @param summary устанавливаемая сборка, напр. из каталога
+     * @param gameDir игровая директория инстанса
+     * @return установленный дескриптор
+     * @throws IOException при сетевых ошибках или повреждённых загрузках
      */
     public BuildDescriptor install(ServerSession session, BuildSummary summary, Path gameDir) throws IOException {
         return syncBuild(session, gameDir, api.fetchBuild(session, summary.id()));
     }
 
     /**
-     * Updates a build to whatever version the server currently
-     * publishes for its id. A no-op when the local folder already
-     * matches the manifest.
+     * Обновляет сборку до версии, которую сервер сейчас публикует
+     * для её id. Ничего не делает, если локальная папка уже
+     * соответствует манифесту.
      *
-     * @param session the signed-in session
-     * @param gameDir the instance's game directory
-     * @param buildId unique build id
-     * @return the updated descriptor
-     * @throws IOException on network errors or corrupt downloads
+     * @param session вошедшая сессия
+     * @param gameDir игровая директория инстанса
+     * @param buildId уникальный id сборки
+     * @return обновлённый дескриптор
+     * @throws IOException при сетевых ошибках или повреждённых загрузках
      */
     public BuildDescriptor update(ServerSession session, Path gameDir, String buildId) throws IOException {
         return syncBuild(session, gameDir, api.fetchBuild(session, buildId));
     }
 
     /**
-     * @param gameDir  the instance's game directory
-     * @param buildId  unique build id
-     * @return the installed manifest of that build, when present
+     * Опубликованные администратором сборки, которых в этом инстансе ещё нет —
+     * новые папки на стороне источника, определяемые по id. Пользователь
+     * сам выбирает, что скачать.
+     *
+     * @param session вошедшая сессия
+     * @param gameDir игровая директория инстанса
+     * @return описания из каталога без локальной установки, никогда {@code null}
+     * @throws IOException при сетевых ошибках
+     */
+    public List<BuildSummary> newBuilds(ServerSession session, Path gameDir) throws IOException {
+        Set<String> installed = new HashSet<>();
+        for (BuildDescriptor descriptor : installedBuilds(gameDir)) {
+            installed.add(descriptor.id());
+        }
+        List<BuildSummary> fresh = new ArrayList<>();
+        for (BuildSummary summary : catalog(session)) {
+            if (!installed.contains(summary.id())) {
+                fresh.add(summary);
+            }
+        }
+        return fresh;
+    }
+
+    /**
+     * @param gameDir  игровая директория инстанса
+     * @param buildId  уникальный id сборки
+     * @return установленный манифест этой сборки, если есть
      */
     public Optional<BuildDescriptor> installedBuild(Path gameDir, String buildId) {
         return readManifest(buildDir(gameDir, buildId));
     }
 
     /**
-     * @param gameDir the instance's game directory
-     * @return all server-distributed builds installed in it
-     * @throws IOException when the builds folder cannot be read
+     * @param gameDir игровая директория инстанса
+     * @return все установленные в неё сборки, распространённые с сервера
+     * @throws IOException если папку сборок не удаётся прочитать
      */
     public List<BuildDescriptor> installedBuilds(Path gameDir) throws IOException {
         Path builds = gameDir.resolve(BUILDS_DIR);
@@ -131,10 +156,10 @@ public class RemoteBuildService {
     }
 
     /**
-     * @param installed  the locally installed manifest
-     * @param catalogSum the version the server currently publishes
-     * @return true when the server's version is strictly newer and an
-     *         update should be offered
+     * @param installed  локально установленный манифест
+     * @param catalogSum версия, которую сервер сейчас публикует
+     * @return true, если версия сервера строго новее и
+     *         следует предложить обновление
      */
     public boolean updateAvailable(BuildDescriptor installed, BuildSummary catalogSum) {
         if (installed == null || catalogSum == null || !installed.id().equals(catalogSum.id())) {
@@ -143,7 +168,7 @@ public class RemoteBuildService {
         return BuildVersions.isNewer(catalogSum.version(), installed.version());
     }
 
-    /** @return the local folder of a build: {@code gameDir/builds/{buildId}}. */
+    /** @return локальная папка сборки: {@code gameDir/builds/{buildId}}. */
     public Path buildDir(Path gameDir, String buildId) {
         return gameDir.resolve(BUILDS_DIR).resolve(sanitizeId(buildId));
     }
@@ -157,15 +182,15 @@ public class RemoteBuildService {
         for (BuildFileEntry file : descriptor.files()) {
             wantedKeys.add(file.key());
             Path target = buildDir.resolve(file.category().folder()).resolve(file.relativePath());
-            if (Files.isRegularFile(target) && sha1Matches(target, file.sha1())) {
-                continue; // already present and unchanged — no download
+            if (Files.isRegularFile(target) && checksumMatches(target, file)) {
+                continue; // уже есть и не изменился — без скачивания
             }
             Path parent = target.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
             api.downloadFile(session, descriptor, file, target);
-            if (!sha1Matches(target, file.sha1())) {
+            if (!checksumMatches(target, file)) {
                 throw new IOException("Corrupt download for build " + descriptor.id()
                         + ": " + file.key());
             }
@@ -184,11 +209,41 @@ public class RemoteBuildService {
         return descriptor;
     }
 
-    private boolean sha1Matches(Path file, String expectedSha1) throws IOException {
+    /**
+     * Проверяет файл по самому сильному доступному
+     * хешу записи (SHA-256, затем SHA-1, затем MD5).
+     */
+    private boolean checksumMatches(Path file, BuildFileEntry entry) throws IOException {
+        if (entry.sha256() != null && !entry.sha256().isBlank()) {
+            return computeDigest(file, "SHA-256").equalsIgnoreCase(entry.sha256());
+        }
+        if (entry.sha1() != null && !entry.sha1().isBlank()) {
+            return computeDigest(file, "SHA-1").equalsIgnoreCase(entry.sha1());
+        }
+        if (entry.md5() != null && !entry.md5().isBlank()) {
+            return computeDigest(file, "MD5").equalsIgnoreCase(entry.md5());
+        }
+        throw new IOException("No checksum to verify " + entry.key());
+    }
+
+    private static String computeDigest(Path file, String algorithm) throws IOException {
         try {
-            return Sha1ChecksumVerifier.computeSha1(file).equalsIgnoreCase(expectedSha1);
+            MessageDigest digest = MessageDigest.getInstance(algorithm);
+            try (InputStream in = Files.newInputStream(file)) {
+                byte[] buffer = new byte[65536];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest.digest()) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new IOException("SHA-1 is not available", e);
+            throw new IOException(algorithm + " is not available", e);
         }
     }
 
@@ -227,7 +282,15 @@ public class RemoteBuildService {
             JsonObject fileJson = new JsonObject();
             fileJson.addProperty("relativePath", file.relativePath());
             fileJson.addProperty("category", file.category().name());
-            fileJson.addProperty("sha1", file.sha1());
+            if (file.sha1() != null) {
+                fileJson.addProperty("sha1", file.sha1());
+            }
+            if (file.sha256() != null) {
+                fileJson.addProperty("sha256", file.sha256());
+            }
+            if (file.md5() != null) {
+                fileJson.addProperty("md5", file.md5());
+            }
             fileJson.addProperty("size", file.size());
             files.add(fileJson);
         }
@@ -269,7 +332,9 @@ public class RemoteBuildService {
                 files.add(new BuildFileEntry(
                         required(fileJson, "relativePath"),
                         category,
-                        required(fileJson, "sha1"),
+                        optional(fileJson, "sha1"),
+                        optional(fileJson, "sha256"),
+                        optional(fileJson, "md5"),
                         fileJson.has("size") ? fileJson.get("size").getAsLong() : 0L));
             }
         }
@@ -280,7 +345,7 @@ public class RemoteBuildService {
             try {
                 origin = BuildOrigin.valueOf(originRaw);
             } catch (IllegalArgumentException ignored) {
-                // keep SERVER default
+                // оставить значение SERVER по умолчанию
             }
         }
         return new BuildDescriptor(summary, files, origin);

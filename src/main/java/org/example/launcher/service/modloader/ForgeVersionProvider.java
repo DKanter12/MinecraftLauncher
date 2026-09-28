@@ -15,15 +15,15 @@ import java.util.regex.Pattern;
 import org.example.launcher.model.ModLoaderVersion;
 
 /**
- * {@link ModLoaderVersionProvider} for Forge, backed by the Forge
- * Maven repository metadata.
+ * Поставщик {@link ModLoaderVersionProvider} для Forge на метаданных
+ * Maven-репозитория Forge.
  * <p>
  * {@code GET https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml}
- * lists all Forge builds in the form {@code {mcVersion}-{forgeVersion}}
- * (e.g. {@code 1.20.1-47.4.10}). Entries are filtered by the requested
- * Minecraft version prefix, so every returned version is compatible by
- * construction. Installer JARs are resolved from the same Maven
- * repository.
+ * перечисляет все сборки Forge в виде {@code {mcVersion}-{forgeVersion}}
+ * (например, {@code 1.20.1-47.4.10}). Записи фильтруются по префиксу запрошенной
+ * версии Minecraft, поэтому каждая возвращённая версия совместима по
+ * построению. Установочные JAR разрешаются из того же Maven-
+ * репозитория.
  */
 public class ForgeVersionProvider implements ModLoaderVersionProvider {
 
@@ -96,10 +96,10 @@ public class ForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses Forge maven-metadata.xml and extracts the set of
-     * Minecraft versions Forge exists for — the part before the dash
-     * of {@code {mcVersion}-{forgeVersion}} entries. Exposed for unit
-     * testing.
+     * Разбирает Forge maven-metadata.xml и извлекает множество
+     * версий Minecraft, для которых существует Forge, — часть до дефиса
+     * в записях {@code {mcVersion}-{forgeVersion}}. Выставлен для юнит-
+     * тестирования.
      */
     public java.util.Set<String> parseSupportedMinecraftVersions(String xml) {
         java.util.Set<String> result = new java.util.HashSet<>();
@@ -110,8 +110,8 @@ public class ForgeVersionProvider implements ModLoaderVersionProvider {
             if (dash <= 0) continue;
             String mc = entry.substring(0, dash);
             String build = entry.substring(dash + 1);
-            // Both sides must start with a digit — filters odd
-            // legacy entries that are not "{mc}-{build}" pairs
+            // Обе стороны должны начинаться с цифры — отсеивает странные
+            // legacy-записи, не являющиеся парами «{mc}-{build}»
             if (Character.isDigit(mc.charAt(0))
                     && !build.isEmpty()
                     && Character.isDigit(build.charAt(0))) {
@@ -122,12 +122,12 @@ public class ForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses Forge maven-metadata.xml and keeps only versions matching
-     * the requested Minecraft version. Exposed for unit testing.
+     * Разбирает Forge maven-metadata.xml и оставляет только версии под
+     * запрошенную версию Minecraft. Выставлен для юнит-тестирования.
      * <p>
-     * The metadata lists versions ascending; the result is reversed so
-     * the newest build comes first, and the newest build is flagged as
-     * stable (the closest analogue to Forge's "recommended" promo).
+     * В метаданных версии идут по возрастанию; результат разворачивается, чтобы
+     * новейшая сборка была первой, и новейшая сборка помечается как
+     * стабильная (ближайший аналог «recommended»-промо Forge).
      */
     public List<ModLoaderVersion> parseVersions(String xml, String minecraftVersion) {
         String prefix = minecraftVersion + "-";

@@ -4,18 +4,18 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 
 /**
- * An authorized session with the launcher server, returned after the
- * account signs in with login and password.
+ * Авторизованная сессия с сервером лаунчера, возвращается после
+ * входа по логину и паролю.
  *
- * <p>The launcher stores this record persistently (token only — the
- * password is never written anywhere) and attaches the token to all
- * subsequent server requests, exactly like a web session.</p>
+ * <p>Лаунчер хранит эту запись постоянно (только токен — пароль
+ * никуда не записывается) и прикладывает токен ко всем
+ * последующим запросам к серверу, как веб-сессию.</p>
  *
- * @param accountName  display name of the signed-in account
- * @param role         server-assigned role, gates available features
- * @param token        bearer token for subsequent requests (JWT-like)
- * @param serverUrl    base URL of the launcher server the token belongs to
- * @param expiresAtRaw optional ISO-8601 expiry timestamp of the token
+ * @param accountName  отображаемое имя вошедшей учётной записи
+ * @param role         назначенная сервером роль, определяет доступные функции
+ * @param token        bearer-токен для последующих запросов (JWT-подобный)
+ * @param serverUrl    базовый URL сервера лаунчера, к которому относится токен
+ * @param expiresAtRaw опциональная метка истечения токена в формате ISO-8601
  */
 public record ServerSession(
         String accountName,
@@ -31,20 +31,27 @@ public record ServerSession(
         if (role == null) {
             throw new IllegalArgumentException("role must not be null");
         }
-        if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("token must not be blank");
+        // Пусто — анонимная сессия (публичные git-репозитории): bearer-заголовок
+        // тогда не отправляется (см. GitHubBuildApi).
+        if (token == null) {
+            token = "";
         }
         if (serverUrl == null || serverUrl.isBlank()) {
             throw new IllegalArgumentException("serverUrl must not be blank");
         }
     }
 
-    /** @return true when this session carries the ADMIN role. */
+    /** @return true, если сессия анонимная (без учётных данных). */
+    public boolean isAnonymous() {
+        return token.isBlank();
+    }
+
+    /** @return true, если сессия имеет роль ADMIN. */
     public boolean isAdmin() {
         return role == UserRole.ADMIN;
     }
 
-    /** @return parsed expiry timestamp, when present. */
+    /** @return разобранная метка истечения, если есть. */
     public Optional<OffsetDateTime> expiresAt() {
         if (expiresAtRaw == null || expiresAtRaw.isBlank()) {
             return Optional.empty();
@@ -56,7 +63,7 @@ public record ServerSession(
         }
     }
 
-    /** @return true when the token has a parseable expiry in the past. */
+    /** @return true, если у токена есть разобранная метка истечения в прошлом. */
     public boolean isExpired() {
         return expiresAt().map(expiry -> expiry.isBefore(OffsetDateTime.now()))
                 .orElse(false);

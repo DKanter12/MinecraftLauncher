@@ -5,12 +5,11 @@ import java.nio.file.Path;
 import org.example.launcher.model.JavaRuntime;
 
 /**
- * Stub implementation of {@link JavaRuntimeInstaller}.
+ * Заглушка {@link JavaRuntimeInstaller}.
  * <p>
- * Always reports failure. This exists so that the launcher can be wired
- * up with the full Java resolution + installation pipeline now, and a
- * real implementation can replace this class later without changing any
- * call sites.
+ * Всегда сообщает о неудаче. Нужна, чтобы лаунчер уже сейчас можно было
+ * связать с полным пайплайном разрешения + установки Java, а реальную
+ * реализацию подставить позже без изменения точек вызова.
  */
 public class StubJavaRuntimeInstaller implements JavaRuntimeInstaller {
 

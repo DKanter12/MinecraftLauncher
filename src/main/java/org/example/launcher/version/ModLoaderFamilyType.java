@@ -6,11 +6,11 @@ import java.util.Map;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * Version type for locally installed mod loader versions (Fabric,
- * Forge, NeoForge, Quilt). One cached instance per loader family, so
- * installed modded versions can appear in the unified version
- * browser next to the vanilla manifest versions, with their own type
- * filters (registered via {@link VersionTypeRegistry#register}).
+ * Тип версии для локально установленных версий загрузчиков модов (Fabric,
+ * Forge, NeoForge, Quilt). Один кэшированный экземпляр на семейство загрузчиков, чтобы
+ * установленные модовые версии могли показываться в едином обозревателе
+ * версий рядом с ванильными версиями манифеста со своими фильтрами
+ * типов (регистрируются через {@link VersionTypeRegistry#register}).
  */
 public final class ModLoaderFamilyType implements VersionType {
 
@@ -23,7 +23,7 @@ public final class ModLoaderFamilyType implements VersionType {
         this.loaderType = loaderType;
     }
 
-    /** The cached type instance for a loader family. */
+    /** Кэшированный экземпляр типа для семейства загрузчиков. */
     public static synchronized ModLoaderFamilyType of(ModLoaderType loaderType) {
         return INSTANCES.computeIfAbsent(loaderType, ModLoaderFamilyType::new);
     }

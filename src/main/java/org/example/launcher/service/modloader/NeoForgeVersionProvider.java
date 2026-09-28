@@ -15,14 +15,14 @@ import java.util.regex.Pattern;
 import org.example.launcher.model.ModLoaderVersion;
 
 /**
- * {@link ModLoaderVersionProvider} for NeoForge, backed by the
- * NeoForge Maven repository metadata.
+ * Поставщик {@link ModLoaderVersionProvider} для NeoForge на метаданных
+ * Maven-репозитория NeoForge.
  * <p>
  * {@code GET https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml}
- * lists all NeoForge builds. Every build number encodes its target
- * Minecraft version (see {@link #minecraftVersionOf}), so entries are
- * filtered by exact decode and every returned version is compatible
- * by construction.
+ * перечисляет все сборки NeoForge. Каждый номер сборки кодирует свою целевую
+ * версию Minecraft (см. {@link #minecraftVersionOf}), поэтому записи фильтруются
+ * по точному декодированию, и каждая возвращённая версия совместима по
+ * построению.
  */
 public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
 
@@ -95,29 +95,29 @@ public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Maps a NeoForge build number to the Minecraft version it
-     * targets — both numbering schemes NeoForge has used:
+     * Отображает номер сборки NeoForge на целевую версию Minecraft —
+     * обе схемы нумерации, использовавшиеся в NeoForge:
      * <ul>
-     *   <li>legacy 3-component {@code {major}.{minor}.{build}} for
-     *       the MC {@code 1.x} era: {@code 47.1.104} →
-     *       {@code 1.20.1} (the only version carrying the old Forge
-     *       build number), {@code 21.0.167} → {@code 1.21},
+     *   <li>старая 3-компонентная {@code {major}.{minor}.{build}} для
+     *       эры MC {@code 1.x}: {@code 47.1.104} →
+     *       {@code 1.20.1} (единственная версия со старым номером сборки
+     *       Forge), {@code 21.0.167} → {@code 1.21},
      *       {@code 21.4.147} → {@code 1.21.4}</li>
-     *   <li>modern 4-component {@code {mc…}.{build}} for the MC
-     *       {@code 26.x} era: {@code 26.1.0.19} → {@code 26.1} (a
-     *       {@code .0} patch component marks the 2-part MC version),
+     *   <li>современная 4-компонентная {@code {mc…}.{build}} для эры MC
+     *       {@code 26.x}: {@code 26.1.0.19} → {@code 26.1} (компонент
+     *       патча {@code .0} маркирует 2-компонентную версию MC),
      *       {@code 26.1.2.101} → {@code 26.1.2},
      *       {@code 26.2.0.3} → {@code 26.2}</li>
      * </ul>
-     * Returns {@code null} for numbers that encode no known Minecraft
-     * version — including odd special builds like
-     * {@code 0.25w14craftmine.3-beta} that occasionally appear in the
-     * Maven metadata.
+     * Возвращает {@code null} для номеров, не кодирующих известную версию
+     * Minecraft, — включая редкие особые сборки вида
+     * {@code 0.25w14craftmine.3-beta}, иногда встречающиеся в
+     * метаданных Maven.
      */
     public static String minecraftVersionOf(String neoforgeVersion) {
         String number = neoforgeVersion;
-        // Strip qualifiers: "-beta", "-rc", "+snapshot-1" after
-        // "alpha.N", … — whichever comes first
+        // Отрезать квалификаторы: «-beta», «-rc», «+snapshot-1» после
+        // «alpha.N», … — что встретится первым
         int cut = number.length();
         int dash = number.indexOf('-');
         int plus = number.indexOf('+');
@@ -138,17 +138,17 @@ public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
             major = Integer.parseInt(parts[0]);
             minor = Integer.parseInt(parts[1]);
         } catch (NumberFormatException e) {
-            return null; // e.g. "0.25w14craftmine.3"
+            return null; // например, "0.25w14craftmine.3"
         }
         if (major == 20 || major == 21) {
-            // Legacy scheme (MC 1.20–1.21): 1.{major}.{minor}
+            // Старая схема (MC 1.20–1.21): 1.{major}.{minor}
             return minor == 0 ? "1." + major
                     : "1." + major + "." + minor;
         }
         if (major >= 22 && parts.length >= 3) {
-            // Modern scheme (MC 26.x): every component but the last
-            // (the build) forms the MC version; a ".0" patch marks
-            // the 2-part MC version (26.1.0.x → 26.1)
+            // Современная схема (MC 26.x): все компоненты, кроме последнего
+            // (сборки), образуют версию MC; патч «.0» маркирует
+            // 2-компонентную версию MC (26.1.0.x → 26.1)
             String[] mcParts = new String[parts.length - 1];
             System.arraycopy(parts, 0, mcParts, 0, mcParts.length);
             if (mcParts.length == 3 && "0".equals(mcParts[2])) {
@@ -160,13 +160,13 @@ public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses NeoForge maven-metadata.xml and keeps only builds whose
-     * decoded target Minecraft version equals the requested one.
-     * Exposed for unit testing.
+     * Разбирает NeoForge maven-metadata.xml и оставляет только сборки, чья
+     * декодированная целевая версия Minecraft равна запрошенной.
+     * Выставлен для юнит-тестирования.
      * <p>
-     * The metadata lists versions ascending; the result is reversed so
-     * the newest build comes first, and the newest build is flagged as
-     * stable.
+     * В метаданных версии идут по возрастанию; результат разворачивается, чтобы
+     * новейшая сборка была первой, и новейшая сборка помечается как
+     * стабильная.
      */
     public List<ModLoaderVersion> parseVersions(String xml, String minecraftVersion) {
         List<String> matching = new ArrayList<>();
@@ -195,9 +195,9 @@ public class NeoForgeVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses NeoForge maven-metadata.xml and extracts the set of
-     * Minecraft versions NeoForge exists for (via
-     * {@link #minecraftVersionOf}). Exposed for unit testing.
+     * Разбирает NeoForge maven-metadata.xml и извлекает множество
+     * версий Minecraft, для которых существует NeoForge (через
+     * {@link #minecraftVersionOf}). Выставлен для юнит-тестирования.
      */
     public java.util.Set<String> parseSupportedMinecraftVersions(String xml) {
         java.util.Set<String> result = new java.util.HashSet<>();

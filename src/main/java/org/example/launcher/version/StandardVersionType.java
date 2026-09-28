@@ -1,11 +1,11 @@
 package org.example.launcher.version;
 
 /**
- * Standard Minecraft version types returned by the official Mojang manifest.
+ * Стандартные типы версий Minecraft из официального манифеста Mojang.
  * <p>
- * Each constant corresponds to the {@code "type"} field value in the
- * version manifest JSON. New constants can be appended here when Mojang
- * introduces additional types — existing code does not need to change.
+ * Каждая константа соответствует значению поля {@code "type"} в JSON
+ * манифеста версий. Новые константы можно добавлять сюда при появлении
+ * дополнительных типов у Mojang — существующий код менять не нужно.
  */
 public enum StandardVersionType implements VersionType {
 

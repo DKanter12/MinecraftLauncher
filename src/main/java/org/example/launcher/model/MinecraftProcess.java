@@ -9,13 +9,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 /**
- * Wrapper around the {@link Process} started for Minecraft, providing
- * convenience methods for state queries, output capture, and lifecycle
- * control.
+ * Обёртка вокруг {@link Process}, запущенного для Minecraft, с
+ * удобными методами опроса состояния, захвата вывода и управления
+ * жизненным циклом.
  * <p>
- * Output streams (stdout / stderr) are consumed on background threads
- * to prevent buffer deadlocks when the game produces significant
- * log output.
+ * Потоки вывода (stdout / stderr) читаются в фоновых потоках,
+ * чтобы избежать взаимной блокировки буферов при значительном
+ * объёме журналов игры.
  */
 public final class MinecraftProcess {
 
@@ -42,29 +42,29 @@ public final class MinecraftProcess {
     }
 
     /**
-     * Blocks until the process exits and returns the exit code.
+     * Блокируется до завершения процесса и возвращает код выхода.
      */
     public int waitFor() throws InterruptedException {
         return process.waitFor();
     }
 
     /**
-     * Returns the exit code if the process has finished, or
-     * {@code -1} if still running.
+     * Возвращает код выхода, если процесс завершён, или
+     * {@code -1}, если он ещё выполняется.
      */
     public int exitCode() {
         return process.isAlive() ? -1 : process.exitValue();
     }
 
     /**
-     * Forcefully terminates the process.
+     * Принудительно завершает процесс.
      */
     public void kill() {
         process.destroyForcibly();
     }
 
     /**
-     * Completes when the process exits, carrying the exit code.
+     * Завершается при выходе процесса, неся код выхода.
      */
     public CompletableFuture<Integer> onExit() {
         return process.onExit().thenApply(Process::exitValue);

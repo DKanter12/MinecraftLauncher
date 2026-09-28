@@ -4,8 +4,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Describes a downloadable file (client JAR, library artifact, asset index).
- * Immutable value object.
+ * Описывает загружаемый файл (клиентский JAR, артефакт библиотеки, индекс ресурсов).
+ * Неизменяемый объект-значение.
  */
 public final class DownloadInfo {
 

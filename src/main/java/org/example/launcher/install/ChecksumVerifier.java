@@ -3,20 +3,20 @@ package org.example.launcher.install;
 import java.nio.file.Path;
 
 /**
- * Verifies file integrity via checksum (SHA1).
+ * Проверяет целостность файла по контрольной сумме (SHA1).
  * <p>
- * Used to determine whether a local file matches the expected hash,
- * enabling skip-if-exists-and-valid logic during installation.
+ * Используется для определения соответствия локального файла ожидаемому хэшу,
+ * обеспечивая логику пропуска существующих валидных файлов при установке.
  */
 public interface ChecksumVerifier {
 
     /**
-     * Verifies that the file at {@code path} has the expected SHA1 hash.
+     * Проверяет, что файл по пути {@code path} имеет ожидаемый SHA1-хэш.
      *
-     * @param path         the local file to verify
-     * @param expectedSha1 the expected SHA1 hex string (lowercase)
-     * @return {@code true} if the file exists and its hash matches;
-     *         {@code false} otherwise
+     * @param path         проверяемый локальный файл
+     * @param expectedSha1 ожидаемая hex-строка SHA1 (в нижнем регистре)
+     * @return {@code true}, если файл существует и хэш совпадает;
+     *         иначе {@code false}
      */
     boolean verify(Path path, String expectedSha1);
 }

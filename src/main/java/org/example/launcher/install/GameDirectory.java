@@ -5,11 +5,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * Centralised definition of the local Minecraft storage layout.
+ * Централизованное определение раскладки локального хранилища Minecraft.
  * <p>
- * All components (installer, launcher, profile manager) resolve paths
- * through this class, ensuring a consistent directory structure and
- * enabling reuse of shared libraries/assets between versions.
+ * Все компоненты (установщик, лаунчер, менеджер профилей) разрешают пути
+ * через этот класс, обеспечивая единообразную структуру каталогов и
+ * переиспользование общих библиотек/ресурсов между версиями.
  *
  * <pre>
  * gameDir/
@@ -45,7 +45,7 @@ public final class GameDirectory {
         return new GameDirectory(Path.of(home, ".minecraft"));
     }
 
-    /** Root game directory (e.g. {@code ~/.minecraft}). */
+    /** Корневой игровой каталог (например, {@code ~/.minecraft}). */
     public Path root() {
         return root;
     }
@@ -56,17 +56,17 @@ public final class GameDirectory {
         return root.resolve("versions");
     }
 
-    /** Directory for a specific version, e.g. {@code versions/1.21/}. */
+    /** Каталог конкретной версии, например {@code versions/1.21/}. */
     public Path versionDir(String versionId) {
         return versionsDir().resolve(versionId);
     }
 
-    /** Client JAR path, e.g. {@code versions/1.21/1.21.jar}. */
+    /** Путь клиентского JAR, например {@code versions/1.21/1.21.jar}. */
     public Path clientJar(String versionId) {
         return versionDir(versionId).resolve(versionId + ".jar");
     }
 
-    /** Cached version metadata JSON, e.g. {@code versions/1.21/1.21.json}. */
+    /** Кэшированный JSON метаданных версии, например {@code versions/1.21/1.21.json}. */
     public Path versionMetadata(String versionId) {
         return versionDir(versionId).resolve(versionId + ".json");
     }
@@ -78,8 +78,8 @@ public final class GameDirectory {
     }
 
     /**
-     * Resolves a library JAR path from its Maven-style relative path
-     * (e.g. {@code "com/mojang/logging/1.1.1/logging-1.1.1.jar"}).
+     * Разрешает путь JAR библиотеки по её относительному пути в стиле Maven
+     * (например, {@code "com/mojang/logging/1.1.1/logging-1.1.1.jar"}).
      */
     public Path library(String relativePath) {
         return librariesDir().resolve(relativePath.replace('/',
@@ -92,7 +92,7 @@ public final class GameDirectory {
         return root.resolve("natives");
     }
 
-    /** Extraction directory for a specific version's natives. */
+    /** Каталог распаковки нативных файлов конкретной версии. */
     public Path nativeDir(String versionId) {
         return nativesDir().resolve(versionId);
     }
@@ -116,14 +116,14 @@ public final class GameDirectory {
     }
 
     /**
-     * Path for an individual asset object, addressed by its SHA-1 hash
-     * prefix + full hash (e.g. {@code assets/objects/ab/abcdef...}).
+     * Путь отдельного объекта ресурсов, адресуемого по префиксу SHA-1 хэша
+     * и полному хэшу (например, {@code assets/objects/ab/abcdef...}).
      */
     public Path assetObject(String hashPrefix, String hash) {
         return assetObjectsDir().resolve(hashPrefix).resolve(hash);
     }
 
-    /** Virtual assets directory (legacy versions that need a flat copy). */
+    /** Каталог виртуальных ресурсов (устаревшие версии с плоской копией). */
     public Path virtualAssetsDir(String indexId) {
         return assetsDir().resolve("virtual").resolve(indexId);
     }
@@ -131,7 +131,7 @@ public final class GameDirectory {
     // --- Java runtimes (managed by launcher, future auto-install) ---
 
     /**
-     * Directory for launcher-managed Java runtimes, e.g.
+     * Каталог управляемых лаунчером сред Java, например
      * {@code java-runtimes/java-runtime-gamma/}.
      */
     public Path javaRuntimesDir() {
@@ -139,7 +139,7 @@ public final class GameDirectory {
     }
 
     /**
-     * Path for a specific managed runtime, e.g.
+     * Путь конкретной управляемой среды, например
      * {@code java-runtimes/java-runtime-gamma/}.
      */
     public Path javaRuntimeDir(String component) {
@@ -159,32 +159,32 @@ public final class GameDirectory {
     // --- Instances (per-instance game directories) ---
 
     /**
-     * Root directory holding the game directories of all instances,
-     * e.g. {@code gameDir/profiles/}.
+     * Корневой каталог игровых каталогов всех экземпляров,
+     * например {@code gameDir/profiles/}.
      */
     public Path moddedProfilesRoot() {
         return root.resolve("profiles");
     }
 
     /**
-     * Game directory of a single instance, e.g.
-     * {@code gameDir/profiles/{instanceId}}. Holds the instance's
+     * Игровой каталог одного экземпляра, например
+     * {@code gameDir/profiles/{instanceId}}. Хранит
      * {@code mods/}, {@code config/}, {@code resourcepacks/},
-     * {@code shaderpacks/}, {@code saves/} and {@code logs/}.
+     * {@code shaderpacks/}, {@code saves/} и {@code logs/} экземпляра.
      */
     public Path moddedProfileDir(String profileId) {
         return moddedProfilesRoot().resolve(profileId);
     }
 
-    /** Persistence file for the instance registry. */
+    /** Файл persistence реестра экземпляров. */
     public Path instancesFile() {
         return root.resolve("instances.json");
     }
 
     /**
-     * Legacy persistence file used before instances supported vanilla
-     * games. Read as a fallback by the instance service when
-     * {@link #instancesFile()} does not exist yet.
+     * Устаревший файл persistence, использовавшийся до поддержки ванильных
+     * игр экземплярами. Читается как запасной вариант службой экземпляров, когда
+     * {@link #instancesFile()} ещё не существует.
      */
     public Path legacyModdedProfilesFile() {
         return root.resolve("modded_profiles.json");
@@ -192,7 +192,7 @@ public final class GameDirectory {
 
     // --- Directory creation ---
 
-    /** Creates the full directory tree if it does not already exist. */
+    /** Создаёт полное дерево каталогов, если оно ещё не существует. */
     public void createDirectories() throws java.io.IOException {
         Files.createDirectories(versionsDir());
         Files.createDirectories(librariesDir());

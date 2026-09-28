@@ -6,20 +6,20 @@ import org.example.launcher.model.AssetIndex;
 import org.example.launcher.model.AssetIndexContent;
 
 /**
- * Fetches and parses the asset index for a Minecraft version.
+ * Загружает и разбирает asset-индекс версии Minecraft.
  * <p>
- * The asset index is a JSON document referenced by
- * {@link AssetIndex#url()} that maps every individual asset
- * (textures, sounds, lang files…) to its SHA1 hash and size.
+ * Asset-индекс — это JSON-документ по ссылке
+ * {@link AssetIndex#url()}, который отображает каждый отдельный ассет
+ * (текстуры, звуки, языковые файлы…) в его SHA1-хэш и размер.
  */
 public interface AssetIndexService {
 
     /**
-     * Fetches and parses the asset index content.
+     * Загружает и разбирает содержимое asset-индекса.
      *
-     * @param assetIndex the asset index reference from version metadata
-     * @return parsed content containing all asset objects
-     * @throws IOException if the index could not be fetched or parsed
+     * @param assetIndex ссылка на asset-индекс из метаданных версии
+     * @return разобранное содержимое со всеми объектами-ассетами
+     * @throws IOException если индекс не удалось загрузить или разобрать
      */
     AssetIndexContent fetchIndex(AssetIndex assetIndex) throws IOException;
 }

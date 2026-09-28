@@ -18,18 +18,18 @@ import org.example.launcher.model.JavaRuntime;
 import org.example.launcher.util.OsDetector;
 
 /**
- * Default {@link JavaDetector} that scans the host system for installed
- * Java runtimes using the following strategies (in order):
+ * Реализация {@link JavaDetector} по умолчанию, сканирующая систему хоста
+ * в поисках установленных рантаймов Java следующими способами (по порядку):
  * <ol>
- *   <li><b>JAVA_HOME</b> environment variable</li>
- *   <li><b>PATH</b> — locates {@code java} on the system PATH</li>
- *   <li><b>Windows registry</b> — queries {@code HKLM\SOFTWARE\JavaSoft}
- *       (JDK / JRE entries)</li>
- *   <li><b>Common installation directories</b> — scans well-known
- *       locations per OS (e.g. {@code C:\Program Files\Java},
+ *   <li>переменная окружения <b>JAVA_HOME</b></li>
+ *   <li><b>PATH</b> — поиск {@code java} в системном PATH</li>
+ *   <li><b>реестр Windows</b> — запрос {@code HKLM\SOFTWARE\JavaSoft}
+ *       (записи JDK / JRE)</li>
+ *   <li><b>Типовые каталоги установок</b> — сканирование общеизвестных
+ *       мест для каждой ОС (например, {@code C:\Program Files\Java},
  *       {@code /usr/lib/jvm}, {@code /Library/Java/JavaVirtualMachines})</li>
  * </ol>
- * Duplicate runtimes (same executable path) are de-duplicated.
+ * Дублирующиеся рантаймы (один и тот же путь к исполняемому файлу) удаляются.
  */
 public class SystemJavaDetector implements JavaDetector {
 
@@ -52,7 +52,7 @@ public class SystemJavaDetector implements JavaDetector {
         // 2. PATH
         findOnPath(runtimes);
 
-        // 3. Platform-specific detection
+        // 3. Платформенный поиск
         switch (OsDetector.current()) {
             case WINDOWS -> {
                 scanCommonLocations(runtimes);
@@ -60,10 +60,10 @@ public class SystemJavaDetector implements JavaDetector {
             }
             case LINUX -> scanCommonLocations(runtimes);
             case OSX -> scanCommonLocations(runtimes);
-            default -> { /* nothing extra */ }
+            default -> { /* ничего дополнительно */ }
         }
 
-        // 4. Launcher-managed runtimes (~/.minecraft/java-runtimes/)
+        // 4. Управляемые лаунчером рантаймы (~/.minecraft/java-runtimes/)
         scanManagedRuntimes(runtimes);
 
         return new ArrayList<>(runtimes.values());
@@ -80,7 +80,7 @@ public class SystemJavaDetector implements JavaDetector {
         Path javaExe = binDir.resolve(exeName);
 
         if (!Files.isRegularFile(javaExe)) {
-            // Some JRE layouts may not have bin/java; try the home itself
+            // В некоторых раскладках JRE может не быть bin/java; пробуем сам home
             javaExe = homeDir.resolve(exeName);
             if (!Files.isRegularFile(javaExe)) {
                 return null;
@@ -96,7 +96,7 @@ public class SystemJavaDetector implements JavaDetector {
     }
 
     /**
-     * Runs {@code java -version} and parses the major version from stdout.
+     * Запускает {@code java -version} и извлекает major-версию из stdout.
      */
     private Optional<Integer> probeVersion(Path javaExe) {
         try {
@@ -119,17 +119,19 @@ public class SystemJavaDetector implements JavaDetector {
                 }
             }
             process.waitFor();
-        } catch (IOException | InterruptedException e) {
-            // Cannot probe this java — skip it
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            // Не удалось опросить этот java — пропустить его
         }
         return Optional.empty();
     }
 
     /**
-     * Parses the major version from a regex match.
+     * Извлекает major-версию из совпадения регулярного выражения.
      * <p>
-     * Pre-Java 9 versions look like {@code 1.8.0_42} → major 8.<br>
-     * Java 9+ versions look like {@code 17.0.1} or {@code 21} → major 17/21.
+     * Версии до Java 9 выглядят как {@code 1.8.0_42} → major 8.<br>
+     * Версии Java 9+ выглядят как {@code 17.0.1} или {@code 21} → major 17/21.
      */
     private int parseMajor(Matcher m) {
         int first = Integer.parseInt(m.group(1));
@@ -152,7 +154,7 @@ public class SystemJavaDetector implements JavaDetector {
             if (dir.isBlank()) continue;
             Path exe = Path.of(dir, exeName);
             if (Files.isRegularFile(exe)) {
-                // Resolve symlink and find the actual JAVA_HOME
+                // Разрешить симлинк и найти фактический JAVA_HOME
                 Path home = exe.getParent() != null ? exe.getParent().getParent() : null;
                 if (home != null) {
                     JavaRuntime rt = detectFromPath(home, JavaRuntime.Source.PATH);
@@ -160,7 +162,7 @@ public class SystemJavaDetector implements JavaDetector {
                         runtimes.putIfAbsent(rt.javaExecutable(), rt);
                     }
                 } else {
-                    // Probe directly
+                    // Опросить напрямую
                     Optional<Integer> ver = probeVersion(exe);
                     ver.ifPresent(v -> {
                         JavaRuntime rt = new JavaRuntime(exe.toAbsolutePath().normalize(), v,
@@ -186,7 +188,7 @@ public class SystemJavaDetector implements JavaDetector {
                             }
                         });
             } catch (IOException e) {
-                // Skip unreadable directories
+                // Пропустить нечитаемые каталоги
             }
         }
     }
@@ -205,11 +207,11 @@ public class SystemJavaDetector implements JavaDetector {
                         }
                     });
                 } catch (IOException e) {
-                    // Skip
+                    // Пропустить
                 }
             });
         } catch (IOException e) {
-            // Skip
+            // Пропустить
         }
     }
 
@@ -219,11 +221,11 @@ public class SystemJavaDetector implements JavaDetector {
             case WINDOWS -> {
                 dirs.add(Path.of("C:\\Program Files\\Java"));
                 dirs.add(Path.of("C:\\Program Files (x86)\\Java"));
-                dirs.add(Path.of(System.getenv("LOCALAPPDATA") != null
-                        ? System.getenv("LOCALAPPDATA") + "\\Programs\\Eclipse Adoptium"
-                        : ""));
-                dirs.add(Path.of(System.getProperty("user.home", ""),
-                        ".jdks"));
+                String localAppData = System.getenv("LOCALAPPDATA");
+                if (localAppData != null && !localAppData.isBlank()) {
+                    dirs.add(Path.of(localAppData, "Programs", "Eclipse Adoptium"));
+                }
+                dirs.add(Path.of(System.getProperty("user.home", ""), ".jdks"));
             }
             case LINUX -> {
                 dirs.add(Path.of("/usr/lib/jvm"));
@@ -241,11 +243,11 @@ public class SystemJavaDetector implements JavaDetector {
     }
 
     /**
-     * Queries the Windows registry for installed Java runtimes.
+     * Опрашивает реестр Windows в поисках установленных рантаймов Java.
      * <p>
-     * Uses {@code reg query} to enumerate
+     * Использует {@code reg query} для перечисления
      * {@code HKLM\SOFTWARE\JavaSoft\Java Development Kit},
-     * {@code ...\JDK}, and {@code ...\Java Runtime Environment}.
+     * {@code ...\JDK} и {@code ...\Java Runtime Environment}.
      */
     private void scanWindowsRegistry(Map<Path, JavaRuntime> runtimes) {
         String[] registryPaths = {
@@ -285,8 +287,10 @@ public class SystemJavaDetector implements JavaDetector {
                 }
             }
             process.waitFor();
-        } catch (IOException | InterruptedException e) {
-            // Registry query failed — skip
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            // Запрос к реестру не удался — пропустить
         }
     }
 

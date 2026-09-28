@@ -18,13 +18,13 @@ import org.example.launcher.version.VersionType;
 import org.example.launcher.version.VersionTypeRegistry;
 
 /**
- * {@link VersionService} implementation backed by the official Mojang
- * version manifest ({@code version_manifest.json}).
+ * Реализация {@link VersionService} на официальном манифесте версий Mojang
+ * ({@code version_manifest.json}).
  * <p>
- * The manifest URL, HTTP client and type registry are all injectable,
- * which keeps the class easy to test and configure. JSON parsing is
- * isolated in {@link #parseManifest(String)} so it can be unit-tested
- * without network access.
+ * URL манифеста, HTTP-клиент и реестр типов — всё инжектится,
+ * что упрощает тестирование и настройку. Разбор JSON выделен в
+ * {@link #parseManifest(String)}, чтобы его можно было юнит-тестировать
+ * без доступа к сети.
  */
 public class MojangVersionService implements VersionService {
 
@@ -80,8 +80,8 @@ public class MojangVersionService implements VersionService {
     }
 
     /**
-     * Parses a raw manifest JSON string into a {@link VersionManifest}.
-     * Exposed as package-private for unit testing.
+     * Разбирает сырую строку JSON манифеста в {@link VersionManifest}.
+     * Видимость на уровне пакета — для юнит-тестов.
      */
     VersionManifest parseManifest(String json) throws IOException {
         ManifestDto dto;
@@ -105,7 +105,7 @@ public class MojangVersionService implements VersionService {
         return new VersionManifest(latestRelease, latestSnapshot, versions);
     }
 
-    // ---- internal Gson DTOs mirroring the Mojang manifest structure ----
+    // ---- внутренние Gson-DTO, зеркалящие структуру манифеста Mojang ----
 
     static final class ManifestDto {
         LatestDto latest;

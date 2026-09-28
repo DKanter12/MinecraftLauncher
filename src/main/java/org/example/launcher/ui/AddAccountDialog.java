@@ -15,12 +15,14 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import org.example.launcher.i18n.Lang;
+
 /**
- * Unified dialog for adding an account.
- * The user picks the account type (Offline or Ely.by) in one place
- * instead of having two separate buttons in the main window.
+ * Единый диалог добавления аккаунта.
+ * Пользователь выбирает тип аккаунта (Offline или Ely.by) в одном месте
+ * вместо двух отдельных кнопок в главном окне.
  * <p>
- * Offline needs only a player name; Ely.by needs login + password.
+ * Для Offline нужно только имя игрока; для Ely.by — логин + пароль.
  */
 public class AddAccountDialog extends Stage {
 
@@ -34,7 +36,7 @@ public class AddAccountDialog extends Stage {
     private final TextField elyUserField = new TextField();
     private final PasswordField elyPassField = new PasswordField();
     private final Label errorLabel = new Label();
-    private final Button actionButton = new Button("Create");
+    private final Button actionButton = new Button(Lang.tr("account.create"));
 
     private Type selectedType = Type.OFFLINE;
 
@@ -43,19 +45,19 @@ public class AddAccountDialog extends Stage {
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        setTitle("Add Account");
+        setTitle(Lang.tr("account.title"));
 
-        Label titleLabel = new Label("Add Account");
+        Label titleLabel = new Label(Lang.tr("account.title"));
         titleLabel.getStyleClass().add("account-title");
 
-        Label hintLabel = new Label("Choose the account type. Offline needs no password; Ely.by brings skins and capes.");
+        Label hintLabel = new Label(Lang.tr("account.hint"));
         hintLabel.getStyleClass().add("account-hint");
         hintLabel.setWrapText(true);
         hintLabel.setMaxWidth(380);
 
-        // --- Type switch ---
+        // --- Переключатель типа ---
         ToggleGroup typeGroup = new ToggleGroup();
-        ToggleButton offlineToggle = new ToggleButton("Offline");
+        ToggleButton offlineToggle = new ToggleButton(Lang.tr("account.offline"));
         offlineToggle.setToggleGroup(typeGroup);
         offlineToggle.setSelected(true);
         offlineToggle.getStyleClass().add("filter-button");
@@ -65,23 +67,23 @@ public class AddAccountDialog extends Stage {
         HBox typeRow = new HBox(8, offlineToggle, elyToggle);
         typeRow.setAlignment(Pos.CENTER_LEFT);
 
-        // --- Offline pane ---
-        Label offlineLabel = new Label("Player name");
+        // --- Панель Offline ---
+        Label offlineLabel = new Label(Lang.tr("account.name"));
         offlineLabel.getStyleClass().add("section-title");
-        offlineNameField.setPromptText("e.g. Steve");
+        offlineNameField.setPromptText(Lang.tr("account.name.prompt"));
         offlineNameField.getStyleClass().add("search-field");
-        Label offlineHint = new Label("Up to 16 characters, no password needed.");
+        Label offlineHint = new Label(Lang.tr("account.name.hint"));
         offlineHint.getStyleClass().add("quick-select-label");
         VBox offlineBox = new VBox(4, offlineLabel, offlineNameField, offlineHint);
 
-        // --- Ely.by pane ---
-        Label elyLabel = new Label("Ely.by credentials");
+        // --- Панель Ely.by ---
+        Label elyLabel = new Label(Lang.tr("account.ely"));
         elyLabel.getStyleClass().add("section-title");
-        elyUserField.setPromptText("Username or email");
+        elyUserField.setPromptText(Lang.tr("account.user.prompt"));
         elyUserField.getStyleClass().add("search-field");
-        elyPassField.setPromptText("Password");
+        elyPassField.setPromptText(Lang.tr("server.password"));
         elyPassField.getStyleClass().add("search-field");
-        Label elyHint = new Label("Used only to sign in to ely.by — the password is not stored in plain text.");
+        Label elyHint = new Label(Lang.tr("account.ely.hint"));
         elyHint.getStyleClass().add("quick-select-label");
         elyHint.setWrapText(true);
         elyHint.setMaxWidth(380);
@@ -89,7 +91,7 @@ public class AddAccountDialog extends Stage {
         elyBox.setVisible(false);
         elyBox.setManaged(false);
 
-        // Switch logic
+        // Логика переключения
         typeGroup.selectedToggleProperty().addListener((obs, old, val) -> {
             boolean isOffline = val == offlineToggle;
             if (val == null) {
@@ -101,7 +103,8 @@ public class AddAccountDialog extends Stage {
             offlineBox.setManaged(isOffline);
             elyBox.setVisible(!isOffline);
             elyBox.setManaged(!isOffline);
-            actionButton.setText(isOffline ? "Create" : "Login");
+            actionButton.setText(isOffline ? Lang.tr("account.create")
+                    : Lang.tr("account.login"));
             errorLabel.setVisible(false);
             errorLabel.setManaged(false);
             updateActionButton();
@@ -119,7 +122,7 @@ public class AddAccountDialog extends Stage {
         actionButton.setDisable(true);
         actionButton.setOnAction(e -> onAction());
 
-        Button cancelButton = new Button("Cancel");
+        Button cancelButton = new Button(Lang.tr("button.cancel"));
         cancelButton.getStyleClass().add("browse-java-button");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> close());
@@ -174,24 +177,15 @@ public class AddAccountDialog extends Stage {
         if (selectedType == Type.OFFLINE) {
             String name = offlineNameField.getText().trim();
             if (name.isEmpty()) {
-                errorLabel.setText("Name cannot be empty");
-                errorLabel.setVisible(true);
-                errorLabel.setManaged(true);
-                sizeToScene();
+                showError(Lang.tr("account.error.empty"));
                 return;
             }
             if (name.length() > 16) {
-                errorLabel.setText("Name must be 16 characters or less");
-                errorLabel.setVisible(true);
-                errorLabel.setManaged(true);
-                sizeToScene();
+                showError(Lang.tr("account.error.long"));
                 return;
             }
             if (!name.matches("[a-zA-Z0-9_]+")) {
-                errorLabel.setText("Only letters, digits and _ are allowed");
-                errorLabel.setVisible(true);
-                errorLabel.setManaged(true);
-                sizeToScene();
+                showError(Lang.tr("account.error.chars"));
                 return;
             }
             result = new Result(Type.OFFLINE, name, null, null);
@@ -200,22 +194,23 @@ public class AddAccountDialog extends Stage {
             String u = elyUserField.getText().trim();
             String p = elyPassField.getText();
             if (u.isEmpty()) {
-                errorLabel.setText("Enter Ely.by username");
-                errorLabel.setVisible(true);
-                errorLabel.setManaged(true);
-                sizeToScene();
+                showError(Lang.tr("account.error.user"));
                 return;
             }
             if (p.isEmpty()) {
-                errorLabel.setText("Enter password");
-                errorLabel.setVisible(true);
-                errorLabel.setManaged(true);
-                sizeToScene();
+                showError(Lang.tr("account.error.pass"));
                 return;
             }
             result = new Result(Type.ELY_BY, null, u, p);
             close();
         }
+    }
+
+    private void showError(String text) {
+        errorLabel.setText(text);
+        errorLabel.setVisible(true);
+        errorLabel.setManaged(true);
+        sizeToScene();
     }
 
     public Result getResult() { return result; }

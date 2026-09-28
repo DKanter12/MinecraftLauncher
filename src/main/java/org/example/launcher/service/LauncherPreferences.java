@@ -10,8 +10,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
 /**
- * Persists lightweight launcher preferences (e.g. last selected version,
- * last selected account) to a JSON file in the game directory.
+ * Сохраняет лёгкие настройки лаунчера (например, последнюю выбранную версию,
+ * последний выбранный аккаунт) в JSON-файл в игровом каталоге.
  */
 public class LauncherPreferences {
 
@@ -71,6 +71,71 @@ public class LauncherPreferences {
     public void setLastSelectedAccount(String accountName) throws IOException {
         JsonObject root = readRoot();
         root.addProperty("lastSelectedAccount", accountName != null ? accountName : "");
+        writeRoot(root);
+    }
+
+    public Optional<String> getBuildsGitUrl() throws IOException {
+        JsonObject root = readRoot();
+        if (!root.has("buildsGitUrl")) return Optional.empty();
+        String val = root.get("buildsGitUrl").getAsString();
+        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    }
+
+    public void setBuildsGitUrl(String url) throws IOException {
+        JsonObject root = readRoot();
+        root.addProperty("buildsGitUrl", url != null ? url : "");
+        writeRoot(root);
+    }
+
+    public Optional<String> getBuildsSourceMode() throws IOException {
+        JsonObject root = readRoot();
+        if (!root.has("buildsSourceMode")) return Optional.empty();
+        String val = root.get("buildsSourceMode").getAsString();
+        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    }
+
+    public void setBuildsSourceMode(String mode) throws IOException {
+        JsonObject root = readRoot();
+        root.addProperty("buildsSourceMode", mode != null ? mode : "");
+        writeRoot(root);
+    }
+
+    public Optional<String> getYandexDiskLink() throws IOException {
+        JsonObject root = readRoot();
+        if (!root.has("yandexDiskLink")) return Optional.empty();
+        String val = root.get("yandexDiskLink").getAsString();
+        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    }
+
+    public void setYandexDiskLink(String link) throws IOException {
+        JsonObject root = readRoot();
+        root.addProperty("yandexDiskLink", link != null ? link : "");
+        writeRoot(root);
+    }
+
+    public Optional<String> getBuildsToken() throws IOException {
+        JsonObject root = readRoot();
+        if (!root.has("buildsToken")) return Optional.empty();
+        String val = root.get("buildsToken").getAsString();
+        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    }
+
+    public void setBuildsToken(String token) throws IOException {
+        JsonObject root = readRoot();
+        root.addProperty("buildsToken", token != null ? token : "");
+        writeRoot(root);
+    }
+
+    public Optional<String> getLanguage() throws IOException {
+        JsonObject root = readRoot();
+        if (!root.has("language")) return Optional.empty();
+        String val = root.get("language").getAsString();
+        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    }
+
+    public void setLanguage(String code) throws IOException {
+        JsonObject root = readRoot();
+        root.addProperty("language", code != null ? code : "");
         writeRoot(root);
     }
 }

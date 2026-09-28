@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Aggregate result of a full Minecraft version installation.
+ * Сводный результат полной установки версии Minecraft.
  */
 public final class InstallationResult {
 

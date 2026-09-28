@@ -5,19 +5,19 @@ import java.io.IOException;
 import org.example.launcher.model.VersionManifest;
 
 /**
- * Provides access to the Minecraft version catalogue.
+ * Даёт доступ к каталогу версий Minecraft.
  * <p>
- * Implementations are free to fetch versions from Mojang, a local cache,
- * or any other source. This interface keeps the UI decoupled from the
- * concrete data provider.
+ * Реализации вправе получать версии от Mojang, из локального кэша
+ * или любого другого источника. Интерфейс отделяет UI от
+ * конкретного поставщика данных.
  */
 public interface VersionService {
 
     /**
-     * Fetches the full version manifest.
+     * Загружает полный манифест версий.
      *
-     * @return a non-{@code null} manifest containing all known versions
-     * @throws IOException if the manifest could not be retrieved or parsed
+     * @return не-{@code null} манифест со всеми известными версиями
+     * @throws IOException если манифест не удалось получить или разобрать
      */
     VersionManifest fetchVersions() throws IOException;
 }

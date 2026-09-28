@@ -27,45 +27,44 @@ import org.example.launcher.service.MojangVersionService;
 import org.example.launcher.version.ModdedVersionType;
 
 /**
- * Verifies that a game instance's installation is complete and
- * launchable, with precise, human-readable diagnostics.
+ * Проверяет полноту и запускаемость установки игрового инстанса,
+ * выдавая точную человекочитаемую диагностику.
  * <p>
- * For modded instances verification checks:
+ * Для модовых инстансов проверка включает:
  * <ol>
- *   <li>the loader's version JSON exists ({@code versions/{id}/{id}.json});</li>
- *   <li>the installed Minecraft version matches the instance target
+ *   <li>наличие JSON версии загрузчика ({@code versions/{id}/{id}.json});</li>
+ *   <li>соответствие установленной версии Minecraft целевой версии инстанса
  *       ({@code inheritsFrom});</li>
- *   <li>the installed loader version matches the instance target
- *       (version id convention);</li>
- *   <li>all dependencies are present locally and intact — client JAR,
- *       every library (loader + vanilla closure) and the asset index,
- *       each verified by SHA-1 where a hash is known;</li>
- *   <li>a correct launch command can be formed (main class, game
- *       arguments, resolvable Java runtime);</li>
- *   <li>the instance's game directory exists.</li>
+ *   <li>соответствие установленной версии загрузчика целевой версии инстанса
+ *       (соглашение об id версии);</li>
+ *   <li>наличие и целостность всех зависимостей локально — клиентский JAR,
+ *       каждая библиотека (загрузчик + ванильное замыкание) и asset-индекс,
+ *       каждая с проверкой SHA-1, где хэш известен;</li>
+ *   <li>возможность сформировать корректную команду запуска (main-класс,
+ *       игровые аргументы, разрешаемый рантайм Java);</li>
+ *   <li>наличие игрового каталога инстанса.</li>
  * </ol>
  * <p>
- * Vanilla instances skip the loader checks (1–3); their metadata is
- * fetched from the Mojang manifest directly.
+ * Ванильные инстансы пропускают проверки загрузчика (1–3); их метаданные
+ * берутся напрямую из манифеста Mojang.
  * <p>
- * {@link #repair} reinstalls what is missing: corrupt or missing
- * shared files (client JAR, libraries, asset index) are re-downloaded
- * directly via the {@link InstallationService} over the resolved
- * metadata — skip-if-valid; the mod loader itself is only reinstalled
- * when its version JSON is missing or unresolvable, with the
- * installer URL looked up via the loader's version provider. This
- * makes instances self-healing.
+ * {@link #repair} переустанавливает недостающее: повреждённые или отсутствующие
+ * общие файлы (клиентский JAR, библиотеки, asset-индекс) докачиваются напрямую
+ * через {@link InstallationService} поверх разрешённых метаданных — skip-if-valid;
+ * сам мод-загрузчик переустанавливается только когда его JSON версии отсутствует
+ * или неразрешим, а URL установщика ищется через провайдер версий загрузчика. Это
+ * делает инстансы самовосстанавливающимися.
  */
 public class ModdedProfileVerificationService {
 
     /**
-     * Outcome of an instance verification.
+     * Итог проверки инстанса.
      *
-     * @param ok       whether the instance is ready to launch
-     * @param errors   launch-blocking problems with their causes
-     * @param warnings non-blocking observations
-     * @param metadata the resolved launch metadata (present when the
-     *                 version chain resolved successfully)
+     * @param ok       готов ли инстанс к запуску
+     * @param errors   блокирующие запуск проблемы с их причинами
+     * @param warnings некритичные замечания
+     * @param metadata разрешённые метаданные запуска (присутствуют, когда
+     *                 цепочка версий разрешилась успешно)
      */
     public record VerificationReport(boolean ok,
                                      List<String> errors,
@@ -102,11 +101,11 @@ public class ModdedProfileVerificationService {
     }
 
     // ------------------------------------------------------------------
-    //  Verification
+    //  Проверка
     // ------------------------------------------------------------------
 
     /**
-     * Verifies the instance's installation and returns a full report.
+     * Проверяет установку инстанса и возвращает полный отчёт.
      */
     public VerificationReport verify(ModdedProfile profile, GameDirectory storage) {
         if (profile.isVanilla()) {
@@ -116,11 +115,12 @@ public class ModdedProfileVerificationService {
     }
 
     /**
-     * Vanilla instance verification: metadata from the Mojang manifest,
-     * dependency integrity, launch command and game directory.
-     * Offline fallback: if the manifest/metadata cannot be fetched
-     * but the version JSON is already cached locally (previous install),
-     * that cached file is used so already-downloaded versions launch offline.
+     * Проверка ванильного инстанса: метаданные из манифеста Mojang,
+     * целостность зависимостей, команда запуска и игровой каталог.
+     * Офлайн-запасной вариант: если манифест/метаданные получить нельзя,
+     * но JSON версии уже закэширован локально (предыдущая установка),
+     * используется этот кэшированный файл, чтобы уже скачанные версии
+     * запускались офлайн.
      */
     private VerificationReport verifyVanilla(ModdedProfile profile,
                                              GameDirectory storage) {
@@ -129,7 +129,7 @@ public class ModdedProfileVerificationService {
 
         MinecraftVersion vanillaVersion = findManifestVersion(
                 profile.minecraftVersion());
-        // Offline fallback: manifest unavailable but version JSON exists locally
+        // Офлайн-запасной вариант: манифест недоступен, но локальный JSON версии существует
         boolean offlineVanilla = false;
         if (vanillaVersion == null) {
             Path localJson = storage.versionMetadata(profile.minecraftVersion());
@@ -153,7 +153,7 @@ public class ModdedProfileVerificationService {
             metadata = metadataService.fetchMetadata(vanillaVersion);
         } catch (IOException e) {
             String netMsg = e.getMessage() != null ? e.getMessage() : e.toString();
-            // Offline: try cached version JSON directly
+            // Офлайн: попробовать локальный кэшированный JSON версии напрямую
             Optional<VersionMetadata> local = tryLoadLocalMetadata(profile.minecraftVersion(), storage);
             if (local.isPresent()) {
                 metadata = local.get();
@@ -171,10 +171,10 @@ public class ModdedProfileVerificationService {
             }
         }
 
-        // Dependencies present and intact (client JAR, libraries,
-        // asset index — SHA-1 verified where known). A missing file
-        // means the game is not fully installed; repair re-downloads
-        // only what is missing.
+        // Зависимости на месте и целы (клиентский JAR, библиотеки,
+        // asset-индекс — с проверкой SHA-1, где известен). Отсутствующий файл
+        // означает неполную установку; починка докачивает
+        // только недостающее.
         List<String> fileProblems = launcher.verifyFiles(metadata, storage);
         for (String problem : fileProblems) {
             errors.add("Missing or corrupt dependency: " + problem);
@@ -188,16 +188,16 @@ public class ModdedProfileVerificationService {
     }
 
     /**
-     * Modded instance verification: loader JSON, version chain,
-     * merged metadata, dependency integrity, launch command and game
-     * directory.
+     * Проверка модового инстанса: JSON загрузчика, цепочка версий,
+     * слитые метаданные, целостность зависимостей, команда запуска и игровой
+     * каталог.
      */
     private VerificationReport verifyModded(ModdedProfile profile,
                                             GameDirectory storage) {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
-        // 1. Version JSON present?
+        // 1. JSON версии на месте?
         Path versionJson = storage.versionMetadata(profile.versionId());
         if (!Files.isRegularFile(versionJson)) {
             errors.add("Loader configuration file is missing: " + versionJson);
@@ -207,7 +207,7 @@ public class ModdedProfileVerificationService {
             return new VerificationReport(false, errors, warnings, Optional.empty());
         }
 
-        // 2. Version chain matches the instance?
+        // 2. Цепочка версий совпадает с инстансом?
         JsonObject json;
         try {
             json = JsonParser.parseString(
@@ -250,19 +250,19 @@ public class ModdedProfileVerificationService {
             return new VerificationReport(false, errors, warnings, Optional.empty());
         }
 
-        // 3. Resolve merged launch metadata (vanilla chain)
+        // 3. Разрешить слитые метаданные запуска (ванильная цепочка)
         VersionMetadata merged;
         try {
             merged = moddedVersionService.resolveMetadata(profile.versionId(), storage);
         } catch (IOException e) {
             String netMsg = e.getMessage() != null ? e.getMessage() : e.toString();
-            // Offline fallback: merge cached vanilla JSON with loader JSON locally
+            // Офлайн-запасной вариант: слить кэшированный ванильный JSON с JSON загрузчика локально
             Optional<VersionMetadata> offline = tryResolveOfflineModdedMetadata(profile, storage, e);
             if (offline.isPresent()) {
                 merged = offline.get();
                 warnings.add("Offline mode: using cached merged metadata (network: " + netMsg + ")");
             } else {
-                // If cache missing, give actionable hint instead of "null"
+                // Если кэша нет, дать полезную подсказку вместо «null»
                 Path vanillaCache = storage.versionMetadata(profile.minecraftVersion());
                 boolean hasVanillaCache = Files.isRegularFile(vanillaCache);
                 errors.add("Failed to resolve launch metadata: " + netMsg);
@@ -281,17 +281,17 @@ public class ModdedProfileVerificationService {
             }
         }
 
-        // 4. Dependencies present and intact (client JAR, libraries,
-        //    asset index — SHA-1 verified where known)
+        // 4. Зависимости на месте и целы (клиентский JAR, библиотеки,
+        //    asset-индекс — с проверкой SHA-1, где известен)
         List<String> fileProblems = launcher.verifyFiles(merged, storage);
         for (String problem : fileProblems) {
             errors.add("Missing or corrupt dependency: " + problem);
         }
 
-        // 5. Launch command can be formed
+        // 5. Команда запуска может быть сформирована
         checkLaunchCommand(merged, errors);
 
-        // 6. Instance game directory
+        // 6. Игровой каталог инстанса
         checkInstanceDirectory(profile, storage, warnings);
 
         return new VerificationReport(errors.isEmpty(), errors, warnings,
@@ -330,26 +330,24 @@ public class ModdedProfileVerificationService {
     }
 
     // ------------------------------------------------------------------
-    //  Repair
+    //  Починка
     // ------------------------------------------------------------------
 
     /**
-     * Repairs the instance's installation by reinstalling what is
-     * missing. Corrupt or missing shared files (client JAR,
-     * libraries, asset index) are re-downloaded directly via the
-     * installation service over the resolved metadata — skip-if-valid,
-     * so intact files are not touched. The mod loader itself is only
-     * reinstalled when its version JSON is missing or unresolvable;
-     * the installer URL needed by installer-JAR loaders (Forge,
-     * NeoForge) is then looked up via the loader's version provider.
+     * Чинит установку инстанса, переустанавливая недостающее. Повреждённые или
+     * отсутствующие общие файлы (клиентский JAR, библиотеки, asset-индекс)
+     * докачиваются напрямую через сервис установки поверх разрешённых метаданных —
+     * skip-if-valid, поэтому целые файлы не трогаются. Сам мод-загрузчик
+     * переустанавливается только когда его JSON версии отсутствует или неразрешим;
+     * нужный установщикам-JAR загрузчикам (Forge, NeoForge) URL установщика тогда
+     * ищется через провайдер версий загрузчика.
      *
-     * @param profile  the instance to repair
-     * @param storage  the storage game directory
-     * @param progress progress callback
-     * @return the install result (version id of the repaired install)
-     * @throws IOException if the repair cannot be performed (e.g. the
-     *                     vanilla version is unknown or the loader is
-     *                     not registered)
+     * @param profile  чинимый инстанс
+     * @param storage  игровой каталог хранилища
+     * @param progress колбэк прогресса
+     * @return результат установки (id версии починенной установки)
+     * @throws IOException если починка невозможна (например, ванильная версия
+     *                     неизвестна или загрузчик не зарегистрирован)
      */
     public ModLoaderInstaller.ModLoaderInstallResult repair(ModdedProfile profile,
                                                             GameDirectory storage,
@@ -365,8 +363,8 @@ public class ModdedProfileVerificationService {
         VersionMetadata vanillaMetadata = metadataService.fetchMetadata(vanillaVersion);
 
         if (profile.isVanilla()) {
-            // Reinstall the vanilla game — skip-if-valid, so intact
-            // files are not touched
+            // Переустановить ванильную игру — skip-if-valid, поэтому целые
+            // файлы не трогаются
             InstallationResult result = installationService.install(
                     vanillaVersion, vanillaMetadata, storage, progress);
             if (result.hasFailures()) {
@@ -383,19 +381,19 @@ public class ModdedProfileVerificationService {
                     + " support is not registered in this launcher");
         }
 
-        // Light path: the loader installation itself is intact (its
-        // version JSON resolves) and only shared files are missing or
-        // corrupt — re-running the standard installation over the
-        // merged metadata re-downloads exactly those, with
-        // skip-if-valid; no loader reinstall (and no installer JAR
-        // download) is needed
+        // Лёгкий путь: сама установка загрузчика цела (её
+        // JSON версии разрешается), и только общие файлы отсутствуют или
+        // повреждены — повторный прогон стандартной установки поверх
+        // слитых метаданных докачивает ровно их, с
+        // skip-if-valid; переустановка загрузчика (и скачивание JAR
+        // установщика) не нужна
         if (Files.isRegularFile(storage.versionMetadata(profile.versionId()))) {
             VersionMetadata merged = null;
             try {
                 merged = moddedVersionService.resolveMetadata(
                         profile.versionId(), storage);
             } catch (IOException e) {
-                // Corrupt/unresolvable loader JSON → full reinstall
+                // Повреждённый/неразрешимый JSON загрузчика → полная переустановка
             }
             if (merged != null) {
                 MinecraftVersion moddedVersion = new MinecraftVersion(
@@ -413,20 +411,20 @@ public class ModdedProfileVerificationService {
             }
         }
 
-        // Full reinstall: rewrites the version JSON, re-runs the
-        // loader installer (Forge/NeoForge) and fetches every
-        // dependency — with skip-if-valid, so intact files are not
-        // touched
+        // Полная переустановка: перезаписывает JSON версии, заново запускает
+        // установщик загрузчика (Forge/NeoForge) и забирает каждую
+        // зависимость — со skip-if-valid, поэтому целые файлы не
+        // трогаются
         return entry.installer().install(vanillaVersion, vanillaMetadata,
                 resolveLoaderVersion(entry, profile), storage, progress);
     }
 
     /**
-     * Resolves the loader version to reinstall from the loader's
-     * version provider — the only source of the installer URL needed
-     * by installer-JAR loaders — falling back to a URL-less
-     * reconstruction from the instance data when the provider is
-     * unavailable (e.g. offline).
+     * Разрешает версию загрузчика для переустановки из провайдера версий
+     * загрузчика — единственного источника URL установщика, нужного
+     * загрузчикам с installer-JAR, — с откатом на безадресную
+     * реконструкцию из данных инстанса, когда провайдер недоступен
+     * (например, офлайн).
      */
     private ModLoaderVersion resolveLoaderVersion(ModLoaderRegistry.Entry entry,
                                                   ModdedProfile profile) {
@@ -438,8 +436,8 @@ public class ModdedProfileVerificationService {
                 }
             }
         } catch (Exception e) {
-            // Provider unavailable or the version not listed — the
-            // reconstruction below is the best available data
+            // Провайдер недоступен или версии нет в списке — реконструкция
+            // ниже является лучшими доступными данными
         }
         return new ModLoaderVersion(
                 profile.loaderType(), profile.loaderVersion(),
@@ -469,7 +467,7 @@ public class ModdedProfileVerificationService {
                     ? root.get("inheritsFrom").getAsString() : profile.minecraftVersion();
             Optional<VersionMetadata> vanillaOpt = tryLoadLocalMetadata(vanillaId, storage);
             if (vanillaOpt.isEmpty()) return Optional.empty();
-            // Merge vanilla + loader locally using same parser
+            // Слить ваниллу + загрузчик локально тем же парсером
             ModLoaderMetadataMerger merger = new ModLoaderMetadataMerger(metadataService);
             return Optional.of(merger.merge(vanillaOpt.get(), loaderJson));
         } catch (Exception ex) {

@@ -4,24 +4,24 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /**
- * Low-level file download port.
+ * Низкоуровневый порт загрузки файлов.
  * <p>
- * Responsible only for downloading a single file from a URL to a local
- * path. The caller is responsible for directory creation and hash
- * verification.
+ * Отвечает только за загрузку одного файла из URL в локальный
+ * путь. Вызывающий отвечает за создание каталогов и проверку
+ * хэша.
  */
 public interface FileDownloader {
 
     /**
-     * Downloads a file from {@code url} to {@code targetPath}.
+     * Загружает файл из {@code url} в {@code targetPath}.
      * <p>
-     * Parent directories are created if needed. If the target file
-     * already exists it is overwritten.
+     * Родительские каталоги создаются при необходимости. Если целевой файл
+     * уже существует, он перезаписывается.
      *
-     * @param url        the remote URL to download from
-     * @param targetPath the local file to write to
-     * @return the number of bytes downloaded
-     * @throws IOException if the download fails for any reason
+     * @param url        удалённый URL для загрузки
+     * @param targetPath локальный файл для записи
+     * @return число загруженных байтов
+     * @throws IOException при любой ошибке загрузки
      */
     long download(String url, Path targetPath) throws IOException;
 }

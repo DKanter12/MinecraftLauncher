@@ -25,26 +25,26 @@ import org.example.launcher.service.JavaResolutionService;
 import org.example.launcher.version.ModdedVersionType;
 
 /**
- * {@link ModLoaderInstaller} for loaders distributed as installer JARs
- * (Forge and NeoForge), following the Forge headless-installation
- * approach: the official installer is downloaded and executed with
- * {@code --installClient <gameDir>} — fully automatic, no GUI, no
- * manual steps.
+ * Реализация {@link ModLoaderInstaller} для загрузчиков, распространяемых как
+ * установочные JAR (Forge и NeoForge), по подходу headless-установки Forge:
+ * официальный установщик скачивается и выполняется с
+ * {@code --installClient <gameDir>} — полностью автоматически, без GUI и
+ * ручных шагов.
  * <p>
- * Flow:
+ * Поток:
  * <ol>
- *   <li>download the installer JAR from the loader's Maven repository
- *       into {@code installers/};</li>
- *   <li>resolve the Java runtime required by the vanilla version
- *       (the installer requires a compatible JVM);</li>
- *   <li>run {@code java -jar installer.jar --installClient <gameDir>}
- *       and wait for completion;</li>
- *   <li>locate the created {@code versions/{id}/{id}.json} launch
- *       configuration;</li>
- *   <li>merge it with vanilla metadata and run the standard
- *       {@link InstallationService} to fetch the vanilla base
- *       (client JAR, libraries, assets) and verify every file —
- *       including the libraries the installer downloaded.</li>
+ *   <li>скачать установочный JAR из Maven-репозитория загрузчика
+ *       в {@code installers/};</li>
+ *   <li>подобрать рантайм Java, требуемый ванильной версией
+ *       (установщику нужна совместимая JVM);</li>
+ *   <li>выполнить {@code java -jar installer.jar --installClient <gameDir>}
+ *       и дождаться завершения;</li>
+ *   <li>найти созданную конфигурацию запуска
+ *       {@code versions/{id}/{id}.json};</li>
+ *   <li>слить её с ванильными метаданными и прогнать стандартную
+ *       {@link InstallationService} для получения ванильной базы
+ *       (клиентский JAR, библиотеки, ассеты) и проверки каждого файла —
+ *       включая скачанные установщиком библиотеки.</li>
  * </ol>
  */
 public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
@@ -76,7 +76,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
                 .orElseThrow(() -> new IOException(
                         "No installer URL available for " + loader));
 
-        // 1. Download installer JAR
+        // 1. Скачать установочный JAR
         Path installerFile = gameDir.root().resolve("installers")
                 .resolve(installerFileName(installerUrl));
         Files.createDirectories(installerFile.getParent());
@@ -85,7 +85,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
             throw new IOException("Installer download failed: " + installerUrl);
         }
 
-        // 2. Resolve Java runtime required to run the installer
+        // 2. Подобрать рантайм Java для запуска установщика
         JavaResolutionResult javaResult = javaResolutionService.resolve(vanillaMetadata);
         if (!javaResult.isFound() || javaResult.runtime().isEmpty()) {
             throw new IOException("No suitable Java runtime to run the "
@@ -94,11 +94,11 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
         }
         Path javaExecutable = javaResult.runtime().get().javaExecutable();
 
-        // 3. Run installer headless
+        // 3. Запустить установщик в headless-режиме
         runInstaller(javaExecutable, installerFile, gameDir.root().toAbsolutePath(),
                 loader);
 
-        // 4. Locate the created launch configuration
+        // 4. Найти созданную конфигурацию запуска
         String expectedId = loader.installedVersionId();
         Path versionJson = locateVersionJson(gameDir, expectedId, loader);
         if (versionJson == null) {
@@ -108,7 +108,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
         }
         String loaderJson = Files.readString(versionJson, StandardCharsets.UTF_8);
 
-        // 5. Merge + standard installation (vanilla base + verification)
+        // 5. Слить + стандартная установка (ванильная база + проверка)
         VersionMetadata merged = merger.merge(vanillaMetadata, loaderJson);
         String versionId = merged.id();
 
@@ -168,9 +168,9 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
     }
 
     /**
-     * Locates the version JSON created by the installer: first the
-     * expected id, then a fallback scan of {@code versions/} for a
-     * matching profile (robust against loader id-convention changes).
+     * Ищет JSON версии, созданный установщиком: сначала ожидаемый id,
+     * затем запасной скан {@code versions/} в поисках подходящего профиля
+     * (устойчиво к смене соглашений об id загрузчиков).
      */
     private Path locateVersionJson(GameDirectory gameDir, String expectedId,
                                    ModLoaderVersion loader) {
@@ -210,7 +210,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
                     return json;
                 }
             } catch (Exception ignored) {
-                // Not a valid version JSON — skip
+                // Невалидный JSON версии — пропустить
             }
         }
         return null;

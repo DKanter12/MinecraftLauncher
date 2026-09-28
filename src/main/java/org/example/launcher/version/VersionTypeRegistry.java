@@ -8,12 +8,12 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Registry of known version types.
+ * Реестр известных типов версий.
  * <p>
- * Pre-populated with all {@link StandardVersionType} values. Third-party
- * or custom types can be registered at runtime via
- * {@link #register(VersionType)} without changing any existing code,
- * which is the main extension point for future version type support.
+ * Предзаполнен всеми значениями {@link StandardVersionType}. Сторонние
+ * или пользовательские типы можно регистрировать во время выполнения через
+ * {@link #register(VersionType)} без изменения существующего кода,
+ * что является основной точкой расширения для поддержки будущих типов версий.
  */
 public final class VersionTypeRegistry {
 
@@ -26,10 +26,10 @@ public final class VersionTypeRegistry {
     }
 
     /**
-     * Registers a custom version type, making it resolvable from the
-     * manifest and selectable in the UI.
+     * Регистрирует пользовательский тип версии, делая его разрешимым из
+     * манифеста и выбираемым в интерфейсе.
      *
-     * @param type the version type to register (must not be {@code null})
+     * @param type регистрируемый тип версии (не должен быть {@code null})
      */
     public void register(VersionType type) {
         Objects.requireNonNull(type, "type");
@@ -37,9 +37,9 @@ public final class VersionTypeRegistry {
     }
 
     /**
-     * Resolves a raw type string (as found in the Mojang manifest) to a
-     * {@link VersionType}. Falls back to {@link StandardVersionType#UNKNOWN}
-     * when the identifier is not recognised.
+     * Разрешает исходную строку типа (из манифеста Mojang) в
+     * {@link VersionType}. Возвращает {@link StandardVersionType#UNKNOWN},
+     * если идентификатор не распознан.
      */
     public VersionType resolve(String id) {
         if (id == null) {
@@ -49,8 +49,8 @@ public final class VersionTypeRegistry {
     }
 
     /**
-     * @return an unmodifiable, insertion-ordered list of all registered
-     *         version types (useful for populating UI filters).
+     * @return немодифицируемый список всех зарегистрированных типов версий в порядке
+     *         вставки (удобен для заполнения фильтров интерфейса).
      */
     public List<VersionType> all() {
         return Collections.unmodifiableList(new ArrayList<>(typesById.values()));

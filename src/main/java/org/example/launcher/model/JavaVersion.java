@@ -3,7 +3,7 @@ package org.example.launcher.model;
 import java.util.Optional;
 
 /**
- * Java runtime requirements for a Minecraft version.
+ * Требования к среде Java для версии Minecraft.
  */
 public final class JavaVersion {
 
@@ -16,7 +16,7 @@ public final class JavaVersion {
     }
 
     /**
-     * Mojang's runtime component identifier, e.g.
+     * Идентификатор компонента среды Mojang, например
      * {@code "java-runtime-gamma"}.
      */
     public String component() {
@@ -28,7 +28,7 @@ public final class JavaVersion {
     }
 
     /**
-     * Major Java version required, e.g. {@code 21}.
+     * Требуемая мажорная версия Java, например {@code 21}.
      */
     public int majorVersion() {
         return majorVersion;

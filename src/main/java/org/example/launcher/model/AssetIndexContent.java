@@ -4,10 +4,10 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Parsed content of a Mojang asset index JSON file.
+ * Разобранное содержимое JSON-файла индекса ресурсов Mojang.
  * <p>
- * Maps asset logical names (e.g. {@code "minecraft/sounds/...ogg"})
- * to their {@link AssetObject} descriptors.
+ * Отображает логические имена ресурсов (например, {@code "minecraft/sounds/...ogg"})
+ * на их дескрипторы {@link AssetObject}.
  */
 public final class AssetIndexContent {
 

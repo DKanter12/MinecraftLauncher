@@ -114,4 +114,59 @@ class LauncherPreferencesTest {
         assertEquals("1.21", prefs.getLastSelectedVersion().orElseThrow());
         assertEquals("Alex", prefs.getLastSelectedAccount().orElseThrow());
     }
+
+    @Test
+    @DisplayName("builds git url round-trip")
+    void buildsGitUrlRoundTrip() throws IOException {
+        Path file = tempDir.resolve("prefs.json");
+        LauncherPreferences prefs = new LauncherPreferences(file);
+
+        assertTrue(prefs.getBuildsGitUrl().isEmpty());
+
+        prefs.setBuildsGitUrl("https://raw.githubusercontent.com/o/r/main/");
+
+        assertEquals("https://raw.githubusercontent.com/o/r/main/",
+                prefs.getBuildsGitUrl().orElseThrow());
+
+        prefs.setBuildsGitUrl("");
+
+        assertTrue(prefs.getBuildsGitUrl().isEmpty());
+    }
+
+    @Test
+    @DisplayName("builds source settings round-trip")
+    void buildsSourceRoundTrip() throws IOException {
+        Path file = tempDir.resolve("prefs.json");
+        LauncherPreferences prefs = new LauncherPreferences(file);
+
+        assertTrue(prefs.getBuildsSourceMode().isEmpty());
+        assertTrue(prefs.getYandexDiskLink().isEmpty());
+        assertTrue(prefs.getBuildsToken().isEmpty());
+
+        prefs.setBuildsSourceMode("YANDEX");
+        prefs.setYandexDiskLink("https://disk.yandex.ru/d/abc");
+        prefs.setBuildsToken("tok");
+
+        assertEquals("YANDEX", prefs.getBuildsSourceMode().orElseThrow());
+        assertEquals("https://disk.yandex.ru/d/abc",
+                prefs.getYandexDiskLink().orElseThrow());
+        assertEquals("tok", prefs.getBuildsToken().orElseThrow());
+    }
+
+    @Test
+    @DisplayName("language round-trip")
+    void languageRoundTrip() throws IOException {
+        Path file = tempDir.resolve("prefs.json");
+        LauncherPreferences prefs = new LauncherPreferences(file);
+
+        assertTrue(prefs.getLanguage().isEmpty());
+
+        prefs.setLanguage("ru");
+
+        assertEquals("ru", prefs.getLanguage().orElseThrow());
+
+        prefs.setLanguage("");
+
+        assertTrue(prefs.getLanguage().isEmpty());
+    }
 }

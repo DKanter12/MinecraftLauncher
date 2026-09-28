@@ -10,45 +10,45 @@ import java.util.Optional;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * A game instance: a named, self-contained play environment.
+ * Игровой экземпляр: именованная изолированная игровая среда.
  * <p>
- * An instance is either {@code VANILLA} (plays the unmodified game)
- * or a mod loader installation (Fabric, Forge, NeoForge, Quilt). Each
- * instance owns a separate game directory (holding {@code mods/},
+ * Экземпляр бывает {@code VANILLA} (запускает немодифицированную игру)
+ * либо установкой загрузчика модов (Fabric, Forge, NeoForge, Quilt). Каждый
+ * экземпляр владеет отдельным игровым каталогом (с {@code mods/},
  * {@code config/}, {@code resourcepacks/}, {@code shaderpacks/},
- * {@code saves/}, {@code logs/} and other pack-specific files), so
- * different instances never conflict with each other. Shared
- * resources (the client JAR, libraries, assets, natives) live in the
- * launcher's storage root and are reused across instances without
- * re-downloading.
+ * {@code saves/}, {@code logs/} и прочими файлами сборки), поэтому
+ * разные экземпляры никогда не конфликтуют друг с другом. Общие
+ * ресурсы (клиентский JAR, библиотеки, ресурсы, нативные файлы) хранятся в
+ * корневом хранилище лаунчера и переиспользуются экземплярами без
+ * повторной загрузки.
  * <p>
- * An instance records everything needed to reproduce and verify the
- * installation: the Minecraft version, the loader type and version,
- * the installed version id, the game directory, the installed
- * components and additional launch parameters.
+ * Экземпляр хранит всё необходимое для воспроизведения и проверки
+ * установки: версию Minecraft, тип и версию загрузчика,
+ * идентификатор установленной версии, игровой каталог, установленные
+ * компоненты и дополнительные параметры запуска.
  *
- * @param id              unique profile id (also the directory name
- *                        under {@code profiles/})
- * @param name            human-readable display name
- * @param loaderType      the mod loader family (Fabric, Forge, …)
- * @param loaderVersion   the loader's own version (e.g. "0.16.9")
- * @param minecraftVersion the target Minecraft version (e.g. "1.21.4")
- * @param versionId       the installed modded version id this profile
- *                        launches (e.g. "fabric-loader-0.16.9-1.21.4")
- * @param gameDirPath     the profile's game directory, relative to the
- *                        storage root (e.g. "profiles/MyPack")
- * @param components      the installed components, e.g.
+ * @param id              уникальный идентификатор профиля (также имя каталога
+ *                        в {@code profiles/})
+ * @param name            человекочитаемое отображаемое имя
+ * @param loaderType      семейство загрузчика модов (Fabric, Forge, …)
+ * @param loaderVersion   собственная версия загрузчика (например, "0.16.9")
+ * @param minecraftVersion целевая версия Minecraft (например, "1.21.4")
+ * @param versionId       идентификатор установленной модовой версии, которую запускает
+ *                        профиль (например, "fabric-loader-0.16.9-1.21.4")
+ * @param gameDirPath     игровой каталог профиля относительно корня
+ *                        хранилища (например, "profiles/MyPack")
+ * @param components      установленные компоненты, например
  *                        ["minecraft:1.21.4", "fabric-loader:0.16.9"]
- * @param extraJvmArgs    additional JVM launch parameters for this
- *                        profile (e.g. "-Xmx4G")
- * @param memoryMb        dedicated RAM limit in megabytes, applied as
- *                        {@code -Xmx} at launch (overrides any
- *                        {@code -Xmx}/{@code -Xms} in
- *                        {@code extraJvmArgs}); {@code 0} means automatic
- *                        (no explicit limit)
- * @param createdTimeRaw     ISO-8601 creation timestamp
- * @param lastPlayedTimeRaw  ISO-8601 timestamp of the last launch,
- *                           or {@code null} if never played
+ * @param extraJvmArgs    дополнительные параметры запуска JVM для этого
+ *                        профиля (например, "-Xmx4G")
+ * @param memoryMb        лимит выделенной памяти в мегабайтах, применяется как
+ *                        {@code -Xmx} при запуске (переопределяет
+ *                        {@code -Xmx}/{@code -Xms} в
+ *                        {@code extraJvmArgs}); {@code 0} означает автоматический
+ *                        режим (без явного лимита)
+ * @param createdTimeRaw     метка создания в формате ISO-8601
+ * @param lastPlayedTimeRaw  метка последнего запуска в формате ISO-8601
+ *                           либо {@code null}, если запусков не было
  */
 public record ModdedProfile(
         String id,
@@ -80,11 +80,11 @@ public record ModdedProfile(
     }
 
     /**
-     * The version id this profile is expected to launch, derived from
-     * the loader type/version and Minecraft version using the loader's
-     * id convention. Compared against the installed version JSON's id
-     * during verification. Vanilla instances launch the vanilla
-     * version id itself.
+     * Идентификатор версии, который должен запускать профиль, выведенный из
+     * типа/версии загрузчика и версии Minecraft по соглашению об идентификаторах
+     * загрузчика. Сверяется с идентификатором установленного JSON версии
+     * при проверке. Ванильные экземпляры запускают сам
+     * ванильный идентификатор версии.
      */
     public String expectedVersionId() {
         if (loaderType == ModLoaderType.VANILLA) {
@@ -94,7 +94,7 @@ public record ModdedProfile(
                 true, null).installedVersionId();
     }
 
-    /** Whether this instance plays the unmodified vanilla game. */
+    /** Признак запуска немодифицированной ванильной игры данным экземпляром. */
     public boolean isVanilla() {
         return loaderType == ModLoaderType.VANILLA;
     }
@@ -107,7 +107,7 @@ public record ModdedProfile(
         return parseTime(lastPlayedTimeRaw);
     }
 
-    /** Short display line, e.g. "Fabric 0.16.9 · MC 1.21.4". */
+    /** Краткая строка описания, например "Fabric 0.16.9 · MC 1.21.4". */
     public String summary() {
         if (isVanilla()) {
             return "Vanilla · MC " + minecraftVersion;

@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Fully resolved command-line arguments for launching Minecraft.
+ * Полностью разрешённые аргументы командной строки для запуска Minecraft.
  * <p>
- * Produced by a {@code LaunchArgumentBuilder} from version metadata,
- * game directory layout, player profile, and resolved Java runtime.
- * Consumed by the launch service to start the game process.
+ * Создаются построителем {@code LaunchArgumentBuilder} из метаданных версии,
+ * раскладки игрового каталога, профиля игрока и разрешённой среды Java.
+ * Используются службой запуска для старта игрового процесса.
  */
 public final class LaunchArguments {
 
@@ -60,12 +60,12 @@ public final class LaunchArguments {
     }
 
     /**
-     * Returns the complete command-line token list:
+     * Возвращает полный список токенов командной строки:
      * {@code java [jvmArgs] [mainClass] [gameArgs]}.
      * <p>
-     * Note: {@code -cp} and the classpath value are already part of
-     * {@link #jvmArguments()} for modern versions, or injected by the
-     * builder for legacy versions.
+     * Примечание: {@code -cp} и значение classpath уже входят в
+     * {@link #jvmArguments()} для современных версий либо подставляются
+     * построителем для устаревших версий.
      */
     public List<String> fullCommand() {
         List<String> cmd = new java.util.ArrayList<>();

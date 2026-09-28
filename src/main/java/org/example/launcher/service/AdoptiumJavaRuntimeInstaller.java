@@ -18,14 +18,14 @@ import org.example.launcher.model.JavaRuntime;
 import org.example.launcher.util.OsDetector;
 
 /**
- * {@link JavaRuntimeInstaller} backed by the Eclipse Adoptium (Temurin) API.
+ * {@link JavaRuntimeInstaller} на базе API Eclipse Adoptium (Temurin).
  * <p>
- * Downloads a JRE ZIP archive from
+ * Скачивает ZIP-архив JRE из
  * {@code https://api.adoptium.net/v3/assets/latest/<major>/hotspot}
- * and extracts it into the target directory. After extraction the
- * installer probes the executable ({@code bin/java} or
- * {@code bin/java.exe}) and returns a {@link JavaRuntime} with the
- * correct major version and {@link JavaRuntime.Source#MANAGED}.
+ * и распаковывает его в целевой каталог. После распаковки
+ * установщик ищет исполняемый файл ({@code bin/java} или
+ * {@code bin/java.exe}) и возвращает {@link JavaRuntime} с
+ * корректной major-версией и {@link JavaRuntime.Source#MANAGED}.
  */
 public class AdoptiumJavaRuntimeInstaller implements JavaRuntimeInstaller {
 

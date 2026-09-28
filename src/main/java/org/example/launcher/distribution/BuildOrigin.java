@@ -1,19 +1,19 @@
 package org.example.launcher.distribution;
 
 /**
- * Where a build came from.
+ * Откуда пришла сборка.
  *
  * <ul>
- *   <li>{@code LOCAL} — a build the player saved from their own
- *       instance's mods/configs via the "Save Build" dialog.</li>
- *   <li>{@code SERVER} — a build published by the administrator,
- *       downloaded through the launcher server and installed with a
- *       build.json manifest (see {@link RemoteBuildService}).</li>
+ *   <li>{@code LOCAL} — сборка, сохранённая игроком из модов/конфигов
+ *       собственного инстанса через диалог «Сохранить сборку».</li>
+ *   <li>{@code SERVER} — сборка, опубликованная администратором,
+ *       скачанная через сервер лаунчера и установленная с
+ *       манифестом build.json (см. {@link RemoteBuildService}).</li>
  * </ul>
  *
- * Both kinds live side by side in the same {@code builds} folder of an
- * instance, remain fully independent and can be selected, applied and
- * switched between freely.
+ * Оба вида лежат рядом в одной папке {@code builds} инстанса,
+ * остаются полностью независимыми и могут свободно выбираться, применяться и
+ * переключаться.
  */
 public enum BuildOrigin {
     LOCAL, SERVER

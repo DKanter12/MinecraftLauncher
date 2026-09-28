@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parsed Mojang version manifest containing the full version list and the
- * identifiers of the latest release / snapshot.
+ * Разобранный манифест версий Mojang с полным списком версий и
+ * идентификаторами последнего релиза / снапшота.
  */
 public final class VersionManifest {
 
@@ -22,17 +22,17 @@ public final class VersionManifest {
         this.versions = List.copyOf(versions);
     }
 
-    /** Identifier of the latest stable release, if reported by Mojang. */
+    /** Идентификатор последнего стабильного релиза, если сообщён Mojang. */
     public Optional<String> latestReleaseId() {
         return Optional.ofNullable(latestReleaseId);
     }
 
-    /** Identifier of the latest snapshot, if reported by Mojang. */
+    /** Идентификатор последнего снапшота, если сообщён Mojang. */
     public Optional<String> latestSnapshotId() {
         return Optional.ofNullable(latestSnapshotId);
     }
 
-    /** Unmodifiable list of all versions in the manifest. */
+    /** Немодифицируемый список всех версий манифеста. */
     public List<MinecraftVersion> versions() {
         return Collections.unmodifiableList(versions);
     }

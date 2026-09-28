@@ -5,16 +5,16 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Describes a single file that needs to be downloaded and verified
- * during Minecraft installation.
+ * Описывает один файл для загрузки и проверки
+ * при установке Minecraft.
  * <p>
- * Each task carries:
+ * Каждая задача несёт:
  * <ul>
- *   <li>the remote URL to download from</li>
- *   <li>the local target path</li>
- *   <li>an optional expected SHA1 hash for verification</li>
- *   <li>the expected file size (for progress reporting)</li>
- *   <li>a human-readable category (client, library, native, asset)</li>
+ *   <li>удалённый URL для загрузки</li>
+ *   <li>локальный целевой путь</li>
+ *   <li>необязательный ожидаемый SHA1-хэш для проверки</li>
+ *   <li>ожидаемый размер файла (для отчёта о прогрессе)</li>
+ *   <li>человекочитаемую категорию (клиент, библиотека, нативный файл, ресурс)</li>
  * </ul>
  */
 public final class DownloadTask {

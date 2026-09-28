@@ -12,12 +12,12 @@ import java.time.Duration;
 import org.example.launcher.install.GameDirectory;
 
 /**
- * Manages the authlib-injector JAR — a javaagent that patches
- * Mojang's authlib at runtime to redirect auth/session/skin
- * requests to Ely.by servers.
+ * Управляет JAR-файлом authlib-injector — javaagent, который патчит
+ * authlib Mojang в рантайме и перенаправляет запросы
+ * авторизации/сессий/скинов на серверы Ely.by.
  * <p>
- * The JAR is downloaded once from GitHub releases and cached
- * locally in {@code ~/.minecraft/authlib-injector.jar}.
+ * JAR скачивается один раз из GitHub releases и кэшируется
+ * локально в {@code ~/.minecraft/authlib-injector.jar}.
  *
  * @see <a href="https://docs.ely.by/en/authlib-injector.html">Ely.by docs</a>
  */
@@ -38,11 +38,11 @@ public class AuthlibInjectorManager {
     }
 
     /**
-     * Returns the local path to the authlib-injector JAR,
-     * downloading it if necessary.
+     * Возвращает локальный путь к JAR-файлу authlib-injector,
+     * при необходимости скачивая его.
      *
-     * @return path to the cached authlib-injector.jar
-     * @throws IOException if download fails
+     * @return путь к кэшированному authlib-injector.jar
+     * @throws IOException если скачивание не удалось
      */
     public Path ensureAvailable() throws IOException {
         Path jarPath = gameDir.root().resolve("authlib-injector.jar");
@@ -76,10 +76,10 @@ public class AuthlibInjectorManager {
     }
 
     /**
-     * Builds the JVM argument string for the javaagent.
+     * Формирует строку JVM-аргумента для javaagent.
      *
-     * @param jarPath path to the authlib-injector JAR
-     * @return the {@code -javaagent:...=ely.by} argument
+     * @param jarPath путь к JAR-файлу authlib-injector
+     * @return аргумент {@code -javaagent:...=ely.by}
      */
     public String buildAgentArg(Path jarPath) {
         return "-javaagent:" + jarPath.toAbsolutePath().normalize() + "=ely.by";

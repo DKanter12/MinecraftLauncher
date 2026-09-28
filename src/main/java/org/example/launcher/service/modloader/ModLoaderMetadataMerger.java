@@ -9,29 +9,28 @@ import org.example.launcher.model.VersionMetadata;
 import org.example.launcher.service.MojangVersionMetadataService;
 
 /**
- * Merges a mod loader's version JSON (the {@code inheritsFrom}-style
- * profile produced by the Fabric/Quilt meta API or by the
- * Forge/NeoForge installers) with the vanilla Minecraft metadata it
- * inherits from, producing a single self-contained
- * {@link VersionMetadata} for the existing install and launch pipeline.
+ * Сливает JSON версии мод-загрузчика (профиль в стиле {@code inheritsFrom},
+ * выдаваемый Fabric/Quilt meta API или установщиками
+ * Forge/NeoForge) с ванильными метаданными Minecraft, от которых он
+ * наследуется, в единые самодостаточные {@link VersionMetadata} для
+ * существующего пайплайна установки и запуска.
  * <p>
- * Merge rules (matching the official launcher's inheritance semantics):
+ * Правила слияния (соответствуют семантике наследования официального лаунчера):
  * <ul>
- *   <li>{@code id} — the loader profile's id (e.g.
+ *   <li>{@code id} — id профиля загрузчика (например,
  *       {@code fabric-loader-0.16.9-1.21.4})</li>
- *   <li>{@code mainClass} — loader's (this is what makes it a modded
- *       launch)</li>
- *   <li>{@code libraries} — loader's libraries first, then vanilla's
- *       (shared libraries are deduplicated by name)</li>
- *   <li>{@code arguments} — vanilla's arguments followed by the
- *       loader's (official {@code inheritsFrom} concatenation
- *       semantics). Loader profiles carry only their own additions:
- *       Forge/NeoForge add {@code -p}/fml arguments but rely on the
- *       vanilla {@code -cp ${classpath}} and {@code --username} etc.;
- *       Fabric/Quilt carry empty argument lists</li>
+ *   <li>{@code mainClass} — загрузчика (именно это делает запуск модовым)</li>
+ *   <li>{@code libraries} — сначала библиотеки загрузчика, затем ванильные
+ *       (общие библиотеки дедуплицируются по имени)</li>
+ *   <li>{@code arguments} — сначала ванильные аргументы, затем
+ *       загрузчика (официальная семантика конкатенации при
+ *       {@code inheritsFrom}). Профили загрузчиков несут только свои добавки:
+ *       Forge/NeoForge добавляют аргументы {@code -p}/fml, но опираются на
+ *       ванильные {@code -cp ${classpath}} и {@code --username} и т.д.;
+ *       Fabric/Quilt несут пустые списки аргументов</li>
  *   <li>{@code assetIndex}, {@code assets}, {@code javaVersion},
- *       {@code clientDownload} — loader's value when present,
- *       otherwise vanilla's (loader profiles normally omit these)</li>
+ *       {@code clientDownload} — значение загрузчика при наличии,
+ *       иначе ванильное (профили загрузчиков обычно их опускают)</li>
  * </ul>
  */
 public class ModLoaderMetadataMerger {
@@ -43,12 +42,12 @@ public class ModLoaderMetadataMerger {
     }
 
     /**
-     * Merges the loader profile JSON with the vanilla metadata.
+     * Сливает JSON профиля загрузчика с ванильными метаданными.
      *
-     * @param vanilla    vanilla Minecraft metadata for the inherited version
-     * @param loaderJson the loader profile JSON (raw string)
-     * @return merged, self-contained metadata
-     * @throws IOException if the loader JSON cannot be parsed
+     * @param vanilla    ванильные метаданные Minecraft наследуемой версии
+     * @param loaderJson JSON профиля загрузчика (сырая строка)
+     * @return слитые самодостаточные метаданные
+     * @throws IOException если JSON загрузчика не разбирается
      */
     public VersionMetadata merge(VersionMetadata vanilla, String loaderJson)
             throws IOException {
@@ -60,10 +59,9 @@ public class ModLoaderMetadataMerger {
         List<org.example.launcher.model.Library> libraries =
                 mergeLibraries(loader.libraries(), vanilla.libraries());
 
-        // Official inheritsFrom semantics: the parent's arguments come
-        // first, the child's (loader's) are appended. Forge/NeoForge
-        // rely on the vanilla -cp ${classpath} entry to provide the
-        // legacy class path for BootstrapLauncher.
+        // Официальная семантика inheritsFrom: сначала аргументы родителя,
+        // затем дочерние (загрузчика). Forge/NeoForge опираются на ванильную
+        // запись -cp ${classpath} для legacy classpath BootstrapLauncher.
         List<String> gameArgs = concat(vanilla.gameArguments(), loader.gameArguments());
         List<String> jvmArgs = concat(vanilla.jvmArguments(), loader.jvmArguments());
 
@@ -93,10 +91,10 @@ public class ModLoaderMetadataMerger {
     }
 
     /**
-     * Combines loader and vanilla libraries: loader libraries win on
-     * name conflicts (loaders replace/override specific vanilla
-     * libraries such as bridged auth patches), vanilla libraries are
-     * appended otherwise.
+     * Объединяет библиотеки загрузчика и ваниллы: при конфликте имён побеждают
+     * библиотеки загрузчика (загрузчики заменяют/переопределяют отдельные ванильные
+     * библиотеки, например пропатченный бридж авторизации), иначе ванильные
+     * добавляются в конец.
      */
     private List<org.example.launcher.model.Library> mergeLibraries(
             List<org.example.launcher.model.Library> loaderLibs,
@@ -117,7 +115,7 @@ public class ModLoaderMetadataMerger {
         return result;
     }
 
-    /** Base list first, additions appended (order-preserving). */
+    /** Базовый список первым, добавки — в конец (с сохранением порядка). */
     private static List<String> concat(List<String> base, List<String> additions) {
         if (additions.isEmpty()) return base;
         List<String> result = new ArrayList<>(base.size() + additions.size());

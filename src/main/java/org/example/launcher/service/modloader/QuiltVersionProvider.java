@@ -15,21 +15,22 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.util.Json;
 
 /**
- * {@link ModLoaderVersionProvider} for Quilt Loader, backed by the
- * official Quilt meta API ({@code https://meta.quiltmc.org}).
+ * Поставщик {@link ModLoaderVersionProvider} для Quilt Loader на официальном
+ * Quilt meta API ({@code https://meta.quiltmc.org}).
  * <p>
- * {@code GET /v3/versions/loader/{game_version}} returns one entry per
- * compatible loader version. The response shape mirrors the Fabric
- * meta API (Quilt loader is a Fabric fork).
+ * {@code GET /v3/versions/loader/{game_version}} возвращает по одной записи на
+ * совместимую версию загрузчика. Форма ответа зеркалит Fabric
+ * meta API (Quilt loader — форк Fabric).
  */
 public class QuiltVersionProvider implements ModLoaderVersionProvider {
 
     public static final String DEFAULT_META_URL =
             "https://meta.quiltmc.org/v3/versions/loader/";
 
-    /** Lists the game versions Quilt supports (releases + snapshots). */
+    /** Перечисляет версии игры, поддерживаемые Quilt (релизы + снапшоты). */
     public static final String DEFAULT_GAME_VERSIONS_URL =
             "https://meta.quiltmc.org/v3/versions/game";
 
@@ -113,11 +114,11 @@ public class QuiltVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses the Quilt meta game-version list JSON. Exposed for unit
-     * testing.
+     * Разбирает JSON списка игровых версий Quilt meta. Выставлен для юнит-
+     * тестирования.
      * <p>
-     * Response shape: {@code [{"version":"1.21.4",…}, …]} — every
-     * version Quilt can be installed on.
+     * Форма ответа: {@code [{"version":"1.21.4",…}, …]} — каждая
+     * версия, на которую ставится Quilt.
      */
     public java.util.Set<String> parseGameVersions(String json) throws IOException {
         java.util.Set<String> result = new java.util.HashSet<>();
@@ -141,9 +142,9 @@ public class QuiltVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses the Quilt meta loader-list JSON. Exposed for unit testing.
+     * Разбирает JSON списка загрузчиков Quilt meta. Выставлен для юнит-тестирования.
      * <p>
-     * Response shape: {@code [{"loader": {"version": "0.26.0",
+     * Форма ответа: {@code [{"loader": {"version": "0.26.0",
      * "stable": true, "build": 3}, "hashed": {...}}, …]}
      */
     public List<ModLoaderVersion> parseVersions(String json, String minecraftVersion)
@@ -176,9 +177,6 @@ public class QuiltVersionProvider implements ModLoaderVersionProvider {
     }
 
     private static String getStr(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 }

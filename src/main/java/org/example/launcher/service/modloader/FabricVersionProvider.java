@@ -16,21 +16,22 @@ import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.model.ModLoaderVersion;
 import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.util.Json;
 
 /**
- * {@link ModLoaderVersionProvider} for Fabric Loader, backed by the
- * official Fabric meta API ({@code https://meta.fabricmc.net}).
+ * Поставщик {@link ModLoaderVersionProvider} для Fabric Loader на официальном
+ * Fabric meta API ({@code https://meta.fabricmc.net}).
  * <p>
- * {@code GET /v2/versions/loader/{game_version}} returns one entry per
- * compatible loader version, each carrying loader version, build and
- * stability flag plus the intermediary mappings it targets.
+ * {@code GET /v2/versions/loader/{game_version}} возвращает по одной записи на
+ * совместимую версию загрузчика, каждая с версией загрузчика, сборкой и
+ * флагом стабильности плюс целевые intermediary-мэппинги.
  */
 public class FabricVersionProvider implements ModLoaderVersionProvider {
 
     public static final String DEFAULT_META_URL =
             "https://meta.fabricmc.net/v2/versions/loader/";
 
-    /** Lists the game versions Fabric supports (releases + snapshots). */
+    /** Перечисляет версии игры, поддерживаемые Fabric (релизы + снапшоты). */
     public static final String DEFAULT_GAME_VERSIONS_URL =
             "https://meta.fabricmc.net/v2/versions/game";
 
@@ -114,11 +115,11 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses the Fabric meta game-version list JSON. Exposed for unit
-     * testing.
+     * Разбирает JSON списка игровых версий Fabric meta. Выставлен для юнит-
+     * тестирования.
      * <p>
-     * Response shape: {@code [{"version":"1.21.4","stable":true},
-     * …]} — every version Fabric can be installed on.
+     * Форма ответа: {@code [{"version":"1.21.4","stable":true},
+     * …]} — каждая версия, на которую ставится Fabric.
      */
     public java.util.Set<String> parseGameVersions(String json) throws IOException {
         java.util.Set<String> result = new java.util.HashSet<>();
@@ -142,9 +143,9 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
     }
 
     /**
-     * Parses the Fabric meta loader-list JSON. Exposed for unit testing.
+     * Разбирает JSON списка загрузчиков Fabric meta. Выставлен для юнит-тестирования.
      * <p>
-     * Response shape: {@code [{"loader": {"version": "0.16.9",
+     * Форма ответа: {@code [{"loader": {"version": "0.16.9",
      * "stable": true, "build": 10}, "intermediary": {...}}, …]}
      */
     public List<ModLoaderVersion> parseVersions(String json, String minecraftVersion)
@@ -177,9 +178,6 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
     }
 
     private static String getStr(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 }

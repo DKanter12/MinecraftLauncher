@@ -1,13 +1,14 @@
 package org.example.launcher.service;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.example.launcher.install.GameDirectory;
@@ -17,30 +18,46 @@ import org.example.launcher.model.JavaRuntime;
 import org.example.launcher.model.LaunchArguments;
 import org.example.launcher.model.Library;
 import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.util.LibraryPaths;
 import org.example.launcher.util.OsDetector;
 
 /**
- * Default {@link LaunchArgumentBuilder} for Minecraft.
+ * Реализация {@link LaunchArgumentBuilder} для Minecraft по умолчанию.
  * <p>
- * Replaces all Mojang placeholders with concrete values from the
- * provided context, builds the classpath from library artifact paths
- * and the client JAR, and assembles the final JVM and game argument
- * lists.
+ * Заменяет все плейсхолдеры Mojang конкретными значениями из
+ * переданного контекста, строит classpath из путей артефактов библиотек
+ * и клиентского JAR и собирает итоговые списки JVM- и игровых аргументов.
  * <p>
- * For modern versions (1.13+), JVM and game arguments come from
- * {@link VersionMetadata#jvmArguments()} and
- * {@link VersionMetadata#gameArguments()} respectively. For legacy
- * versions, a default set of JVM arguments is constructed and the
- * game arguments are parsed from
- * {@link VersionMetadata#legacyMinecraftArguments()}.
+ * Для современных версий (1.13+) JVM- и игровые аргументы берутся из
+ * {@link VersionMetadata#jvmArguments()} и
+ * {@link VersionMetadata#gameArguments()} соответственно. Для старых
+ * версий строится набор JVM-аргументов по умолчанию, а игровые
+ * разбираются из {@link VersionMetadata#legacyMinecraftArguments()}.
  */
 public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
     private static final String OFFLINE_TOKEN = "offline";
     private static final String DEFAULT_USER_TYPE = "mojang";
+    private static final String LAUNCHER_NAME = "opencode-launcher";
+    private static final String LAUNCHER_VERSION = "1.0";
+    private static final String OFFLINE_UUID_PREFIX = "OfflinePlayer:";
+    private static final String DEFAULT_MAIN_CLASS = "net.minecraft.client.main.Main";
 
     private AuthlibInjectorManager authlibInjectorManager;
 
+    public MinecraftLaunchArgumentBuilder() {
+        this(null);
+    }
+
+    public MinecraftLaunchArgumentBuilder(AuthlibInjectorManager authlibInjectorManager) {
+        this.authlibInjectorManager = authlibInjectorManager;
+    }
+
+    /**
+     * @deprecated предпочтительнее внедрение через конструктор
+     * {@link #MinecraftLaunchArgumentBuilder(AuthlibInjectorManager)}.
+     */
+    @Deprecated
     public void setAuthlibInjectorManager(AuthlibInjectorManager manager) {
         this.authlibInjectorManager = manager;
     }
@@ -78,7 +95,7 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
             gameArgs = buildLegacyGameArgs(metadata, placeholders);
         }
 
-        // Profile-specific JVM arguments (e.g. -Xmx4G)
+        // Профильные JVM-аргументы (например, -Xmx4G)
         if (extraJvmArgs != null && !extraJvmArgs.isEmpty()) {
             List<String> withExtra = new ArrayList<>(
                     jvmArgs.size() + extraJvmArgs.size());
@@ -92,13 +109,13 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
                 Path agentJar = authlibInjectorManager.ensureAvailable();
                 String agentArg = authlibInjectorManager.buildAgentArg(agentJar);
                 jvmArgs.add(0, agentArg);
-            } catch (java.io.IOException e) {
-                // If we can't download authlib-injector, fall back to JVM properties
+            } catch (IOException e) {
+                // Если authlib-injector скачать не удалось, откатываемся на JVM-свойства
                 jvmArgs = addElyByServerArgs(jvmArgs);
             }
         }
 
-        String mainClass = metadata.mainClass().orElse("net.minecraft.client.main.Main");
+        String mainClass = metadata.mainClass().orElse(DEFAULT_MAIN_CLASS);
 
         Path workingDir = runtimeDirectory != null ? runtimeDirectory : gameDir.root();
 
@@ -112,7 +129,7 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     }
 
     // ------------------------------------------------------------------
-    //  Placeholder construction
+    //  Построение плейсхолдеров
     // ------------------------------------------------------------------
 
     private Map<String, String> buildPlaceholders(VersionMetadata meta, GameDirectory gameDir,
@@ -137,9 +154,9 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
         String userProperties = profile.profileProperties().orElse("{}");
 
-        // The game runs inside the runtime directory (per-profile for
-        // modded profiles); shared storage paths (assets, libraries,
-        // natives) keep pointing at the storage root
+        // Игра работает внутри рабочего каталога (для модовых профилей — свой
+        // на профиль); общие пути хранилища (ассеты, библиотеки,
+        // нативы) продолжают указывать на корень хранилища
         String gameDirValue = runtimeDirectory != null
                 ? runtimeDirectory.toString() : gameDir.root().toString();
 
@@ -161,12 +178,12 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
         map.put("${user_type}", userType);
         map.put("${game_assets}", gameDir.virtualAssetsDir(assetIndexName).toString());
         map.put("${library_directory}", gameDir.librariesDir().toString());
-        // Forge/NeoForge build their module path (-p) from
-        // ${library_directory}/…jar${classpath_separator}… — the
-        // separator must resolve to the platform path separator
+        // Forge/NeoForge строят свой module path (-p) из
+        // ${library_directory}/…jar${classpath_separator}… — разделитель
+        // должен разрешаться в платформенный разделитель путей
         map.put("${classpath_separator}", File.pathSeparator);
-        map.put("${launcher_name}", "opencode-launcher");
-        map.put("${launcher_version}", "1.0");
+        map.put("${launcher_name}", LAUNCHER_NAME);
+        map.put("${launcher_version}", LAUNCHER_VERSION);
 
         return map;
     }
@@ -181,14 +198,14 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
 
     private String replacePlaceholdersInString(String arg, Map<String, String> placeholders) {
         String result = arg;
-        for (var entry : placeholders.entrySet()) {
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             result = result.replace(entry.getKey(), entry.getValue());
         }
         return result;
     }
 
     // ------------------------------------------------------------------
-    //  Classpath construction
+    //  Построение classpath
     // ------------------------------------------------------------------
 
     private String buildClasspath(VersionMetadata metadata, GameDirectory gameDir) {
@@ -203,13 +220,12 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
                 }
             });
 
-            var nativeDl = lib.nativeDownload(osName);
-            if (nativeDl.isPresent()) {
-                Path np = resolveLibraryPath(gameDir, nativeDl.get());
+            lib.nativeDownload(osName).ifPresent(nativeDl -> {
+                Path np = resolveLibraryPath(gameDir, nativeDl);
                 if (!paths.contains(np.toString())) {
                     paths.add(np.toString());
                 }
-            }
+            });
         }
 
         Path clientJar = gameDir.clientJar(metadata.id());
@@ -219,21 +235,11 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     }
 
     private Path resolveLibraryPath(GameDirectory gameDir, DownloadInfo dl) {
-        Optional<String> pathOpt = dl.path();
-        if (pathOpt.isPresent()) {
-            return gameDir.library(pathOpt.get());
-        }
-        String url = dl.url();
-        if (url != null && !url.isBlank()) {
-            int idx = url.lastIndexOf('/');
-            String fileName = (idx >= 0) ? url.substring(idx + 1) : url;
-            return gameDir.librariesDir().resolve(fileName);
-        }
-        return gameDir.librariesDir().resolve("unknown.jar");
+        return LibraryPaths.resolve(gameDir, dl);
     }
 
     // ------------------------------------------------------------------
-    //  Legacy argument construction (pre-1.13)
+    //  Построение legacy-аргументов (до 1.13)
     // ------------------------------------------------------------------
 
     private List<String> buildLegacyJvmArgs(VersionMetadata meta, GameDirectory gameDir,
@@ -246,8 +252,8 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     }
 
     /**
-     * Adds Ely.by server override JVM properties so Minecraft uses
-     * Ely.by's auth/session/skin servers instead of Mojang's.
+     * Добавляет переопределения серверов Ely.by через JVM-свойства, чтобы Minecraft
+     * использовал серверы авторизации/сессий/скинов Ely.by вместо Mojang.
      */
     private List<String> addElyByServerArgs(List<String> jvmArgs) {
         List<String> result = new ArrayList<>(jvmArgs);
@@ -271,9 +277,9 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     }
 
     /**
-     * Formats a UUID string to the standard 8-4-4-4-12 dashed format.
-     * Ely.by returns UUIDs without dashes (e.g. "a1b2c3d4e5f6..."),
-     * but Minecraft expects them with dashes.
+     * Форматирует строку UUID в стандартный вид 8-4-4-4-12 с дефисами.
+     * Ely.by возвращает UUID без дефисов (например, "a1b2c3d4e5f6..."),
+     * а Minecraft ожидает их с дефисами.
      */
     static String formatUuid(String uuid) {
         if (uuid == null) return null;
@@ -285,15 +291,16 @@ public class MinecraftLaunchArgumentBuilder implements LaunchArgumentBuilder {
     }
 
     // ------------------------------------------------------------------
-    //  Offline UUID generation
+    //  Генерация офлайн-UUID
     // ------------------------------------------------------------------
 
     /**
-     * Generates an offline UUID from the player name, matching the
-     * algorithm used by Minecraft (bukkit/Spigot OfflinePlayer).
+     * Генерирует офлайн-UUID из ника игрока, повторяя алгоритм
+     * Minecraft (bukkit/Spigot OfflinePlayer).
      */
     static String generateOfflineUuid(String playerName) {
-        byte[] bytes = ("OfflinePlayer:" + playerName).getBytes(StandardCharsets.UTF_8);
+        Objects.requireNonNull(playerName, "playerName");
+        byte[] bytes = (OFFLINE_UUID_PREFIX + playerName).getBytes(StandardCharsets.UTF_8);
         return UUID.nameUUIDFromBytes(bytes).toString();
     }
 }

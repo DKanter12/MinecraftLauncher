@@ -23,23 +23,23 @@ import org.example.launcher.model.VersionMetadata;
 import org.example.launcher.version.ModdedVersionType;
 
 /**
- * {@link ModLoaderInstaller} for loaders that expose a ready-made
- * version profile JSON via a meta API (Fabric and Quilt).
+ * Реализация {@link ModLoaderInstaller} для загрузчиков, отдающих готовый
+ * JSON профиля версии через meta API (Fabric и Quilt).
  * <p>
- * Flow:
+ * Поток:
  * <ol>
- *   <li>fetch the loader profile JSON
+ *   <li>получить JSON профиля загрузчика
  *       ({@code {meta}/versions/loader/{mc}/{loader}/profile/json});</li>
- *   <li>merge it with the vanilla metadata
- *       (see {@link ModLoaderMetadataMerger});</li>
- *   <li>persist the original profile JSON as
- *       {@code versions/{id}/{id}.json} (with an {@code inheritsFrom}
- *       marker) — the launch configuration;</li>
- *   <li>run the standard {@link InstallationService} on the merged
- *       metadata, which downloads the vanilla base (client JAR,
- *       libraries, assets) plus all loader dependencies with SHA-1
- *       verification and skip-if-valid reuse;</li>
- *   <li>verify the result and report it.</li>
+ *   <li>слить его с ванильными метаданными
+ *       (см. {@link ModLoaderMetadataMerger});</li>
+ *   <li>сохранить исходный JSON профиля как
+ *       {@code versions/{id}/{id}.json} (с маркером {@code inheritsFrom})
+ *       — конфигурацию запуска;</li>
+ *   <li>прогнать стандартную {@link InstallationService} на слитых
+ *       метаданных, которая скачает ванильную базу (клиентский JAR,
+ *       библиотеки, ассеты) плюс все зависимости загрузчика с проверкой
+ *       SHA-1 и переиспользованием skip-if-valid;</li>
+ *   <li>проверить результат и отчитаться.</li>
  * </ol>
  */
 public class MetaProfileModLoaderInstaller implements ModLoaderInstaller {
@@ -71,28 +71,28 @@ public class MetaProfileModLoaderInstaller implements ModLoaderInstaller {
                                           ModLoaderVersion loader,
                                           GameDirectory gameDir,
                                           InstallationProgress progress) throws IOException {
-        // 1. Fetch loader profile JSON
+        // 1. Получить JSON профиля загрузчика
         String loaderJson = fetchProfileJson(loader.minecraftVersion(),
                 loader.loaderVersion());
 
-        // 2. Merge with vanilla metadata
+        // 2. Слить с ванильными метаданными
         VersionMetadata merged = merger.merge(vanillaMetadata, loaderJson);
         String versionId = merged.id();
 
-        // 3. Persist launch configuration: original profile JSON +
-        //    inheritsFrom marker, standard versions/{id}/{id}.json layout
+        // 3. Сохранить конфигурацию запуска: исходный JSON профиля +
+        //    маркер inheritsFrom, стандартная раскладка versions/{id}/{id}.json
         Path jsonFile = gameDir.versionMetadata(versionId);
         Files.createDirectories(jsonFile.getParent());
         Files.writeString(jsonFile, withInheritsFrom(loaderJson, vanillaMetadata.id()),
                 StandardCharsets.UTF_8);
 
-        // 4. Install files (vanilla base + loader deps, hash-verified)
+        // 4. Установить файлы (ванильная база + зависимости загрузчика, с проверкой хэша)
         MinecraftVersion moddedVersion = new MinecraftVersion(
                 versionId, ModdedVersionType.INSTANCE, null, null);
         InstallationResult files = installationService.install(
                 moddedVersion, merged, gameDir, progress);
 
-        // 5. Verify
+        // 5. Проверить
         if (files.hasFailures()) {
             throw new IOException("Mod loader installation finished with "
                     + files.failed() + " failed downloads: "
@@ -135,9 +135,9 @@ public class MetaProfileModLoaderInstaller implements ModLoaderInstaller {
     }
 
     /**
-     * Ensures the persisted JSON carries an {@code inheritsFrom} field
-     * pointing at the vanilla version, so the installed version can be
-     * re-resolved at launch time.
+     * Гарантирует, что в сохраняемом JSON есть поле {@code inheritsFrom},
+     * указывающее на ванильную версию, чтобы установленная версия могла
+     * переразрешаться при запуске.
      */
     static String withInheritsFrom(String loaderJson, String vanillaId) {
         JsonObject root = JsonParser.parseString(loaderJson).getAsJsonObject();

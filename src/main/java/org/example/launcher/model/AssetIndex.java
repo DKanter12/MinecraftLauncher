@@ -3,7 +3,7 @@ package org.example.launcher.model;
 import java.util.Optional;
 
 /**
- * Reference to the asset index used by a Minecraft version.
+ * Ссылка на индекс ресурсов, используемый версией Minecraft.
  */
 public final class AssetIndex {
 

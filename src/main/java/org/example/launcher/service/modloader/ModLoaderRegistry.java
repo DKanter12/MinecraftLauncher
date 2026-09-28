@@ -10,20 +10,20 @@ import org.example.launcher.install.FileDownloader;
 import org.example.launcher.install.InstallationService;
 
 /**
- * Central registry and extension point for supported mod loaders.
+ * Центральный реестр и точка расширения для поддерживаемых мод-загрузчиков.
  * <p>
- * Each {@link ModLoaderType} is bound to a {@link ModLoaderVersionProvider}
- * (version discovery) and a {@link ModLoaderInstaller} (fully automatic
- * installation). The UI and services work exclusively through this
- * registry, so adding support for a new loader is a single
- * {@link #register} call — no UI or pipeline changes required.
+ * Каждый {@link ModLoaderType} привязан к {@link ModLoaderVersionProvider}
+ * (поиск версий) и {@link ModLoaderInstaller} (полностью автоматическая
+ * установка). UI и сервисы работают исключительно через этот
+ * реестр, поэтому добавление поддержки нового загрузчика — это один
+ * вызов {@link #register} без изменений UI или пайплайна.
  * <p>
- * {@link #createDefault} wires the four built-in loaders (Fabric,
+ * {@link #createDefault} подключает четыре встроенных загрузчика (Fabric,
  * Forge, NeoForge, Quilt).
  */
 public final class ModLoaderRegistry {
 
-    /** One loader's full wiring: version provider + installer. */
+    /** Полная привязка одного загрузчика: провайдер версий + установщик. */
     public record Entry(ModLoaderType type,
                         ModLoaderVersionProvider provider,
                         ModLoaderInstaller installer) {
@@ -33,7 +33,7 @@ public final class ModLoaderRegistry {
             new EnumMap<>(ModLoaderType.class);
 
     /**
-     * Registers (or replaces) the wiring for a loader type.
+     * Регистрирует (или заменяет) привязку для типа загрузчика.
      */
     public void register(ModLoaderType type,
                          ModLoaderVersionProvider provider,
@@ -41,25 +41,25 @@ public final class ModLoaderRegistry {
         entries.put(type, new Entry(type, provider, installer));
     }
 
-    /** The wiring for a loader type, if registered. */
+    /** Привязка для типа загрузчика, если зарегистрирован. */
     public Optional<Entry> get(ModLoaderType type) {
         return Optional.ofNullable(entries.get(type));
     }
 
-    /** All registered loader types. */
+    /** Все зарегистрированные типы загрузчиков. */
     public List<ModLoaderType> registeredTypes() {
         return new ArrayList<>(entries.keySet());
     }
 
-    /** All registered wirings. */
+    /** Все зарегистрированные привязки. */
     public List<Entry> all() {
         return new ArrayList<>(entries.values());
     }
 
     /**
-     * Creates a registry with the four built-in loaders wired up
-     * (Fabric and Quilt via their meta APIs, Forge and NeoForge via
-     * their official installer JARs).
+     * Создаёт реестр с подключёнными четырьмя встроенными загрузчиками
+     * (Fabric и Quilt через их meta API, Forge и NeoForge через их
+     * официальные installer JAR).
      */
     public static ModLoaderRegistry createDefault(
             java.net.http.HttpClient httpClient,

@@ -13,18 +13,18 @@ import com.google.gson.JsonSyntaxException;
 import org.example.launcher.distribution.api.LauncherServerApi;
 
 /**
- * Sign-in state for the launcher server: the session token is
- * persisted, the password never is.
+ * Состояние входа на сервер лаунчера: токен сессии сохраняется,
+ * пароль — никогда.
  *
- * <p>Sign-in happens once with login and password over the
- * {@link LauncherServerApi}; the server answers with a bearer token
- * (JWT-like) and the account's role. From that moment the launcher
- * stores only the token and uses it for every subsequent request, so
- * the password exists in memory just for the duration of one call.</p>
+ * <p>Вход выполняется один раз по логину и паролю через
+ * {@link LauncherServerApi}; сервер отвечает bearer-токеном
+ * (JWT-подобным) и ролью учётной записи. С этого момента лаунчер
+ * хранит только токен и использует его для каждого последующего
+ * запроса, поэтому пароль находится в памяти лишь на время одного вызова.</p>
  */
 public class ServerAuthService {
 
-    /** File name of the persisted session inside the launcher's storage root. */
+    /** Имя файла сохраняемой сессии внутри корня хранилища лаунчера. */
     public static final String SESSION_FILE_NAME = "server_session.json";
 
     private static final String KEY_ACCOUNT = "accountName";
@@ -48,12 +48,12 @@ public class ServerAuthService {
     }
 
     /**
-     * Signs in and persists the resulting session (token only).
+     * Выполняет вход и сохраняет полученную сессию (только токен).
      *
-     * @param login    account login
-     * @param password account password — used for this call only, never stored
-     * @return the authorized session
-     * @throws IOException when the server is unreachable or rejects the credentials
+     * @param login    логин учётной записи
+     * @param password пароль учётной записи — только для этого вызова, не хранится
+     * @return авторизованная сессия
+     * @throws IOException если сервер недоступен или отклонил учётные данные
      */
     public ServerSession login(String login, String password) throws IOException {
         ServerSession session = api.login(login, password);
@@ -62,11 +62,11 @@ public class ServerAuthService {
     }
 
     /**
-     * Restores a previously persisted session after a launcher
-     * restart, without asking for credentials again.
+     * Восстанавливает ранее сохранённую сессию после перезапуска лаунчера,
+     * без повторного запроса учётных данных.
      *
-     * @return the stored session; empty when none exists or the token
-     *         has expired (an expired token file is removed)
+     * @return сохранённая сессия; пусто, если её нет или токен
+     *         истёк (файл истёкшего токена удаляется)
      */
     public Optional<ServerSession> restoreSession() {
         if (!Files.isRegularFile(sessionFile)) {
@@ -89,10 +89,10 @@ public class ServerAuthService {
     }
 
     /**
-     * Signs out: the stored token is discarded. Nothing else changes —
-     * local builds and instances remain exactly as they are.
+     * Выход: сохранённый токен удаляется. Больше ничего не меняется —
+     * локальные сборки и инстансы остаются как есть.
      *
-     * @throws IOException when the session file cannot be removed
+     * @throws IOException если файл сессии не удаётся удалить
      */
     public void logout() throws IOException {
         deleteSessionFile();
@@ -119,7 +119,7 @@ public class ServerAuthService {
         String roleRaw = stringOrNull(root, KEY_ROLE);
         String token = stringOrNull(root, KEY_TOKEN);
         String serverUrl = stringOrNull(root, KEY_SERVER_URL);
-        if (account == null || token == null || serverUrl == null) {
+        if (account == null || serverUrl == null) {
             return null;
         }
         UserRole role;

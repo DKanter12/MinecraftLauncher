@@ -16,16 +16,16 @@ import org.example.launcher.model.VersionMetadata;
 import org.example.launcher.util.OsDetector;
 
 /**
- * Extracts native libraries from their JAR containers into the
- * version-specific natives directory.
+ * Распаковывает нативные библиотеки из JAR-контейнеров в
+ * каталог нативных файлов конкретной версии.
  * <p>
- * Minecraft requires native libraries (.dll, .so, .dylib) to be
- * present as individual files in the directory pointed to by
- * {@code -Djava.library.path}. The native JARs are downloaded by
- * the installer into the shared libraries directory; this class
- * extracts their contents before launch.
+ * Minecraft требует, чтобы нативные библиотеки (.dll, .so, .dylib) лежали
+ * отдельными файлами в каталоге, указанном через
+ * {@code -Djava.library.path}. Нативные JAR загружаются
+ * установщиком в общий каталог библиотек; этот класс
+ * распаковывает их содержимое перед запуском.
  * <p>
- * META-INF entries are skipped to avoid signature file conflicts.
+ * Записи META-INF пропускаются во избежание конфликтов файлов подписей.
  */
 public final class NativeExtractor {
 
@@ -33,13 +33,13 @@ public final class NativeExtractor {
     }
 
     /**
-     * Extracts all native libraries for the current OS from their
-     * JAR containers into {@code gameDir.nativeDir(versionId)}.
+     * Распаковывает все нативные библиотеки текущей ОС из их
+     * JAR-контейнеров в {@code gameDir.nativeDir(versionId)}.
      *
-     * @param metadata  the version metadata
-     * @param gameDir   the game directory layout
-     * @return the number of files extracted
-     * @throws IOException if extraction fails
+     * @param metadata метаданные версии
+     * @param gameDir  раскладка игрового каталога
+     * @return число извлечённых файлов
+     * @throws IOException при ошибке распаковки
      */
     public static int extractNatives(VersionMetadata metadata, GameDirectory gameDir)
             throws IOException {

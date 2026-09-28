@@ -6,12 +6,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parsed metadata for a single Minecraft version, obtained from the
- * per-version JSON referenced in the Mojang version manifest.
+ * Разобранные метаданные одной версии Minecraft из
+ * JSON версии, на который ссылается манифест версий Mojang.
  * <p>
- * This is the central data structure that downstream components
- * (installer, launcher process builder) consume to install and
- * start the game.
+ * Центральная структура данных, которую последующие компоненты
+ * (установщик, построитель процесса запуска) используют для установки и
+ * запуска игры.
  */
 public final class VersionMetadata {
 
@@ -60,7 +60,7 @@ public final class VersionMetadata {
     }
 
     /**
-     * Main class to launch, e.g.
+     * Главный класс для запуска, например
      * {@code "net.minecraft.client.main.Main"}.
      */
     public Optional<String> mainClass() {
@@ -68,7 +68,7 @@ public final class VersionMetadata {
     }
 
     /**
-     * Asset index name (legacy field, also present in modern versions).
+     * Имя индекса ресурсов (устаревшее поле, присутствует и в современных версиях).
      */
     public Optional<String> assets() {
         return Optional.ofNullable(assets);
@@ -83,21 +83,21 @@ public final class VersionMetadata {
     }
 
     /**
-     * Download descriptor for the client JAR file.
+     * Дескриптор загрузки клиентского JAR-файла.
      */
     public Optional<DownloadInfo> clientDownload() {
         return Optional.ofNullable(clientDownload);
     }
 
     /**
-     * All libraries required by this version.
+     * Все библиотеки, требуемые этой версии.
      */
     public List<Library> libraries() {
         return Collections.unmodifiableList(libraries);
     }
 
     /**
-     * Libraries that contain natives for the given OS name.
+     * Библиотеки, содержащие нативные файлы для заданного имени ОС.
      */
     public List<Library> nativeLibraries(String osName) {
         return libraries.stream()
@@ -106,29 +106,29 @@ public final class VersionMetadata {
     }
 
     /**
-     * Game (client) arguments in structured form (modern versions).
+     * Игровые (клиентские) аргументы в структурированной форме (современные версии).
      */
     public List<String> gameArguments() {
         return Collections.unmodifiableList(gameArguments);
     }
 
     /**
-     * JVM arguments in structured form (modern versions).
+     * Аргументы JVM в структурированной форме (современные версии).
      */
     public List<String> jvmArguments() {
         return Collections.unmodifiableList(jvmArguments);
     }
 
     /**
-     * Legacy space-separated argument string (versions before 1.13).
-     * Present when {@link #gameArguments()} is empty.
+     * Устаревшая строка аргументов через пробел (версии до 1.13).
+     * Присутствует, когда {@link #gameArguments()} пуст.
      */
     public Optional<String> legacyMinecraftArguments() {
         return Optional.ofNullable(legacyMinecraftArguments);
     }
 
     /**
-     * Whether this version uses the modern structured argument format.
+     * Признак использования современного структурированного формата аргументов.
      */
     public boolean hasStructuredArguments() {
         return !gameArguments.isEmpty() || !jvmArguments.isEmpty();

@@ -1,28 +1,28 @@
 package org.example.launcher.version;
 
 /**
- * Represents a type of Minecraft version (e.g. Release, Snapshot).
+ * Представляет тип версии Minecraft (например, релиз, снапшот).
  * <p>
- * Implementations may be enum constants, records, or any other class,
- * which makes the system extensible — new version types can be added
- * without modifying existing code. Register custom implementations
- * via {@link VersionTypeRegistry#register(VersionType)}.
+ * Реализации могут быть константами перечисления, записями или любым другим классом,
+ * что делает систему расширяемой — новые типы версий можно добавлять
+ * без изменения существующего кода. Пользовательские реализации регистрируются
+ * через {@link VersionTypeRegistry#register(VersionType)}.
  */
 public interface VersionType {
 
     /**
-     * Machine-readable identifier as it appears in the Mojang manifest
-     * (e.g. {@code "release"}, {@code "snapshot"}).
+     * Машиночитаемый идентификатор из манифеста Mojang
+     * (например, {@code "release"}, {@code "snapshot"}).
      */
     String id();
 
     /**
-     * Human-readable name for display in the UI.
+     * Человекочитаемое имя для показа в интерфейсе.
      */
     String displayName();
 
     /**
-     * Whether versions of this type are considered stable / production-ready.
+     * Признак того, что версии этого типа считаются стабильными / готовыми к использованию.
      */
     boolean isStable();
 }

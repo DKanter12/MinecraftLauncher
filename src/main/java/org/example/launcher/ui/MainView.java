@@ -1,15 +1,24 @@
 package org.example.launcher.ui;
 
-import java.time.format.DateTimeFormatter;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -23,6 +32,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
@@ -39,10 +49,10 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import org.example.launcher.distribution.RemoteBuildService;
+import org.example.launcher.distribution.DistributionSources;
 import org.example.launcher.distribution.ServerAuthService;
 import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.distribution.api.AdminLauncherServerApi;
+import org.example.launcher.distribution.api.LauncherServerApi;
 import org.example.launcher.distribution.api.OfflineLauncherServerApi;
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.install.InstallationResult;
@@ -57,7 +67,7 @@ import org.example.launcher.model.ModLoaderVersion;
 import org.example.launcher.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.model.VersionMetadata;
-import org.example.launcher.service.BuildService;
+import org.example.launcher.net.UrlFetcher;
 import org.example.launcher.service.DefaultJavaResolutionService;
 import org.example.launcher.service.ElyAuthService;
 import org.example.launcher.service.JavaResolutionService;
@@ -73,33 +83,42 @@ import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
+import org.example.launcher.update.AppVersion;
+import org.example.launcher.update.LauncherUpdate;
+import org.example.launcher.update.UpdateService;
+import org.example.launcher.i18n.Lang;
+import org.example.launcher.version.StandardVersionType;
+import org.example.launcher.version.VersionType;
+import org.example.launcher.version.VersionTypeRegistry;
 
 /**
- * Builds and manages the main launcher window.
+ * Строит главное окно лаунчера и управляет им.
  * <p>
- * Layout (BorderPane):
+ * Раскладка (BorderPane):
  * <pre>
  * +--------+--------------------------------------------------+
- * | Nav    | Top bar: view title + search + account pill      |
- * | rail   +--------------------------------------------------+
- * | Inst.  | Views (center stack):                            |
- * | Prof.  |  My Instances — filter chips + instance cards    |
- * | Sett.  |  Profiles — accounts management                  |
- * |        |  Settings — folders, Java, server, about         |
+ * | Навиг. | Верхняя панель: заголовок + поиск + пилюля ак-та |
+ * | панель +--------------------------------------------------+
+ * | Инст.  | Виды (центральный стек):                          |
+ * | Проф.  |  Мои инстансы — чипы фильтров + карточки          |
+ * | Настр. |  Профили — управление аккаунтами                  |
+ * |        |  Настройки — папки, Java, сервер, о программе     |
  * |        +--------------------------------------------------+
- * |        | Footer: status + launcher info                   |
+ * |        | Подвал: статус + информация о лаунчере            |
  * +--------+--------------------------------------------------+
  * </pre>
  * <p>
- * Everything is an instance (vanilla or modded), each with its own
- * game directory. New instances are created via a single simple
- * dialog (name → loader chips → version list → loader version
- * list); the Mojang manifest is only fetched in the background
- * to feed that dialog.
+ * Всё — это инстанс (ванильный или модовый), у каждого свой
+ * игровой каталог. Новые инстансы создаются через один простой
+ * диалог (имя → чипы загрузчиков → список версий → список версий
+ * загрузчика); манифест Mojang подгружается лишь в фоне,
+ * чтобы питать этот диалог.
  */
 public class MainView {
 
-    private static final String APP_VERSION = "v1.0";
+    private static final Logger LOG = Logger.getLogger(MainView.class.getName());
+
+    private static final String APP_VERSION = AppVersion.BUILT_IN;
 
     private final VersionService versionService;
     private final VersionMetadataService metadataService;
@@ -119,7 +138,7 @@ public class MainView {
     private Label statusLabel;
     private boolean versionsLoadFailed = false;
 
-    // Navigation rail + views
+    // Навигационная панель + виды
     private enum View {
         INSTANCES, PROFILES, SETTINGS
     }
@@ -130,7 +149,7 @@ public class MainView {
     private Label viewTitleLabel;
     private TextField instanceSearchField;
 
-    // Instances view (cards grid)
+    // Вид инстансов (сетка карточек)
     private FlowPane instanceCards;
     private ScrollPane instancesScroll;
     private HBox instanceFilterChips;
@@ -139,49 +158,53 @@ public class MainView {
     private String instanceSearchText = "";
     private ModLoaderType instanceLoaderFilter;
 
-    // Other views
+    // Остальные виды
     private VBox instancesView;
     private VBox profilesView;
     private VBox profilesBox;
     private VBox settingsView;
+    private ComboBox<Lang.Language> languageCombo;
     private TextField javaPathField;
     private Label serverSessionLabel;
     private Label footerVersionLabel;
+    private Label currentVersionLabel;
+    private Label updateStatusLabel;
+    private TextField buildsGitField;
+    private Label buildsStatusLabel;
+    private ComboBox<DistributionSources.BuildsSource> buildsModeCombo;
+    private TextField yandexLinkField;
+    private TextField buildsTokenField;
+    private VBox buildsGitBox;
+    private VBox buildsYandexBox;
 
-    // Single-launch gate: a launch attempt blocks every Play button
+    // Защита от повторного запуска: попытка запуска блокирует все кнопки «Играть»
     private boolean versionPlayInFlight = false;
-    /** Instance currently going through launch, if any (single launch). */
+    /** Инстанс, проходящий запуск, если есть (одиночный запуск). */
     private String launchingProfileId;
-    private String launchingStatusText = "Launching...";
+    private String launchingStatusText = Lang.tr("launch.launching");
 
-    // Instances (cards grid)
+    // Инстансы (сетка карточек)
     private List<ModdedProfile> moddedProfiles = List.of();
 
-    // Builds (mods/configs sets) of the selected instance
-    private final BuildService buildService = new BuildService();
-
-    // Launcher server: admin-distributed builds. Without a configured
-    // server the offline API keeps the launcher fully local.
-    private final AdminLauncherServerApi serverApi = new OfflineLauncherServerApi();
-    private final ServerAuthService serverAuthService = new ServerAuthService(
-            serverApi, GameDirectory.defaultDirectory().root()
-                    .resolve(ServerAuthService.SESSION_FILE_NAME));
-    private final RemoteBuildService remoteBuildService = new RemoteBuildService(serverApi);
+    // Бэкенд распространения сборок для входа на сервер. Локальный
+    // UI сборок удалён; библиотека distribution под ним остаётся для
+    // переиспользования (см. org.example.launcher.distribution).
+    private ServerAuthService serverAuthService;
     private ServerSession serverSession;
     private Button serverButton;
 
-    // Instance launch state
+    // Состояние запуска инстанса
     private boolean javaDownloadAttempted = false;
 
-    // Account
+    // Аккаунт
     private ComboBox<GameProfile> accountCombo;
     private Button addAccountButton;
     private ImageView avatarView;
     private GameProfile selectedProfile;
     private boolean suppressSelectionListener = false;
-    private java.util.Timer elyRefreshTimer;
+    private Timer elyRefreshTimer;
 
-    /** Versions of the Mojang manifest — feeds the creation dialog. */
+    /** Версии манифеста Mojang — питают диалог создания. */
     private List<MinecraftVersion> manifestVersions = List.of();
 
     public MainView(VersionService versionService,
@@ -211,6 +234,8 @@ public class MainView {
         this.modLoaderRegistry = modLoaderRegistry;
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
+        serverSession = null;
+        applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
         buildView();
     }
@@ -219,8 +244,52 @@ public class MainView {
         return root;
     }
 
+    /**
+     * (Пере)привязывает бэкенд сборок из настроек: git-бэкенд, когда
+     * задана ссылка на репозиторий сборок, иначе локальный режим.
+     * Смена бэкенда сбрасывает прошлую серверную сессию — её
+     * токен принадлежит другому бэкенду.
+     */
+    private void applyDistributionSettings() {
+        String mode = "YANDEX";
+        String gitUrl = null;
+        String yandexLink = DistributionSources.YANDEX_BUILDS_LINK_DEFAULT;
+        String token = "";
+        try {
+            mode = preferences.getBuildsSourceMode().orElse("YANDEX");
+            gitUrl = preferences.getBuildsGitUrl().orElse(null);
+            String savedLink = preferences.getYandexDiskLink().orElse(null);
+            if (savedLink != null && !savedLink.isBlank()) {
+                yandexLink = savedLink;
+            }
+            token = preferences.getBuildsToken().orElse("");
+        } catch (IOException ignored) {
+            // оставляем умолчания: yandex со встроенной ссылкой
+        }
+        LauncherServerApi backend;
+        if ("GITHUB".equalsIgnoreCase(mode)) {
+            backend = DistributionSources.createBuildsBackend(gitUrl);
+        } else if ("LOCAL".equalsIgnoreCase(mode)) {
+            backend = new OfflineLauncherServerApi();
+        } else {
+            backend = DistributionSources.createYandexBackend(token, yandexLink);
+        }
+        serverAuthService = new ServerAuthService(backend,
+                GameDirectory.defaultDirectory().root()
+                        .resolve(ServerAuthService.SESSION_FILE_NAME));
+        if (serverSession != null) {
+            try {
+                serverAuthService.logout();
+            } catch (IOException ignored) {
+                // файл токена уже удалён — нормально
+            }
+            serverSession = null;
+            updateServerButtonText();
+        }
+    }
+
     // ------------------------------------------------------------------
-    //  UI construction
+    //  Построение UI
     // ------------------------------------------------------------------
 
     private void buildView() {
@@ -240,14 +309,14 @@ public class MainView {
         showView(View.INSTANCES);
     }
 
-    // --- Top bar ---
+    // --- Верхняя панель ---
 
     private HBox buildTopBar() {
-        viewTitleLabel = new Label("My Instances");
+        viewTitleLabel = new Label(Lang.tr("nav.instances"));
         viewTitleLabel.getStyleClass().add("view-title");
 
         instanceSearchField = new TextField();
-        instanceSearchField.setPromptText("Search instances...");
+        instanceSearchField.setPromptText(Lang.tr("search.instances"));
         instanceSearchField.getStyleClass().add("search-field");
         instanceSearchField.setPrefWidth(260);
         instanceSearchField.textProperty().addListener((obs, old, val) -> {
@@ -258,7 +327,7 @@ public class MainView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Account widget (quick switcher; full management lives in Profiles)
+        // Виджет аккаунта (быстрый переключатель; полное управление — в Профилях)
         avatarView = new ImageView();
         avatarView.setFitWidth(28);
         avatarView.setFitHeight(28);
@@ -267,12 +336,13 @@ public class MainView {
 
         accountCombo = new ComboBox<>();
         accountCombo.setPrefWidth(180);
-        accountCombo.setPromptText("No account");
+        accountCombo.setPromptText(Lang.tr("account.none"));
         accountCombo.setConverter(new javafx.util.StringConverter<>() {
             @Override
             public String toString(GameProfile profile) {
                 if (profile == null) return "";
-                String type = profile.isElyBy() ? " [Ely.by]" : " [Offline]";
+                String type = profile.isElyBy() ? Lang.tr("account.type.ely")
+                        : Lang.tr("account.type.offline");
                 return profile.name() + type;
             }
 
@@ -290,8 +360,8 @@ public class MainView {
                         updateAvatar(val);
                     }
                 });
-        accountCombo.setTooltip(new Tooltip("Select account • Right-click an entry to delete"));
-        // Dropdown rows: right-click shows "Use / Delete" like most launchers
+        accountCombo.setTooltip(new Tooltip(Lang.tr("account.tip")));
+        // Строки списка: правый клик показывает «Использовать / Удалить», как в большинстве лаунчеров
         accountCombo.setCellFactory(list -> {
             ListCell<GameProfile> cell = new ListCell<>() {
                 private ContextMenu menu;
@@ -306,15 +376,17 @@ public class MainView {
                         setOnContextMenuRequested(null);
                         menu = null;
                     } else {
-                        String type = item.isElyBy() ? "Ely.by" : "Offline";
+                        String type = item.isElyBy() ? "Ely.by"
+                                : Lang.tr("account.offline");
                         setText(item.name() + "  [" + type + "]");
                         ContextMenu m = new ContextMenu();
-                        MenuItem useItem = new MenuItem("Use");
+                        MenuItem useItem = new MenuItem(Lang.tr("account.menu.use"));
                         useItem.setOnAction(e -> {
                             accountCombo.getSelectionModel().select(item);
                             onUseAccount(item);
                         });
-                        MenuItem deleteItem = new MenuItem("Delete account");
+                        MenuItem deleteItem = new MenuItem(
+                                Lang.tr("account.menu.delete"));
                         deleteItem.getStyleClass().add("menu-item-danger");
                         deleteItem.setOnAction(e -> onDeleteAccount(item));
                         m.getItems().addAll(useItem, deleteItem);
@@ -329,7 +401,7 @@ public class MainView {
             };
             return cell;
         });
-        // Selected value (button cell): right-click to delete without opening the dropdown
+        // Выбранное значение (кнопка-ячейка): правый клик удаляет без открытия списка
         accountCombo.setButtonCell(new ListCell<>() {
             private ContextMenu menu;
 
@@ -342,10 +414,12 @@ public class MainView {
                     setOnContextMenuRequested(null);
                     menu = null;
                 } else {
-                    String type = item.isElyBy() ? "Ely.by" : "Offline";
+                    String type = item.isElyBy() ? "Ely.by"
+                            : Lang.tr("account.offline");
                     setText(item.name() + "  [" + type + "]");
                     ContextMenu m = new ContextMenu();
-                    MenuItem deleteItem = new MenuItem("Delete \"" + item.name() + "\"");
+                    MenuItem deleteItem = new MenuItem(
+                            Lang.tr("account.menu.delete.name", item.name()));
                     deleteItem.getStyleClass().add("menu-item-danger");
                     deleteItem.setOnAction(e -> onDeleteAccount(item));
                     m.getItems().add(deleteItem);
@@ -359,13 +433,13 @@ public class MainView {
             }
         });
 
-        addAccountButton = new Button("+ Add Account");
+        addAccountButton = new Button(Lang.tr("account.add"));
         addAccountButton.getStyleClass().add("quick-select-button");
         addAccountButton.setStyle("-fx-font-size: 12px;");
         addAccountButton.setOnAction(e -> onAddAccount());
-        addAccountButton.setTooltip(new Tooltip("Create offline or sign in with Ely.by — choose inside"));
+        addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
 
-        serverButton = new Button("Server");
+        serverButton = new Button(Lang.tr("server.button"));
         serverButton.getStyleClass().add("browse-java-button");
         serverButton.setStyle("-fx-font-size: 11px;");
         serverButton.setOnAction(e -> onServerLogin());
@@ -384,16 +458,16 @@ public class MainView {
         return topBar;
     }
 
-    // --- Navigation rail ---
+    // --- Навигационная панель ---
 
     private VBox buildNavRail() {
         VBox rail = new VBox(6);
         rail.setPrefWidth(190);
         rail.setPadding(new Insets(16, 10, 16, 10));
         rail.getStyleClass().add("nav-rail");
-        addNavButton(rail, "My Instances", View.INSTANCES);
-        addNavButton(rail, "Profiles", View.PROFILES);
-        addNavButton(rail, "Settings", View.SETTINGS);
+        addNavButton(rail, Lang.tr("nav.instances"), View.INSTANCES);
+        addNavButton(rail, Lang.tr("nav.profiles"), View.PROFILES);
+        addNavButton(rail, Lang.tr("nav.settings"), View.SETTINGS);
         return rail;
     }
 
@@ -407,14 +481,14 @@ public class MainView {
         rail.getChildren().add(button);
     }
 
-    // --- Footer (status left, launcher info right) ---
+    // --- Подвал (статус слева, информация о лаунчере справа) ---
 
     private HBox buildFooter() {
-        statusLabel = new Label("Loading versions...");
+        statusLabel = new Label(Lang.tr("status.loading"));
         statusLabel.getStyleClass().add("status-label");
         HBox.setHgrow(statusLabel, Priority.ALWAYS);
 
-        footerVersionLabel = new Label("Launcher " + APP_VERSION);
+        footerVersionLabel = new Label(Lang.tr("footer.version", APP_VERSION));
         footerVersionLabel.getStyleClass().add("footer-version");
 
         HBox footer = new HBox(12, statusLabel, footerVersionLabel);
@@ -424,21 +498,21 @@ public class MainView {
         return footer;
     }
 
-    // --- Instances view: filter chips + cards grid ---
+    // --- Вид инстансов: чипы фильтров + сетка карточек ---
 
     private VBox buildInstancesView() {
         instanceFilterChips = new HBox(8);
         instanceFilterChips.getStyleClass().add("filter-row");
         instanceFilterGroup = new ToggleGroup();
-        addInstanceFilterChip("All", null);
+        addInstanceFilterChip(Lang.tr("filter.all"), null);
         for (ModLoaderType loader : ModLoaderType.values()) {
             addInstanceFilterChip(loader.displayName(), loader);
         }
         Region filterSpacer = new Region();
         HBox.setHgrow(filterSpacer, Priority.ALWAYS);
-        Button createBuildButton = new Button("+ Create Build");
+        Button createBuildButton = new Button(Lang.tr("instances.create"));
         createBuildButton.getStyleClass().add("quick-select-button");
-        createBuildButton.setTooltip(new Tooltip("Create a new instance — same as Add New Instance tile"));
+        createBuildButton.setTooltip(new Tooltip(Lang.tr("instances.create.tip")));
         createBuildButton.setOnAction(e -> onNewInstance());
         instanceFilterChips.getChildren().addAll(filterSpacer,
                 createBuildButton);
@@ -461,15 +535,16 @@ public class MainView {
         return view;
     }
 
-    private void addInstanceFilterChip(String text, ModLoaderType loader) {
+    private ToggleButton makeInstanceFilterChip(String text,
+                                                  ModLoaderType loader) {
         ToggleButton chip = new ToggleButton(text);
         chip.getStyleClass().add("filter-button");
         chip.setToggleGroup(instanceFilterGroup);
         chip.setUserData(loader);
         chip.setSelected(loader == null);
         chip.setOnAction(e -> {
-            // A single-choice filter never goes empty: clicking the
-            // active chip again keeps it
+            // Фильтр с одиночным выбором не бывает пустым: повторный клик
+            // по активному чипу сохраняет его
             if (!chip.isSelected()) {
                 chip.setSelected(true);
                 return;
@@ -477,10 +552,31 @@ public class MainView {
             instanceLoaderFilter = (ModLoaderType) chip.getUserData();
             refreshInstanceCards();
         });
-        instanceFilterChips.getChildren().add(chip);
+        return chip;
     }
 
-    /** Switches the center view and updates the title, search and nav. */
+    private void addInstanceFilterChip(String text, ModLoaderType loader) {
+        instanceFilterChips.getChildren().add(
+                makeInstanceFilterChip(text, loader));
+    }
+
+    /** Перестраивает чипы фильтров на текущем языке. */
+    private void rebuildInstanceFilterChips() {
+        ModLoaderType keep = instanceLoaderFilter;
+        instanceFilterGroup = new ToggleGroup();
+        List<ToggleButton> chips = new ArrayList<>();
+        chips.add(makeInstanceFilterChip(Lang.tr("filter.all"), null));
+        for (ModLoaderType loader : ModLoaderType.values()) {
+            chips.add(makeInstanceFilterChip(loader.displayName(), loader));
+        }
+        instanceFilterChips.getChildren()
+                .removeIf(node -> node instanceof ToggleButton);
+        instanceFilterChips.getChildren().addAll(0, chips);
+        instanceLoaderFilter = keep;
+        syncInstanceFilterChips();
+    }
+
+    /** Переключает центральный вид и обновляет заголовок, поиск и навигацию. */
     private void showView(View view) {
         currentView = view;
         instancesView.setVisible(view == View.INSTANCES);
@@ -490,9 +586,9 @@ public class MainView {
         settingsView.setVisible(view == View.SETTINGS);
         settingsView.setManaged(view == View.SETTINGS);
         viewTitleLabel.setText(switch (view) {
-            case INSTANCES -> "My Instances";
-            case PROFILES -> "Profiles";
-            case SETTINGS -> "Settings";
+            case INSTANCES -> Lang.tr("nav.instances");
+            case PROFILES -> Lang.tr("nav.profiles");
+            case SETTINGS -> Lang.tr("nav.settings");
         });
         instanceSearchField.setVisible(view == View.INSTANCES);
         instanceSearchField.setManaged(view == View.INSTANCES);
@@ -518,7 +614,7 @@ public class MainView {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM yyyy");
 
-    /** The selected instance (cards grid), or null. */
+    /** Выбранный инстанс (сетка карточек) или null. */
     private ModdedProfile selectedInstance() {
         if (selectedInstanceId == null) return null;
         for (ModdedProfile p : moddedProfiles) {
@@ -528,14 +624,10 @@ public class MainView {
     }
 
     /**
-     * Selects a card in place (no rebuild, so double-click to play
-     * keeps working); full rebuilds happen after data changes.
-     */
-    /**
-     * Jumps to a freshly created instance: reloads the list, moves
-     * the loader filter to its family (so the card is visible even
-     * when another family was filtered), clears the search, opens
-     * the Instances view and expands the card.
+     * Переходит к свежесозданному инстансу: перезагружает список, двигает
+     * фильтр загрузчиков к его семейству (чтобы карточка была видна, даже
+     * если было отфильтровано другое семейство), очищает поиск, открывает
+     * вид инстансов и раскрывает карточку.
      */
     private void jumpToInstance(ModdedProfile profile) {
         instanceLoaderFilter = profile.loaderType();
@@ -547,7 +639,7 @@ public class MainView {
         refreshModdedProfiles(profile.id());
     }
 
-    /** Reflects {@link #instanceLoaderFilter} in the filter chips. */
+    /** Отражает {@link #instanceLoaderFilter} в чипах фильтров. */
     private void syncInstanceFilterChips() {
         if (instanceFilterChips == null) return;
         for (var node : instanceFilterChips.getChildren()) {
@@ -560,6 +652,10 @@ public class MainView {
         }
     }
 
+    /**
+     * Выбирает карточку на месте (без перестройки, чтобы дабл-клик для игры
+     * продолжал работать); полные перестройки — после изменения данных.
+     */
     private void selectInstance(String id) {
         if (id != null && id.equals(selectedInstanceId)) return;
         selectedInstanceId = id;
@@ -584,8 +680,8 @@ public class MainView {
     }
 
     /**
-     * Re-enables every Play button after a launch attempt reaches a
-     * terminal state (launched, failed, repaired or game exited).
+     * Вновь включает все кнопки «Играть» после выхода попытки запуска в
+     * терминальное состояние (запущено, ошибка, починка или выход из игры).
      */
     private void refreshLaunchButtons() {
         versionPlayInFlight = false;
@@ -594,8 +690,8 @@ public class MainView {
     }
 
     /**
-     * Shows the launch stage on the instance card (all calls happen
-     * on the FX thread).
+     * Показывает стадию запуска на карточке инстанса (все вызовы —
+     * в потоке FX).
      */
     private void setLaunchStatus(String profileId, String text) {
         launchingProfileId = profileId;
@@ -603,7 +699,7 @@ public class MainView {
         refreshInstanceCards();
     }
 
-    /** Rebuilds the cards grid from the current filter + search. */
+    /** Перестраивает сетку карточек по текущим фильтру + поиску. */
     private void refreshInstanceCards() {
         if (instanceCards == null) return;
         double scroll = instancesScroll != null
@@ -671,7 +767,8 @@ public class MainView {
         HBox.setHgrow(titles, Priority.ALWAYS);
         card.getChildren().add(top);
 
-        Button play = new Button(launching ? launchingStatusText : "Play");
+        Button play = new Button(
+                launching ? launchingStatusText : Lang.tr("button.play"));
         play.getStyleClass().add("card-play");
         play.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(play, Priority.ALWAYS);
@@ -681,11 +778,11 @@ public class MainView {
             startInstanceLaunch(profile);
         });
 
-        Button folder = new Button("Folder");
+        Button folder = new Button(Lang.tr("button.folder"));
         folder.getStyleClass().add("card-ghost-button");
         folder.setOnAction(e -> onOpenProfileFolder(profile));
 
-        Button edit = new Button("Edit");
+        Button edit = new Button(Lang.tr("button.edit"));
         edit.getStyleClass().add("card-ghost-button");
         edit.setOnAction(e -> onEditProfile(profile));
 
@@ -712,41 +809,27 @@ public class MainView {
         return card;
     }
 
-    /** Expanded block of the selected card: facts + builds + delete. */
+    /** Раскрытый блок выбранной карточки: факты + сборки + удаление. */
     private VBox buildInstanceDetails(ModdedProfile profile) {
         VBox details = new VBox(3);
         details.getStyleClass().add("instance-card-details");
-        details.getChildren().add(detailLine("MC " + profile.minecraftVersion()
-                + (profile.isVanilla() ? " (vanilla)"
-                        : "  ·  " + profile.loaderType().displayName()
-                                + " " + profile.loaderVersion())));
+        details.getChildren().add(detailLine(profile.isVanilla()
+                ? Lang.tr("card.version.vanilla", profile.minecraftVersion())
+                : "MC " + profile.minecraftVersion() + "  ·  "
+                        + profile.loaderType().displayName() + " "
+                        + profile.loaderVersion()));
         Path dir = moddedProfileService.resolveGameDir(profile);
-        details.getChildren().add(detailLine("Game Dir:  .../"
-                + shortGameDir(dir)));
-        details.getChildren().add(detailLine("Memory:  "
-                + ModdedProfileService.formatMemory(profile.memoryMb())));
-        details.getChildren().add(detailLine("JVM Args:  "
-                + (profile.extraJvmArgs().isEmpty()
-                        ? "None" : String.join(" ", profile.extraJvmArgs()))));
-        details.getChildren().add(detailLine("Created:  "
-                + profile.createdTime().map(MainView::formatDate).orElse("—")));
+        details.getChildren().add(detailLine(Lang.tr("card.gamedir",
+                shortGameDir(dir))));
+        details.getChildren().add(detailLine(Lang.tr("card.memory",
+                ModdedProfileService.formatMemory(profile.memoryMb()))));
+        details.getChildren().add(detailLine(Lang.tr("card.jvm",
+                profile.extraJvmArgs().isEmpty() ? Lang.tr("card.none")
+                        : String.join(" ", profile.extraJvmArgs()))));
+        details.getChildren().add(detailLine(Lang.tr("card.created",
+                profile.createdTime().map(MainView::formatDate).orElse("—"))));
 
-        if (!profile.isVanilla()) {
-            Button saveBuild = new Button("Save Build");
-            saveBuild.getStyleClass().add("card-small-button");
-            saveBuild.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(saveBuild, Priority.ALWAYS);
-            saveBuild.setOnAction(e -> onSaveBuild(profile));
-            Button serverBuilds = new Button("Server Builds");
-            serverBuilds.getStyleClass().add("card-small-button");
-            serverBuilds.setMaxWidth(Double.MAX_VALUE);
-            HBox.setHgrow(serverBuilds, Priority.ALWAYS);
-            serverBuilds.setOnAction(e -> onServerBuilds(profile));
-            HBox buildsRow = new HBox(6, saveBuild, serverBuilds);
-            details.getChildren().add(buildsRow);
-        }
-
-        Button delete = new Button("Delete Instance");
+        Button delete = new Button(Lang.tr("button.delete.instance"));
         delete.getStyleClass().add("card-danger-button");
         delete.setMaxWidth(Double.MAX_VALUE);
         delete.setOnAction(e -> onDeleteProfile(profile));
@@ -764,7 +847,7 @@ public class MainView {
     private VBox buildAddInstanceCard() {
         Label plus = new Label("+");
         plus.getStyleClass().add("add-instance-plus");
-        Label text = new Label("Add New Instance");
+        Label text = new Label(Lang.tr("instances.add"));
         text.getStyleClass().add("add-instance-text");
         VBox card = new VBox(6, plus, text);
         card.setAlignment(Pos.CENTER);
@@ -776,7 +859,7 @@ public class MainView {
         return card;
     }
 
-    /** Accent style per loader family, like the reference mockup. */
+    /** Акцентный стиль по семейству загрузчиков, как в эталонном макете. */
     private static String accentClass(ModLoaderType type) {
         return switch (type) {
             case VANILLA -> "accent-vanilla";
@@ -788,8 +871,8 @@ public class MainView {
     }
 
     /**
-     * Icon letters: the first letter, two letters where it collides
-     * (Fabric/Forge share "F").
+     * Буквы иконок: первая буква, две там, где коллизия
+     * (у Fabric/Forge общая «F»).
      */
     private static String iconText(ModLoaderType type) {
         return switch (type) {
@@ -806,22 +889,25 @@ public class MainView {
             return "MC " + profile.minecraftVersion();
         }
         int mods = modsCount(profile);
-        return profile.loaderType().displayName() + " "
-                + profile.minecraftVersion()
-                + (mods < 0 ? "" : "  (" + mods + " Mods)");
+        if (mods < 0) {
+            return profile.loaderType().displayName() + " "
+                    + profile.minecraftVersion();
+        }
+        return Lang.tr("card.mods", profile.loaderType().displayName(),
+                profile.minecraftVersion(), mods);
     }
 
     private String cardPlayedLine(ModdedProfile profile) {
         if (profile.lastPlayedTime().isPresent()) {
-            return "Last played: "
-                    + relativeTime(profile.lastPlayedTime().get());
+            return Lang.tr("card.played",
+                    relativeTime(profile.lastPlayedTime().get()));
         }
         return profile.createdTime()
-                .map(t -> "Created: " + relativeTime(t))
-                .orElse("Never played");
+                .map(t -> Lang.tr("card.created", relativeTime(t)))
+                .orElseGet(() -> Lang.tr("card.never"));
     }
 
-    /** Counts mod jars; negative when unreadable. */
+    /** Считает jar-моды; отрицательное — когда не читается. */
     private int modsCount(ModdedProfile profile) {
         try {
             Path mods = moddedProfileService.resolveGameDir(profile)
@@ -855,20 +941,20 @@ public class MainView {
             age = Duration.ZERO;
         }
         long minutes = age.toMinutes();
-        if (minutes < 1) return "just now";
+        if (minutes < 1) return Lang.tr("time.now");
         if (minutes < 60) {
-            return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
+            return Lang.tr("time.minutes", minutes);
         }
         long hours = age.toHours();
         if (hours < 24) {
-            return hours + (hours == 1 ? " hour ago" : " hours ago");
+            return Lang.tr("time.hours", hours);
         }
         long days = age.toDays();
-        if (days == 1) return "Yesterday";
-        if (days < 7) return days + " days ago";
+        if (days == 1) return Lang.tr("time.yesterday");
+        if (days < 7) return Lang.tr("time.days", days);
         long weeks = days / 7;
         if (weeks < 5) {
-            return weeks + (weeks == 1 ? " week ago" : " weeks ago");
+            return Lang.tr("time.weeks", weeks);
         }
         return formatDate(time);
     }
@@ -878,26 +964,22 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Profiles view: accounts management
-    // ------------------------------------------------------------------
-
-    // ------------------------------------------------------------------
-    //  Profiles view: accounts management
+    //  Вид профилей: управление аккаунтами
     // ------------------------------------------------------------------
 
     private VBox buildProfilesView() {
-        Button addAccount = new Button("+ Add Account");
+        Button addAccount = new Button(Lang.tr("account.add"));
         addAccount.getStyleClass().add("quick-select-button");
-        addAccount.setTooltip(new Tooltip("Offline or Ely.by — choose inside"));
+        addAccount.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
         addAccount.setOnAction(e -> onAddAccount());
-        Button server = new Button("Server");
+        Button server = new Button(Lang.tr("server.button"));
         server.getStyleClass().add("quick-select-button");
-        server.setTooltip(new Tooltip("Sign in to the builds server (publish / download)"));
+        server.setTooltip(new Tooltip(Lang.tr("profiles.server.tip")));
         server.setOnAction(e -> {
             onServerLogin();
             refreshProfilesView();
         });
-        Label manageHint = new Label("Right-click an account to delete • Active account launches the game");
+        Label manageHint = new Label(Lang.tr("profiles.hint.top"));
         manageHint.getStyleClass().add("quick-select-label");
         HBox buttons = new HBox(8, addAccount, server, manageHint);
         buttons.setAlignment(Pos.CENTER_LEFT);
@@ -905,9 +987,7 @@ public class MainView {
         profilesBox = new VBox(10);
         VBox.setVgrow(profilesBox, Priority.ALWAYS);
 
-        Label hint = new Label("The active account launches the game. "
-                + "Offline needs no password; Ely.by brings skins and capes. "
-                + "Delete an account with right-click in the top bar or with Delete here.");
+        Label hint = new Label(Lang.tr("profiles.hint"));
         hint.getStyleClass().add("quick-select-label");
         hint.setWrapText(true);
 
@@ -924,15 +1004,17 @@ public class MainView {
         try {
             accounts = profileService.loadProfiles();
         } catch (IOException e) {
-            statusLabel.setText("Failed to load accounts: " + e.getMessage());
+            statusLabel.setText(Lang.tr("profiles.load.failed",
+                    e.getMessage()));
             return;
         }
 
         String serverText = serverSession == null
-                ? "Launcher server: not signed in (local mode)"
-                : "Launcher server: " + serverSession.accountName()
-                        + (serverSession.isAdmin() ? " (administrator)"
-                                : " (user)");
+                ? Lang.tr("profiles.server.offline")
+                : Lang.tr("profiles.server.on", serverSession.accountName()
+                        + (serverSession.isAdmin()
+                                ? " (" + Lang.tr("server.role.admin") + ")"
+                                : " (" + Lang.tr("server.role.user") + ")"));
         Label serverLabel = new Label(serverText);
         serverLabel.getStyleClass().add("account-row-sub");
         HBox serverRow = new HBox(10, serverLabel);
@@ -949,9 +1031,10 @@ public class MainView {
             tile.getStyleClass().addAll("account-tile", account.isElyBy()
                     ? "account-tile-ely" : "account-tile-offline");
             Label name = new Label(account.name()
-                    + (active ? "  (active)" : ""));
+                    + (active ? Lang.tr("profiles.active") : ""));
             name.getStyleClass().add("account-row-name");
-            String sub = account.isElyBy() ? "Ely.by" : "Offline";
+            String sub = account.isElyBy() ? "Ely.by"
+                    : Lang.tr("account.offline");
             if (account.uuid().isPresent()) {
                 String uuid = account.uuid().get();
                 sub += "  ·  " + uuid.substring(0, Math.min(8, uuid.length()));
@@ -960,11 +1043,13 @@ public class MainView {
             subLabel.getStyleClass().add("account-row-sub");
             VBox texts = new VBox(2, name, subLabel);
             HBox.setHgrow(texts, Priority.ALWAYS);
-            Button use = new Button(active ? "Active" : "Use");
+            Button use = new Button(
+                    active ? Lang.tr("profiles.is.active")
+                            : Lang.tr("account.menu.use"));
             use.getStyleClass().add("card-ghost-button");
             use.setDisable(active);
             use.setOnAction(e -> onUseAccount(account));
-            Button delete = new Button("Delete");
+            Button delete = new Button(Lang.tr("button.delete"));
             delete.getStyleClass().add("card-danger-button");
             delete.setOnAction(e -> onDeleteAccount(account));
             HBox row = new HBox(10, tile, texts, use, delete);
@@ -973,12 +1058,13 @@ public class MainView {
             if (active) {
                 row.getStyleClass().add("account-row-active");
             }
-            // Right-click row — context menu like most launchers
+            // Строка с правым кликом — контекстное меню, как в большинстве лаунчеров
             ContextMenu rowMenu = new ContextMenu();
-            MenuItem rowUse = new MenuItem("Set active");
+            MenuItem rowUse = new MenuItem(Lang.tr("profiles.menu.use"));
             rowUse.setDisable(active);
             rowUse.setOnAction(e -> onUseAccount(account));
-            MenuItem rowDelete = new MenuItem("Delete account");
+            MenuItem rowDelete = new MenuItem(
+                    Lang.tr("account.menu.delete"));
             rowDelete.getStyleClass().add("menu-item-danger");
             rowDelete.setOnAction(e -> onDeleteAccount(account));
             rowMenu.getItems().addAll(rowUse, rowDelete);
@@ -999,15 +1085,15 @@ public class MainView {
         updateAvatar(account);
         refreshAccounts();
         refreshProfilesView();
-        statusLabel.setText("Active account: " + account.name());
+        statusLabel.setText(Lang.tr("profiles.status.active", account.name()));
     }
 
     private void onDeleteAccount(GameProfile account) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Delete Account");
-        alert.setHeaderText("Delete account '" + account.name() + "'?");
-        alert.setContentText("It is removed from the launcher. "
-                + "Ely.by credentials stay valid on ely.by itself.");
+        alert.setTitle(Lang.tr("profiles.delete.title"));
+        alert.setHeaderText(
+                Lang.tr("profiles.delete.header", account.name()));
+        alert.setContentText(Lang.tr("profiles.delete.text"));
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
@@ -1018,54 +1104,69 @@ public class MainView {
                     }
                     refreshAccounts();
                     refreshProfilesView();
-                    statusLabel.setText("Account deleted: " + account.name());
+                    statusLabel.setText(Lang.tr("profiles.delete.done",
+                            account.name()));
                 } catch (IOException e) {
-                    statusLabel.setText("Failed to delete account: "
-                            + e.getMessage());
+                    statusLabel.setText(Lang.tr("profiles.delete.failed",
+                            e.getMessage()));
                 }
             }
         });
     }
 
     // ------------------------------------------------------------------
-    //  Settings view: folders, Java override, server session
+    //  Вид настроек: папки, переопределение Java, сессия сервера
     // ------------------------------------------------------------------
 
     private VBox buildSettingsView() {
-        Label dirTitle = new Label("Game Directory");
+        Label languageTitle = new Label(Lang.tr("settings.language"));
+        languageTitle.getStyleClass().add("section-title");
+        languageCombo = new ComboBox<>();
+        languageCombo.getItems().setAll(Lang.Language.values());
+        languageCombo.getSelectionModel().select(Lang.getLanguage());
+        languageCombo.setMaxWidth(Double.MAX_VALUE);
+        languageCombo.setOnAction(e -> onApplyLanguage());
+        Label languageHint = new Label(Lang.tr("settings.language.hint"));
+        languageHint.getStyleClass().add("quick-select-label");
+        languageHint.setWrapText(true);
+        VBox languageBox = new VBox(6, languageTitle, languageCombo,
+                languageHint);
+        languageBox.getStyleClass().add("settings-group");
+
+        Label dirTitle = new Label(Lang.tr("settings.dir"));
         dirTitle.getStyleClass().add("section-title");
         Label dirPath = new Label(
                 GameDirectory.defaultDirectory().root().toString());
         dirPath.getStyleClass().add("settings-value");
         dirPath.setWrapText(true);
-        Button openDir = new Button("Open Folder");
+        Button openDir = new Button(Lang.tr("button.openfolder"));
         openDir.getStyleClass().add("quick-select-button");
         openDir.setOnAction(e -> {
             try {
                 java.awt.Desktop.getDesktop().open(
                         GameDirectory.defaultDirectory().root().toFile());
             } catch (Exception ex) {
-                statusLabel.setText("Failed to open folder: "
-                        + ex.getMessage());
+                statusLabel.setText(Lang.tr("settings.open.failed",
+                        ex.getMessage()));
             }
         });
         VBox dirBox = new VBox(6, dirTitle, dirPath, openDir);
         dirBox.getStyleClass().add("settings-group");
 
-        Label javaTitle = new Label("Java Executable");
+        Label javaTitle = new Label(Lang.tr("settings.java"));
         javaTitle.getStyleClass().add("section-title");
         javaPathField = new TextField();
-        javaPathField.setPromptText("Auto-detect (recommended)");
+        javaPathField.setPromptText(Lang.tr("settings.java.auto"));
         javaPathField.getStyleClass().add("search-field");
         javaPathField.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(javaPathField, Priority.ALWAYS);
-        Button browse = new Button("Browse...");
+        Button browse = new Button(Lang.tr("button.browse"));
         browse.getStyleClass().add("quick-select-button");
         browse.setOnAction(e -> onBrowseJava());
-        Button apply = new Button("Apply");
+        Button apply = new Button(Lang.tr("button.apply"));
         apply.getStyleClass().add("quick-select-button");
         apply.setOnAction(e -> onApplyJava());
-        Button clear = new Button("Clear");
+        Button clear = new Button(Lang.tr("button.clear"));
         clear.getStyleClass().add("quick-select-button");
         clear.setOnAction(e -> {
             javaPathField.clear();
@@ -1073,19 +1174,18 @@ public class MainView {
         });
         HBox javaRow = new HBox(8, javaPathField, browse, apply, clear);
         javaRow.setAlignment(Pos.CENTER_LEFT);
-        Label javaHint = new Label("Overrides Java auto-detection until "
-                + "the launcher restarts. Leave empty for auto-detect.");
+        Label javaHint = new Label(Lang.tr("settings.java.hint"));
         javaHint.getStyleClass().add("quick-select-label");
         javaHint.setWrapText(true);
         VBox javaBox = new VBox(6, javaTitle, javaRow, javaHint);
         javaBox.getStyleClass().add("settings-group");
 
-        Label serverTitle = new Label("Launcher Server");
+        Label serverTitle = new Label(Lang.tr("server.title"));
         serverTitle.getStyleClass().add("section-title");
         serverSessionLabel = new Label();
         serverSessionLabel.getStyleClass().add("settings-value");
         serverSessionLabel.setWrapText(true);
-        Button serverButton = new Button("Sign In / Out");
+        Button serverButton = new Button(Lang.tr("settings.server.sign"));
         serverButton.getStyleClass().add("quick-select-button");
         serverButton.setOnAction(e -> {
             onServerLogin();
@@ -1095,16 +1195,85 @@ public class MainView {
                 serverButton);
         serverBox.getStyleClass().add("settings-group");
 
-        Label aboutTitle = new Label("About");
+        Label updatesTitle = new Label(Lang.tr("settings.updates"));
+        updatesTitle.getStyleClass().add("section-title");
+        currentVersionLabel = new Label();
+        currentVersionLabel.getStyleClass().add("settings-value");
+        updateStatusLabel = new Label(Lang.tr("settings.updates.hint"));
+        updateStatusLabel.getStyleClass().add("quick-select-label");
+        updateStatusLabel.setWrapText(true);
+        Button checkNow = new Button(Lang.tr("button.checknow"));
+        checkNow.getStyleClass().add("quick-select-button");
+        checkNow.setOnAction(e -> onCheckUpdatesNow());
+        VBox updatesBox = new VBox(6, updatesTitle, currentVersionLabel,
+                updateStatusLabel, checkNow);
+        updatesBox.getStyleClass().add("settings-group");
+
+        Label buildsTitle = new Label(Lang.tr("settings.builds"));
+        buildsTitle.getStyleClass().add("section-title");
+        buildsModeCombo = new ComboBox<>();
+        buildsModeCombo.getItems().setAll(
+                DistributionSources.BuildsSource.values());
+        buildsModeCombo.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(DistributionSources.BuildsSource mode) {
+                if (mode == null) return "";
+                return switch (mode) {
+                    case LOCAL -> Lang.tr("settings.builds.local");
+                    case GITHUB -> Lang.tr("settings.builds.github");
+                    case YANDEX -> Lang.tr("settings.builds.yandex");
+                };
+            }
+
+            @Override
+            public DistributionSources.BuildsSource fromString(String string) {
+                return null;
+            }
+        });
+        buildsModeCombo.setMaxWidth(Double.MAX_VALUE);
+        buildsStatusLabel = new Label();
+        buildsStatusLabel.getStyleClass().add("settings-value");
+        buildsStatusLabel.setWrapText(true);
+        buildsGitField = new TextField();
+        buildsGitField.setPromptText(Lang.tr("settings.git.prompt"));
+        buildsGitField.getStyleClass().add("search-field");
+        buildsGitField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(buildsGitField, Priority.ALWAYS);
+        yandexLinkField = new TextField();
+        yandexLinkField.setPromptText(Lang.tr("settings.yandex.prompt"));
+        yandexLinkField.getStyleClass().add("search-field");
+        yandexLinkField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(yandexLinkField, Priority.ALWAYS);
+        buildsTokenField = new PasswordField();
+        buildsTokenField.setPromptText(Lang.tr("settings.token.prompt"));
+        buildsTokenField.getStyleClass().add("search-field");
+        buildsTokenField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(buildsTokenField, Priority.ALWAYS);
+        Button buildsApply = new Button(Lang.tr("button.apply"));
+        buildsApply.getStyleClass().add("quick-select-button");
+        buildsApply.setOnAction(e -> onApplyBuildsSource());
+        HBox buildsRow = new HBox(8, buildsGitField, buildsApply);
+        buildsRow.setAlignment(Pos.CENTER_LEFT);
+        HBox yandexRow = new HBox(8, yandexLinkField, buildsTokenField);
+        yandexRow.setAlignment(Pos.CENTER_LEFT);
+        buildsGitBox = new VBox(6, buildsRow);
+        buildsYandexBox = new VBox(6, yandexRow);
+        VBox buildsBox = new VBox(6, buildsTitle, buildsModeCombo,
+                buildsStatusLabel, buildsGitBox, buildsYandexBox);
+        buildsBox.getStyleClass().add("settings-group");
+        buildsModeCombo.getSelectionModel().selectedItemProperty()
+                .addListener((obs, old, val) -> updateBuildsRows());
+
+        Label aboutTitle = new Label(Lang.tr("settings.about"));
         aboutTitle.getStyleClass().add("section-title");
-        Label about = new Label("Minecraft Launcher " + APP_VERSION
-                + "  ·  instances, local builds and server-distributed builds.");
+        Label about = new Label(Lang.tr("settings.about.text", APP_VERSION));
         about.getStyleClass().add("settings-value");
         about.setWrapText(true);
         VBox aboutBox = new VBox(6, aboutTitle, about);
         aboutBox.getStyleClass().add("settings-group");
 
-        VBox view = new VBox(12, dirBox, javaBox, serverBox, aboutBox);
+        VBox view = new VBox(12, languageBox, dirBox, javaBox, serverBox,
+                updatesBox, buildsBox, aboutBox);
         view.setPadding(new Insets(16));
         VBox.setVgrow(view, Priority.ALWAYS);
         return view;
@@ -1112,16 +1281,142 @@ public class MainView {
 
     private void refreshSettingsView() {
         if (serverSessionLabel == null) return;
+        if (languageCombo != null
+                && languageCombo.getSelectionModel().getSelectedItem()
+                        != Lang.getLanguage()) {
+            languageCombo.getSelectionModel().select(Lang.getLanguage());
+        }
         serverSessionLabel.setText(serverSession == null
-                ? "Not signed in — the launcher runs in local mode."
-                : "Signed in as " + serverSession.accountName()
-                        + (serverSession.isAdmin() ? " (administrator)"
-                                : " (user)"));
+                ? Lang.tr("settings.server.offline")
+                : Lang.tr("settings.server.on", serverSession.accountName(),
+                        serverSession.isAdmin()
+                                ? Lang.tr("server.role.admin")
+                                : Lang.tr("server.role.user")));
+        if (currentVersionLabel != null) {
+            currentVersionLabel.setText(
+                    Lang.tr("settings.current", AppVersion.current()));
+        }
+        if (buildsStatusLabel != null) {
+            try {
+                String mode = preferences.getBuildsSourceMode()
+                        .orElse("YANDEX");
+                DistributionSources.BuildsSource selected;
+                try {
+                    selected = DistributionSources.BuildsSource
+                            .valueOf(mode);
+                } catch (IllegalArgumentException e) {
+                    selected = DistributionSources.BuildsSource.YANDEX;
+                }
+                buildsModeCombo.getSelectionModel().select(selected);
+                String gitUrl =
+                        preferences.getBuildsGitUrl().orElse(null);
+                if (buildsGitField != null && gitUrl != null) {
+                    buildsGitField.setText(gitUrl);
+                }
+                String yandexLink = preferences.getYandexDiskLink().orElse(
+                        DistributionSources.YANDEX_BUILDS_LINK_DEFAULT);
+                if (yandexLinkField != null
+                        && yandexLinkField.getText().isBlank()) {
+                    yandexLinkField.setText(yandexLink);
+                }
+                updateBuildsRows();
+                updateBuildsStatus();
+            } catch (IOException e) {
+                buildsStatusLabel.setText(
+                        Lang.tr("settings.builds.local.full"));
+            }
+        }
+    }
+
+    private void updateBuildsRows() {
+        if (buildsModeCombo == null) return;
+        DistributionSources.BuildsSource mode = buildsModeCombo
+                .getSelectionModel().getSelectedItem();
+        boolean git = mode == DistributionSources.BuildsSource.GITHUB;
+        boolean yandex = mode == DistributionSources.BuildsSource.YANDEX;
+        buildsGitBox.setVisible(git);
+        buildsGitBox.setManaged(git);
+        buildsYandexBox.setVisible(yandex);
+        buildsYandexBox.setManaged(yandex);
+    }
+
+    private void updateBuildsStatus() {
+        if (buildsStatusLabel == null || buildsModeCombo == null) return;
+        DistributionSources.BuildsSource mode = buildsModeCombo
+                .getSelectionModel().getSelectedItem();
+        if (mode == null) {
+            buildsStatusLabel.setText(Lang.tr("settings.builds.local.full"));
+        } else {
+            switch (mode) {
+                case LOCAL -> buildsStatusLabel
+                        .setText(Lang.tr("settings.builds.local.full"));
+                case GITHUB -> {
+                    String url = buildsGitField.getText();
+                    buildsStatusLabel.setText(url == null || url.isBlank()
+                            ? Lang.tr("settings.builds.git.empty")
+                            : Lang.tr("settings.builds.git.on", url.trim()));
+                }
+                case YANDEX -> {
+                    String link = yandexLinkField.getText();
+                    buildsStatusLabel.setText(link == null || link.isBlank()
+                            ? Lang.tr("settings.builds.yandex.empty")
+                            : Lang.tr("settings.builds.yandex.on",
+                                    link.trim()));
+                }
+            }
+        }
+    }
+
+    /**
+     * Перерисовывает все статические тексты на текущем языке (вызывается
+     * сразу после переключения в настройках — перезапуск не нужен).
+     * Диалоги читают строки при создании, поэтому подхватят язык
+     * автоматически при следующем открытии.
+     */
+    private void applyLanguage() {
+        for (Button nav : navButtons) {
+            if (nav.getUserData() == View.INSTANCES) {
+                nav.setText(Lang.tr("nav.instances"));
+            } else if (nav.getUserData() == View.PROFILES) {
+                nav.setText(Lang.tr("nav.profiles"));
+            } else if (nav.getUserData() == View.SETTINGS) {
+                nav.setText(Lang.tr("nav.settings"));
+            }
+        }
+        instanceSearchField.setPromptText(Lang.tr("search.instances"));
+        accountCombo.setPromptText(Lang.tr("account.none"));
+        addAccountButton.setText(Lang.tr("account.add"));
+        addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
+        updateServerButtonText();
+        rebuildInstanceFilterChips();
+        updateFooterVersion();
+        refreshAccounts();
+        showView(currentView);
+        refreshSettingsView();
+    }
+
+    private void onApplyLanguage() {
+        Lang.Language selected = languageCombo.getSelectionModel()
+                .getSelectedItem();
+        if (selected == null) {
+            return;
+        }
+        Lang.setLanguage(selected);
+        try {
+            Lang.save(preferences);
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("settings.save.failed", e.getMessage()));
+            return;
+        }
+        applyLanguage();
+        statusLabel.setText(
+                Lang.tr("settings.language.done", selected.displayName()));
     }
 
     private void onBrowseJava() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Select Java Executable");
+        chooser.setTitle(Lang.tr("settings.browse.title"));
         java.io.File picked =
                 chooser.showOpenDialog(root.getScene().getWindow());
         if (picked != null) {
@@ -1135,86 +1430,89 @@ public class MainView {
         if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
             svc.setCustomJavaPath(path.isEmpty() ? null : Path.of(path));
             statusLabel.setText(path.isEmpty()
-                    ? "Java executable: auto-detect"
-                    : "Java executable override: " + path);
+                    ? Lang.tr("settings.java.saved.auto")
+                    : Lang.tr("settings.java.saved.override", path));
         } else {
-            statusLabel.setText(
-                    "Custom Java path is not supported by the active resolver");
+            statusLabel.setText(Lang.tr("settings.java.unsupported"));
         }
     }
 
-    /**
-     * Saves the current mods/configs of the selected modded instance
-     * as a new build: the user names it and chooses the contents
-     * (mods only, or mods together with configs).
-     */
-    private void onSaveBuild(ModdedProfile profile) {
-        if (profile == null || profile.isVanilla()) return;
+    /** Ручная проверка обновлений из настроек. */
+    private void onCheckUpdatesNow() {
+        updateStatusLabel.setText(Lang.tr("settings.checking"));
+        Thread thread = new Thread(() -> {
+            UpdateService.CheckResult result = checkForUpdates();
+            Platform.runLater(() -> {
+                updateStatusLabel.setText(result.detail());
+                if (result.status() == UpdateService.Status.AVAILABLE
+                        || result.status() == UpdateService.Status.STAGED) {
+                    UpdateService service = updateService();
+                    if (service != null) {
+                        UpdateDialog.show(
+                                (Stage) root.getScene().getWindow(), service,
+                                result);
+                    }
+                }
+                refreshSettingsView();
+            });
+        }, "update-check-manual");
+        thread.setDaemon(true);
+        thread.start();
+    }
 
-        SaveBuildDialog.Result result = SaveBuildDialog.show(
-                (Stage) root.getScene().getWindow());
-        if (result == null) return; // cancelled
-
-        Path dir = moddedProfileService.resolveGameDir(profile);
+    /** Сохраняет ссылку на репозиторий сборок (приходит отдельно). */
+    private void onApplyBuildsSource() {
+        DistributionSources.BuildsSource mode = buildsModeCombo
+                .getSelectionModel().getSelectedItem();
+        if (mode == null) {
+            mode = DistributionSources.BuildsSource.LOCAL;
+        }
+        String gitUrl = buildsGitField.getText() == null ? ""
+                : buildsGitField.getText().trim();
+        String yandexLink = yandexLinkField.getText() == null ? ""
+                : yandexLinkField.getText().trim();
+        String token = buildsTokenField.getText() == null ? ""
+                : buildsTokenField.getText();
         try {
-            ModdedProfileService.ensureProfileFolders(dir);
-            BuildService.BuildInfo saved = buildService.saveBuild(
-                    dir, result.name(), result.mods(), result.configs());
-            statusLabel.setText("Build saved: " + saved.name()
-                    + " (" + saved.description() + ")");
-            refreshInstanceCards();
-        } catch (java.io.IOException e) {
-            statusLabel.setText("Failed to save build: " + e.getMessage());
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Save Build",
-                    e.getClass().getSimpleName() + ": " + e.getMessage());
-        }
-    }
-
-    /**
-     * Fast build saving without scrolling the cards: the instance is
-     * picked by typing right in the dialog.
-     */
-    private void onQuickSaveBuild() {
-        boolean anyModded = false;
-        for (ModdedProfile p : moddedProfiles) {
-            if (!p.isVanilla()) {
-                anyModded = true;
-                break;
-            }
-        }
-        if (!anyModded) {
+            preferences.setBuildsSourceMode(mode.name());
+            preferences.setBuildsGitUrl(gitUrl);
+            preferences.setYandexDiskLink(yandexLink);
+            preferences.setBuildsToken(token);
+            applyDistributionSettings();
+            updateBuildsStatus();
+            statusLabel.setText(Lang.tr("settings.builds.relogin",
+                    buildsStatusLabel.getText()));
+        } catch (IOException e) {
             statusLabel.setText(
-                    "Create a modded instance first — builds need mods");
-            return;
-        }
-        QuickSaveBuildDialog.Result result = QuickSaveBuildDialog.show(
-                (Stage) root.getScene().getWindow(), moddedProfiles,
-                selectedInstanceId);
-        if (result == null) return; // cancelled
-
-        Path dir = moddedProfileService.resolveGameDir(result.profile());
-        try {
-            ModdedProfileService.ensureProfileFolders(dir);
-            BuildService.BuildInfo saved = buildService.saveBuild(
-                    dir, result.name(), result.mods(), result.configs());
-            statusLabel.setText("Build saved: " + saved.name()
-                    + " (" + saved.description() + ") for "
-                    + result.profile().name());
-            selectInstance(result.profile().id());
-        } catch (java.io.IOException e) {
-            statusLabel.setText("Failed to save build: " + e.getMessage());
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Save Build",
-                    e.getClass().getSimpleName() + ": " + e.getMessage());
+                    Lang.tr("settings.save.failed", e.getMessage()));
         }
     }
 
+    private UpdateService updateService() {
+        try {
+            return new UpdateService(new UrlFetcher(),
+                    DistributionSources.UPDATE_MANIFEST_URL,
+                    GameDirectory.defaultDirectory().root());
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private UpdateService.CheckResult checkForUpdates() {
+        UpdateService service = updateService();
+        if (service == null) {
+            return new UpdateService.CheckResult(
+                    UpdateService.Status.FAILED, null,
+                    Lang.tr("update.noservice"));
+        }
+        return service.check();
+    }
+
     /**
-     * Signs in to (or out of) the launcher server. The dialog performs
-     * the whole flow; afterwards only the token is stored — the role
-     * it brought decides whether administrative functions (publishing
-     * builds) become available.
+     * Вход на сервер лаунчера (или выход). Диалог выполняет
+     * весь процесс; после хранится только токен — принесённая им роль
+     * решает, станут ли доступны административные функции (публикация
+     * сборок).
      */
     private void onServerLogin() {
         ServerSession result = ServerLoginDialog.show(
@@ -1224,11 +1522,12 @@ public class MainView {
         updateServerButtonText();
         if (changed) {
             statusLabel.setText(serverSession == null
-                    ? "Signed out of the launcher server — running in local mode"
-                    : "Signed in to the launcher server as "
-                            + serverSession.accountName()
-                            + (serverSession.isAdmin()
-                                    ? " (administrator)"
+                    ? Lang.tr("server.signedout.status")
+                    : Lang.tr("server.signedin.status",
+                            serverSession.accountName(),
+                            serverSession.isAdmin()
+                                    ? " (" + Lang.tr("server.role.admin")
+                                            + ")"
                                     : ""));
         }
         refreshProfilesView();
@@ -1239,51 +1538,24 @@ public class MainView {
         if (serverButton == null) {
             return;
         }
-        serverButton.setText(serverSession == null ? "Server"
-                : "Server: " + serverSession.accountName()
-                        + (serverSession.isAdmin() ? " (admin)" : ""));
-    }
-
-    /**
-     * Opens the catalog of builds the administrator published and
-     * installs the chosen one into the selected modded instance. Each
-     * build gets its own folder — saved builds and other server
-     * builds are never touched. Requires a signed-in session (the
-     * sign-in dialog opens automatically when none exists).
-     */
-    private void onServerBuilds(ModdedProfile profile) {
-        if (profile == null || profile.isVanilla()) return;
-        if (serverSession == null) {
-            onServerLogin();
-            if (serverSession == null) {
-                statusLabel.setText(
-                        "Sign in to the launcher server first (Server, top right)");
-                return;
-            }
-        }
-        Path dir = moddedProfileService.resolveGameDir(profile);
-
-        ServerBuildsDialog.Outcome outcome = ServerBuildsDialog.show(
-                (Stage) root.getScene().getWindow(), serverSession,
-                remoteBuildService, serverApi, profile, dir);
-
-        if (outcome != null) {
-            statusLabel.setText((outcome.wasUpdate() ? "Build updated: "
-                    : "Build installed: ")
-                    + outcome.displayName() + " " + outcome.version());
-            refreshInstanceCards();
-        }
+        serverButton.setText(serverSession == null
+                ? Lang.tr("server.button")
+                : serverSession.isAdmin()
+                        ? Lang.tr("server.button.admin",
+                                serverSession.accountName())
+                        : Lang.tr("server.button.session",
+                                serverSession.accountName()));
     }
 
     // ------------------------------------------------------------------
-    //  Async: version list loading (feeds the New Instance dialog)
+    //  Асинхронно: загрузка списка версий (питает диалог «Новый инстанс»)
     // ------------------------------------------------------------------
 
     public void loadVersions() {
         refreshAccounts();
-        // Instant offline support: show already-created instances/assemblies
-        // immediately, so they appear even when the manifest fetch later
-        // times out (15-30s) without internet.
+        // Мгновенная офлайн-поддержка: показываем уже созданные инстансы/сборки
+        // сразу, чтобы они были видны, даже если загрузка манифеста позже
+        // упрётся в таймаут (15–30 с) без интернета.
         refreshModdedProfiles(null);
         try {
             manifestVersions = loadCachedManifestVersions();
@@ -1294,8 +1566,9 @@ public class MainView {
         }
         startElyByRefreshTimer();
         statusLabel.setText(manifestVersions.isEmpty()
-                ? "Loading versions..."
-                : "Offline: " + manifestVersions.size() + " cached versions • Loading latest...");
+                ? Lang.tr("status.loading")
+                : Lang.tr("versions.cached.loading",
+                        manifestVersions.size()));
 
         Task<VersionManifest> task = new Task<>() {
             @Override
@@ -1308,14 +1581,50 @@ public class MainView {
         var thread = new Thread(task, "version-fetch");
         thread.setDaemon(true);
         thread.start();
+
+        checkForUpdatesOnStartup();
+    }
+
+    /**
+     * При каждом запуске (с интернетом): спрашивает главную ветку о новой
+     * версии лаунчера. Молчит, если актуально или офлайн; диалог
+     * открывается, когда обновление доступно или подготовлено.
+     */
+    private void checkForUpdatesOnStartup() {
+        Thread thread = new Thread(() -> {
+            try {
+                UpdateService.CheckResult result = checkForUpdates();
+                Platform.runLater(() -> {
+                    switch (result.status()) {
+                        case AVAILABLE, STAGED -> {
+                            statusLabel.setText(result.detail());
+                            UpdateService service = updateService();
+                            if (service != null) {
+                                UpdateDialog.show((Stage) root.getScene()
+                                        .getWindow(), service, result);
+                            }
+                        }
+                        case FAILED -> statusLabel.setText(Lang.tr(
+                                "update.check.failed", result.detail()));
+                        default -> {
+                            // актуально или офлайн — молчим
+                        }
+                    }
+                });
+            } catch (RuntimeException ignored) {
+                // проверки обновлений не должны ломать старт
+            }
+        }, "update-check");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void startElyByRefreshTimer() {
         if (elyRefreshTimer != null) {
             elyRefreshTimer.cancel();
         }
-        elyRefreshTimer = new java.util.Timer("ely-refresh-timer", true);
-        elyRefreshTimer.scheduleAtFixedRate(new java.util.TimerTask() {
+        elyRefreshTimer = new Timer("ely-refresh-timer", true);
+        elyRefreshTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 checkAllElyByProfiles();
@@ -1328,18 +1637,17 @@ public class MainView {
             var profiles = profileService.loadProfiles();
             boolean changed = false;
             String[] nameChange = null;
-            var updated = new java.util.ArrayList<GameProfile>();
+            var updated = new ArrayList<GameProfile>();
 
             for (GameProfile p : profiles) {
                 if (p.isElyBy() && p.uuid().isPresent()) {
                     GameProfile refreshed = elyAuthService.refreshProfile(p);
                     boolean nameChanged = !refreshed.name().equals(p.name());
                     if (nameChanged) {
-                        System.out.println("[ELY] === NICK CHANGED === old='" + p.name()
-                                + "' new='" + refreshed.name() + "'");
+                        LOG.fine("Ely.by nick changed: '" + p.name() + "' -> '" + refreshed.name() + "'");
                         nameChange = new String[]{p.name(), refreshed.name()};
                     }
-                    if (nameChanged || !java.util.Objects.equals(
+                    if (nameChanged || !Objects.equals(
                             refreshed.skinUrl().orElse(null),
                             p.skinUrl().orElse(null))) {
                         changed = true;
@@ -1353,7 +1661,7 @@ public class MainView {
             if (changed) {
                 profileService.saveProfiles(updated);
                 final String[] finalNameChange = nameChange;
-                javafx.application.Platform.runLater(() -> {
+                Platform.runLater(() -> {
                     var items = accountCombo.getItems();
                     String selectedUuid = selectedProfile != null
                             ? selectedProfile.uuid().orElse(null) : null;
@@ -1364,7 +1672,7 @@ public class MainView {
                             if (old.uuid().isPresent() && up.uuid().isPresent()
                                     && old.uuid().get().equals(up.uuid().get())
                                     && !old.name().equals(up.name())) {
-                                System.out.println("[ELY] combo item " + i + ": "
+                                LOG.fine("Ely.by combo item " + i + ": "
                                         + old.name() + " -> " + up.name());
                                 items.set(i, up);
                                 break;
@@ -1383,7 +1691,7 @@ public class MainView {
                                 selectedProfile = p;
                                 accountCombo.setValue(p);
                                 suppressSelectionListener = false;
-                                System.out.println("[ELY] re-selected: " + p.name());
+                                LOG.fine("Ely.by re-selected: " + p.name());
                                 break;
                             }
                         }
@@ -1393,47 +1701,64 @@ public class MainView {
                         updateAvatar(selectedProfile);
                     }
                     if (finalNameChange != null) {
-                        statusLabel.setText("Nick changed: "
-                                + finalNameChange[0] + " -> " + finalNameChange[1]);
+                        statusLabel.setText(Lang.tr("ely.nick",
+                                finalNameChange[0], finalNameChange[1]));
                     }
                 });
             }
         } catch (Exception e) {
-            System.out.println("[ELY] timer exception: " + e);
+            LOG.log(Level.FINE, "Ely.by background refresh failed", e);
         }
     }
 
     private void onVersionsLoaded(VersionManifest manifest) {
         manifestVersions = manifest.versions();
         versionsLoadFailed = false;
-        statusLabel.setText(manifestVersions.size()
-                + " versions available for new instances");
-        footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  All "
-                + manifestVersions.size() + " versions available");
+        footerVersionsCount = manifestVersions.size();
+        footerOffline = false;
+        statusLabel.setText(
+                Lang.tr("versions.loaded", manifestVersions.size()));
+        updateFooterVersion();
         refreshModdedProfiles(null);
     }
 
     private void onLoadFailed(Throwable cause) {
         versionsLoadFailed = true;
-        statusLabel.setText("Offline mode — version list unavailable ("
-                + cause.getMessage() + ")");
-        // Offline fallback: show already-created instances and cached
-        // installed versions (e.g. Forge) so they can still be launched
-        // without internet. New instance creation will be limited to
-        // locally cached versions.
+        statusLabel.setText(Lang.tr("versions.offline", cause.getMessage()));
+        // Офлайн-запасной вариант: показываем уже созданные инстансы и кэшированные
+        // установленные версии (например, Forge), чтобы их можно было запускать
+        // без интернета. Создание новых инстансов ограничится
+        // локально кэшированными версиями.
         try {
             manifestVersions = loadCachedManifestVersions();
         } catch (Exception ignored) {
             manifestVersions = List.of();
         }
-        if (!manifestVersions.isEmpty()) {
-            footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  Offline — "
-                    + manifestVersions.size() + " cached versions");
-        } else {
-            footerVersionLabel.setText("Launcher " + APP_VERSION + "  |  Offline");
-        }
+        footerVersionsCount = manifestVersions.size();
+        footerOffline = true;
+        updateFooterVersion();
         refreshModdedProfiles(null);
     }
+
+    /** Перестраивает строку подвала (также используется при смене языка). */
+    private void updateFooterVersion() {
+        if (footerVersionLabel == null) return;
+        if (footerOffline) {
+            footerVersionLabel.setText(footerVersionsCount > 0
+                    ? Lang.tr("footer.offline.cached", APP_VERSION,
+                            footerVersionsCount)
+                    : Lang.tr("footer.offline", APP_VERSION));
+        } else {
+            footerVersionLabel.setText(footerVersionsCount >= 0
+                    ? Lang.tr("footer.loaded", APP_VERSION,
+                            footerVersionsCount)
+                    : Lang.tr("footer.version", APP_VERSION));
+        }
+    }
+
+    // Состояние подвала для перерисовок (включая смену языка)
+    private int footerVersionsCount = -1;
+    private boolean footerOffline = false;
 
     private List<MinecraftVersion> loadCachedManifestVersions() {
         List<MinecraftVersion> cached = new ArrayList<>();
@@ -1447,15 +1772,15 @@ public class MainView {
                 if (!Files.isRegularFile(json)) continue;
                 try {
                     String text = Files.readString(json);
-                    com.google.gson.JsonObject obj = com.google.gson.JsonParser.parseString(text).getAsJsonObject();
-                    // Skip corrupt or non-vanilla? Include modded as well for offline visibility
+                    JsonObject obj = JsonParser.parseString(text).getAsJsonObject();
+                    // Пропускать битые или неванильные? Включаем и модовые для офлайн-видимости
                     String typeStr = obj.has("type") && obj.get("type").isJsonPrimitive()
                             ? obj.get("type").getAsString() : "release";
-                    org.example.launcher.version.VersionType type;
+                    VersionType type;
                     try {
-                        type = new org.example.launcher.version.VersionTypeRegistry().resolve(typeStr);
+                        type = new VersionTypeRegistry().resolve(typeStr);
                     } catch (Exception e) {
-                        type = org.example.launcher.version.StandardVersionType.RELEASE;
+                        type = StandardVersionType.RELEASE;
                     }
                     cached.add(new MinecraftVersion(id, type, null, null));
                 } catch (Exception ignored) {
@@ -1466,7 +1791,7 @@ public class MainView {
         return cached;
     }
 
-    /** Whether the version's metadata requires Java 8 or older. */
+    /** Требуют ли метаданные версии Java 8 или старше. */
     private boolean needsJava8(VersionMetadata meta) {
         int required = meta.javaVersion()
                 .map(JavaVersion::majorVersion)
@@ -1478,13 +1803,12 @@ public class MainView {
         if (preferences == null) return;
         try {
             preferences.setLastSelectedAccount(accountName);
-        } catch (java.io.IOException e) {
-            // Non-fatal
+        } catch (IOException e) {
+            // Некритично
         }
     }
 
-    private final java.util.concurrent.atomic.AtomicLong avatarRequestId =
-            new java.util.concurrent.atomic.AtomicLong();
+    private final AtomicLong avatarRequestId = new AtomicLong();
 
     private void updateAvatar(GameProfile profile) {
         long requestId = avatarRequestId.incrementAndGet();
@@ -1493,7 +1817,7 @@ public class MainView {
             return;
         }
         skinService.loadAvatarAsync(profile, 32)
-                .thenAccept(optImg -> javafx.application.Platform.runLater(() -> {
+                .thenAccept(optImg -> Platform.runLater(() -> {
                     if (requestId != avatarRequestId.get()) {
                         return;
                     }
@@ -1507,7 +1831,7 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Account management
+    //  Управление аккаунтами
     // ------------------------------------------------------------------
 
     private void refreshAccounts() {
@@ -1553,7 +1877,7 @@ public class MainView {
             } finally {
                 suppressSelectionListener = false;
             }
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             suppressSelectionListener = false;
         }
         if (selectedProfile != null) {
@@ -1561,7 +1885,7 @@ public class MainView {
         }
     }
 
-    /** Unified entry: one button opens a dialog where the user picks Offline or Ely.by. */
+    /** Единая точка входа: одна кнопка открывает диалог, где пользователь выбирает Offline или Ely.by. */
     private void onAddAccount() {
         Stage launcherStage = (Stage) root.getScene().getWindow();
         AddAccountDialog.Result res = AddAccountDialog.showDialog(launcherStage);
@@ -1588,24 +1912,16 @@ public class MainView {
                     break;
                 }
             }
-            statusLabel.setText("Account '" + name + "' created (offline)");
-        } catch (java.io.IOException e) {
-            ErrorDialog.show(launcherStage, "Account Error",
-                    "Failed to create account: " + e.getMessage());
+            statusLabel.setText(Lang.tr("account.created", name));
+        } catch (IOException e) {
+            ErrorDialog.show(launcherStage, Lang.tr("account.error.title"),
+                    Lang.tr("account.create.failed", e.getMessage()));
         }
-    }
-
-    // Kept for internal reuse / legacy callers
-    private void onCreateAccount() {
-        Stage launcherStage = (Stage) root.getScene().getWindow();
-        String name = CreateAccountDialog.showDialog(launcherStage);
-        if (name == null || name.isBlank()) return;
-        createOfflineAccount(name);
     }
 
     private void authenticateElyBy(String user, String pass) {
         Stage launcherStage = (Stage) root.getScene().getWindow();
-        statusLabel.setText("Signing in with Ely.by...");
+        statusLabel.setText(Lang.tr("ely.signing"));
         if (addAccountButton != null) addAccountButton.setDisable(true);
 
         Task<GameProfile> authTask = new Task<>() {
@@ -1617,14 +1933,14 @@ public class MainView {
         authTask.setOnSucceeded(e -> {
             GameProfile profile = authTask.getValue();
             try {
-                var profiles = new java.util.ArrayList<>(profileService.loadProfiles());
+                var profiles = new ArrayList<>(profileService.loadProfiles());
                 profiles.removeIf(p -> (profile.uuid().isPresent() && p.uuid().isPresent()
                         && p.uuid().get().equals(profile.uuid().get()))
                         || p.name().equals(profile.name()));
                 profiles.add(profile);
                 profileService.saveProfiles(profiles);
-            } catch (java.io.IOException ex) {
-                // Non-fatal
+            } catch (IOException ex) {
+                // Некритично
             }
             refreshAccounts();
             refreshProfilesView();
@@ -1640,50 +1956,43 @@ public class MainView {
                 }
             }
             String skinInfo = profile.skinUrl().isPresent()
-                    ? " (skin: " + profile.skinModel().orElse("classic") + ")"
-                    : " (no skin)";
-            statusLabel.setText("Ely.by: " + profile.name() + skinInfo);
+                    ? Lang.tr("ely.skin", profile.skinModel().orElse("classic"))
+                    : Lang.tr("ely.noskin");
+            statusLabel.setText(Lang.tr("ely.ok", profile.name(), skinInfo));
             if (addAccountButton != null) addAccountButton.setDisable(false);
         });
         authTask.setOnFailed(e -> {
             String msg = authTask.getException().getMessage();
-            statusLabel.setText("Ely.by sign-in failed: " + msg);
+            statusLabel.setText(Lang.tr("ely.failed", msg));
             if (addAccountButton != null) addAccountButton.setDisable(false);
-            ErrorDialog.show(launcherStage, "Ely.by Sign-in Failed", msg);
+            ErrorDialog.show(launcherStage, Lang.tr("ely.failed.title"), msg);
         });
         var thread = new Thread(authTask, "ely-auth");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private void onElyLogin() {
-        Stage launcherStage = (Stage) root.getScene().getWindow();
-        String[] creds = ElyLoginDialog.showDialog(launcherStage);
-        if (creds == null) return;
-        authenticateElyBy(creds[0], creds[1]);
-    }
-
     // ------------------------------------------------------------------
-    //  Details panel
+    //  Панель деталей
     // ------------------------------------------------------------------
 
     // ------------------------------------------------------------------
-    //  Instance creation
+    //  Создание инстанса
     // ------------------------------------------------------------------
 
     /**
-     * Opens the New Instance dialog — one simple screen with the
-     * instance name, loader chips, the version list and the loader
-     * version list — and creates the instance on confirmation.
-     * Version picking lives here, on the main tab.
+     * Открывает диалог «Новый инстанс» — один простой экран с именем
+     * инстанса, чипами загрузчиков, списком версий и списком версий
+     * загрузчика — и создаёт инстанс при подтверждении.
+     * Выбор версии живёт здесь, на главной вкладке.
      */
     private void onNewInstance() {
         if (manifestVersions.isEmpty()) {
             if (versionsLoadFailed) {
-                statusLabel.setText("Retrying version list...");
+                statusLabel.setText(Lang.tr("versions.retry"));
                 loadVersions();
             } else {
-                statusLabel.setText("Versions are still loading — please wait...");
+                statusLabel.setText(Lang.tr("versions.wait"));
             }
             return;
         }
@@ -1696,19 +2005,18 @@ public class MainView {
     }
 
     /**
-     * Creates the instance in one background task: installs the
-     * game/loader version only when it is not already installed
-     * (skip-if-valid: intact files are not re-downloaded; no network
-     * access at all for already-present versions) and registers the
-     * instance with its own game directory.
+     * Создаёт инстанс в одной фоновой задаче: устанавливает
+     * версию игры/загрузчика, только если она ещё не установлена
+     * (пропуск-если-цело: целые файлы не перекачиваются; для уже
+     * имеющихся версий сеть вообще не используется) и регистрирует
+     * инстанс с собственным игровым каталогом.
      */
     private void createInstance(NewInstanceDialog.Result result) {
         createInstance(result, false);
     }
 
     /**
-     * @param playWhenReady launch the instance right after creating
-     *                      it
+     * @param playWhenReady запустить инстанс сразу после создания
      */
     private void createInstance(NewInstanceDialog.Result result,
                                 boolean playWhenReady) {
@@ -1717,18 +2025,18 @@ public class MainView {
         ModLoaderVersion loader = result.loader();
         GameDirectory storage = GameDirectory.defaultDirectory();
 
-        // Several instances may share one version (each has its own
-        // name, game directory, mods and builds) — every creation
-        // makes a new one; the directory name stays unique
-        // automatically
-        statusLabel.setText("Creating instance ("
-                + (type == ModLoaderType.VANILLA ? "vanilla " + mc.id()
+        // Несколько инстансов могут делить одну версию (у каждого свои
+        // имя, игровой каталог, моды и сборки) — каждое создание
+        // делает новый; имя каталога остаётся уникальным
+        // автоматически
+        statusLabel.setText(Lang.tr("instance.creating",
+                type == ModLoaderType.VANILLA ? "vanilla " + mc.id()
                         : type.displayName() + " " + loader.loaderVersion()
-                                + " for MC " + mc.id()) + ")...");
+                                + " for MC " + mc.id()));
 
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
-        progressDialog.setTitle("Creating Instance");
+        progressDialog.setTitle(Lang.tr("install.create.title"));
         progressDialog.show();
 
         Task<ModdedProfile> task = new Task<>() {
@@ -1736,8 +2044,8 @@ public class MainView {
             protected ModdedProfile call() throws Exception {
                 String versionId = type == ModLoaderType.VANILLA
                         ? mc.id() : loader.installedVersionId();
-                // Already-installed versions need no metadata fetch or
-                // download — instance creation works offline then
+                // Уже установленным версиям не нужны ни загрузка метаданных,
+                // ни скачивание — создание инстанса тогда работает офлайн
                 boolean alreadyInstalled = type == ModLoaderType.VANILLA
                         ? Files.isRegularFile(storage.clientJar(mc.id()))
                         : Files.isRegularFile(storage.versionMetadata(versionId));
@@ -1755,9 +2063,9 @@ public class MainView {
                                 storage, progressDialog);
                     }
                 }
-                // The display name is typed in freely (automatic
-                // "Loader MC" when empty); the memory limit defaults
-                // to automatic and is tuned in the Edit dialog
+                // Отображаемое имя вводится свободно (автоматическое
+                // «Загрузчик МК», если пусто); лимит памяти по умолчанию
+                // автоматический и настраивается в диалоге редактирования
                 return moddedProfileService.createProfile(
                         type,
                         type == ModLoaderType.VANILLA ? "" : loader.loaderVersion(),
@@ -1770,9 +2078,9 @@ public class MainView {
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 0, 0,
                     List.of()));
             jumpToInstance(profile);
-            statusLabel.setText("Instance ready: " + profile.name()
-                    + " — press Play"
-                    + (profile.isVanilla() ? "" : " and add mods via Folder"));
+            statusLabel.setText(Lang.tr("instance.ready", profile.name(),
+                    profile.isVanilla() ? ""
+                            : Lang.tr("instance.ready.mods")));
             if (playWhenReady) {
                 startInstanceLaunch(profile);
             }
@@ -1780,8 +2088,9 @@ public class MainView {
         task.setOnFailed(e -> {
             Throwable cause = task.getException();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
-            statusLabel.setText("Instance creation failed: " + cause.getMessage());
-            ErrorDialog.show(owner, "Instance Creation Failed",
+            statusLabel.setText(
+                    Lang.tr("instance.create.failed", cause.getMessage()));
+            ErrorDialog.show(owner, Lang.tr("instance.create.failed.title"),
                     cause.getClass().getSimpleName() + ": " + cause.getMessage());
         });
         var thread = new Thread(task, "instance-create");
@@ -1790,13 +2099,13 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Instances: listing, launch, folder, deletion
+    //  Инстансы: список, запуск, папка, удаление
     // ------------------------------------------------------------------
 
     /**
-     * Reloads the instance list into the sidebar panel.
+     * Перезагружает список инстансов в боковую панель.
      *
-     * @param selectId instance id to select after loading, or null
+     * @param selectId id инстанса для выбора после загрузки, либо null
      */
     private void refreshModdedProfiles(String selectId) {
         try {
@@ -1807,15 +2116,16 @@ public class MainView {
                 selectedInstanceId = null;
             }
             refreshInstanceCards();
-        } catch (java.io.IOException e) {
-            statusLabel.setText("Failed to load instances: " + e.getMessage());
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("instances.load.failed", e.getMessage()));
         }
     }
 
     /**
-     * Opens the selected profile's game directory in the system file
-     * manager, so the user can add mods, resource packs, shader packs,
-     * worlds or check logs manually.
+     * Открывает игровой каталог выбранного профиля в системном файловом
+     * менеджере, чтобы пользователь мог добавить моды, ресурс-паки, шейдеры,
+     * миры или вручную проверить логи.
      */
     private void onOpenProfileFolder(ModdedProfile profile) {
         if (profile == null) return;
@@ -1823,20 +2133,20 @@ public class MainView {
             Path dir = moddedProfileService.resolveGameDir(profile);
             ModdedProfileService.ensureProfileFolders(dir);
             java.awt.Desktop.getDesktop().open(dir.toFile());
-            statusLabel.setText("Opened " + dir);
+            statusLabel.setText(Lang.tr("folder.opened", dir));
         } catch (Exception ex) {
-            statusLabel.setText("Failed to open folder: " + ex.getMessage());
+            statusLabel.setText(Lang.tr("folder.open.failed", ex.getMessage()));
             ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Open Folder",
+                    Lang.tr("error.folder.title"),
                     ex.getClass().getSimpleName() + ": " + ex.getMessage());
         }
     }
 
     /**
-     * Opens the edit dialog for the selected profile (display name,
-     * memory limit and extra JVM arguments) and persists the changes.
-     * Renaming also renames the game directory (mods, saves and
-     * builds move along); the versions stay fixed.
+     * Открывает диалог редактирования выбранного профиля (отображаемое имя,
+     * лимит памяти и доп. JVM-аргументы) и сохраняет изменения.
+     * Переименование также переименовывает игровой каталог (моды, сохранения
+     * и сборки переезжают вместе); версии остаются фиксированными.
      */
     private void onEditProfile(ModdedProfile profile) {
         if (profile == null) return;
@@ -1846,25 +2156,26 @@ public class MainView {
         if (result == null) return;
 
         try {
-            // Renaming also renames the folder (mods/saves/builds
-            // move along), so select by the new id afterwards
+            // Переименование также переименовывает папку (моды/сохранения/сборки
+            // переезжают вместе), поэтому далее выбираем по новому id
             Optional<ModdedProfile> updated = moddedProfileService.updateProfile(
                     profile.id(), result.extraJvmArgs(), result.name(),
                     result.memoryMb());
             if (updated.isPresent()) {
                 refreshModdedProfiles(updated.get().id());
-                statusLabel.setText("Instance updated: " + updated.get().name()
-                        + "  ·  Memory: "
-                        + ModdedProfileService.formatMemory(
-                                updated.get().memoryMb())
-                        + (result.extraJvmArgs().isEmpty() ? ""
-                                : "  ·  " + result.extraJvmArgs().size()
-                                        + " JVM args"));
+                statusLabel.setText(Lang.tr("instance.updated",
+                        updated.get().name(),
+                        ModdedProfileService.formatMemory(
+                                updated.get().memoryMb()),
+                        result.extraJvmArgs().isEmpty() ? ""
+                                : Lang.tr("instance.updated.jvm",
+                                        result.extraJvmArgs().size())));
             }
-        } catch (java.io.IOException e) {
-            statusLabel.setText("Failed to update instance: " + e.getMessage());
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("instance.update.failed", e.getMessage()));
             ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Cannot Update Instance",
+                    Lang.tr("error.update.title"),
                     e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
@@ -1873,54 +2184,56 @@ public class MainView {
         if (profile == null) return;
 
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Delete Instance");
-        alert.setHeaderText("Delete instance '" + profile.name() + "'?");
+        alert.setTitle(Lang.tr("instance.delete.title"));
+        alert.setHeaderText(
+                Lang.tr("instance.delete.header", profile.name()));
         alert.setContentText(
-                "The instance is removed from the list, but the game directory with "
-                        + "your mods, configs and saves is kept on disk:\n"
-                        + GameDirectory.defaultDirectory().root()
-                                .resolve(profile.gameDirPath()));
+                Lang.tr("instance.delete.text",
+                        GameDirectory.defaultDirectory().root()
+                                .resolve(profile.gameDirPath())));
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
                     var keptDir = moddedProfileService.deleteProfile(profile.id());
                     refreshModdedProfiles(null);
-                    statusLabel.setText("Instance deleted"
-                            + keptDir.map(d -> "; files kept at " + d).orElse(""));
-                } catch (java.io.IOException e) {
-                    statusLabel.setText("Failed to delete instance: " + e.getMessage());
+                    statusLabel.setText(Lang.tr("instance.delete.done",
+                            keptDir.map(d -> Lang.tr("instance.delete.kept", d))
+                                    .orElse("")));
+                } catch (IOException e) {
+                    statusLabel.setText(Lang.tr("instance.delete.failed",
+                            e.getMessage()));
                 }
             }
         });
     }
 
-    // --- Instance launch (verify → repair if needed → launch) ---
+    // --- Запуск инстанса (проверка → починка при нужде → запуск) ---
 
     /**
-     * Common launch entry for every Play button on the cards:
-     * account resolution, Ely.by refresh and then the
-     * verify → repair-if-needed → launch chain.
+     * Общая точка запуска для всех кнопок «Играть» на карточках:
+     * определение аккаунта, обновление Ely.by и далее цепочка
+     * проверка → починка-при-необходимости → запуск.
      */
     private void startInstanceLaunch(ModdedProfile profile) {
-        // Only one game at a time per launcher window — a second
-        // attempt while anything is launching is ignored
+        // Только одна игра за раз на окно лаунчера — повторная
+        // попытка во время запуска игнорируется
         if (versionPlayInFlight) {
-            statusLabel.setText("Already launching "
-                    + launchingStatusText.toLowerCase() + " — please wait");
+            statusLabel.setText(Lang.tr("launch.blocked",
+                    launchingStatusText.toLowerCase()));
             return;
         }
         GameProfile account = getOrCreateProfile();
         GameDirectory storage = GameDirectory.defaultDirectory();
 
-        // A launch attempt blocks every Play button immediately
-        // (until a terminal callback refreshes them)
+        // Попытка запуска сразу блокирует все кнопки «Играть»
+        // (до обновления по терминальному колбэку)
         versionPlayInFlight = true;
         javaDownloadAttempted = false;
-        setLaunchStatus(profile.id(), "Verifying...");
-        statusLabel.setText("Verifying " + profile.name() + "...");
+        setLaunchStatus(profile.id(), Lang.tr("launch.verifying"));
+        statusLabel.setText(Lang.tr("launch.verify.status", profile.name()));
 
         if (account.isElyBy()) {
-            statusLabel.setText("Refreshing Ely.by profile...");
+            statusLabel.setText(Lang.tr("ely.refreshing"));
             Task<GameProfile> refreshTask = new Task<>() {
                 @Override
                 protected GameProfile call() throws Exception {
@@ -1940,10 +2253,10 @@ public class MainView {
     }
 
     /**
-     * Verifies the profile's installation; on problems, attempts an
-     * automatic repair (re-downloading only missing or corrupt files)
-     * and re-verifies before launching. Non-repairable problems are
-     * reported with their causes.
+     * Проверяет установку профиля; при проблемах пытается автоматически
+     * починить (докачивая только отсутствующие или битые файлы)
+     * и перепроверяет перед запуском. Непочиняемые проблемы
+     * показываются с причинами.
      */
     private void verifyProfileAndLaunch(ModdedProfile profile,
                                         GameProfile account,
@@ -1967,10 +2280,10 @@ public class MainView {
         });
         verifyTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            statusLabel.setText("Verification error: "
-                    + verifyTask.getException().getMessage());
+            statusLabel.setText(Lang.tr("launch.verify.error",
+                    verifyTask.getException().getMessage()));
             ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    "Instance Verification Error",
+                    Lang.tr("launch.verify.title"),
                     verifyTask.getException().getClass().getSimpleName() + ": "
                             + verifyTask.getException().getMessage());
         });
@@ -1980,13 +2293,13 @@ public class MainView {
     }
 
     /**
-     * Routes a failed verification to the right recovery path:
-     * automatic Java 8 download for legacy versions that only lack a
-     * runtime, a single automatic repair (re-downloading missing or
-     * corrupt files), or a diagnostic report with the causes.
+     * Направляет неуспешную проверку по нужному пути восстановления:
+     * автоматическое скачивание Java 8 для legacy-версий, которым не хватает
+     * только рантайма, однократная автопочинка (докачка отсутствующих или
+     * битых файлов) либо диагностический отчёт с причинами.
      *
-     * @param repairAttempted whether a repair already ran for this
-     *                        launch attempt (prevents repair loops)
+     * @param repairAttempted выполнялась ли уже починка для этой
+     *                        попытки запуска (защита от циклов починки)
      */
     private void handleInstanceVerificationFailure(
             ModdedProfile profile,
@@ -1994,7 +2307,7 @@ public class MainView {
             GameDirectory storage,
             ModdedProfileVerificationService.VerificationReport report,
             boolean repairAttempted) {
-        // Legacy versions: everything is fine except the Java runtime
+        // Legacy-версии: всё хорошо, кроме Java-рантайма
         if (!javaDownloadAttempted
                 && report.metadata().isPresent()
                 && needsJava8(report.metadata().get())
@@ -2005,9 +2318,9 @@ public class MainView {
                     report.metadata().get());
             return;
         }
-        // Automatic repair: reinstall vanilla/loader — intact files
-        // are skipped, only missing/corrupt ones are downloaded — then
-        // verify again
+        // Автопочинка: переустановка ваниллы/загрузчика — целые файлы
+        // пропускаются, скачиваются только отсутствующие/битые — затем
+        // повторная проверка
         if (report.isRepairableByInstall() && !repairAttempted) {
             repairProfileAndLaunch(profile, account, storage, report);
             return;
@@ -2019,13 +2332,13 @@ public class MainView {
                                         GameProfile account,
                                         GameDirectory storage,
                                         ModdedProfileVerificationService.VerificationReport original) {
-        statusLabel.setText("Repairing " + profile.name()
-                + " (downloading missing files)...");
-        setLaunchStatus(profile.id(), "Repairing...");
+        statusLabel.setText(
+                Lang.tr("launch.repair.status", profile.name()));
+        setLaunchStatus(profile.id(), Lang.tr("launch.repairing"));
 
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
-        progressDialog.setTitle("Repairing " + profile.name());
+        progressDialog.setTitle(Lang.tr("install.repair.title", profile.name()));
         progressDialog.show();
 
         Task<ModdedProfileVerificationService.VerificationReport> repairTask = new Task<>() {
@@ -2050,17 +2363,16 @@ public class MainView {
             refreshLaunchButtons();
             Throwable cause = repairTask.getException();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
-            statusLabel.setText("Repair failed: " + cause.getMessage());
+            statusLabel.setText(
+                    Lang.tr("launch.repair.failed", cause.getMessage()));
             StringBuilder msg = new StringBuilder();
-            msg.append("Automatic repair failed:\n")
-                    .append(cause.getClass().getSimpleName()).append(": ")
-                    .append(cause.getMessage()).append("\n\n")
-                    .append("Problems found before repair:\n");
+            msg.append(Lang.tr("launch.repair.failed.text",
+                    cause.getClass().getSimpleName(), cause.getMessage()));
             for (String error : original.errors()) {
                 msg.append(" - ").append(error).append('\n');
             }
-            ErrorDialog.show(owner, "Instance Repair Failed — " + profile.name(),
-                    msg.toString());
+            ErrorDialog.show(owner, Lang.tr("launch.repair.failed.title",
+                    profile.name()), msg.toString());
         });
         var thread = new Thread(repairTask, "instance-repair");
         thread.setDaemon(true);
@@ -2068,29 +2380,29 @@ public class MainView {
     }
 
     /**
-     * Reports verification problems with their causes and re-enables
-     * the instance controls.
+     * Сообщает о проблемах проверки с причинами и вновь включает
+     * управление инстансом.
      */
     private void showProfileVerificationErrors(
             ModdedProfile profile,
             ModdedProfileVerificationService.VerificationReport report) {
         refreshLaunchButtons();
-        statusLabel.setText("Instance not launchable: "
-                + report.errors().get(0));
+        statusLabel.setText(
+                Lang.tr("launch.notlaunchable", report.errors().get(0)));
 
         StringBuilder msg = new StringBuilder(
-                "The instance cannot be launched.\n\nProblems found:\n");
+                Lang.tr("launch.cannot"));
         for (String error : report.errors()) {
             msg.append(" - ").append(error).append('\n');
         }
         if (!report.warnings().isEmpty()) {
-            msg.append("\nWarnings:\n");
+            msg.append(Lang.tr("launch.warnings"));
             for (String warning : report.warnings()) {
                 msg.append(" - ").append(warning).append('\n');
             }
         }
         ErrorDialog.show((Stage) root.getScene().getWindow(),
-                "Instance Verification Failed — " + profile.name(),
+                Lang.tr("launch.verify.failed.title", profile.name()),
                 msg.toString());
     }
 
@@ -2098,15 +2410,15 @@ public class MainView {
                                  GameProfile account,
                                  VersionMetadata metadata,
                                  GameDirectory storage) {
-        statusLabel.setText("Launching " + profile.name() + "...");
-        setLaunchStatus(profile.id(), "Launching...");
+        statusLabel.setText(Lang.tr("launch.starting", profile.name()));
+        setLaunchStatus(profile.id(), Lang.tr("launch.launching"));
         Path runtimeDir = storage.root().resolve(profile.gameDirPath());
 
         Task<LaunchResult> launchTask = new Task<>() {
             @Override
             protected LaunchResult call() throws Exception {
-                // The profile's game directory must exist before the
-                // process can run inside it
+                // Игровой каталог профиля должен существовать до запуска
+                // процесса внутри него
                 ModdedProfileService.ensureProfileFolders(runtimeDir);
                 return launchService.launch(metadata, storage, account,
                         runtimeDir,
@@ -2118,37 +2430,40 @@ public class MainView {
             if (result.isSuccess()) {
                 try {
                     moddedProfileService.touchLastPlayed(profile.id());
-                } catch (java.io.IOException ignored) {
-                    // Non-fatal
+                } catch (IOException ignored) {
+                    // Некритично
                 }
-                statusLabel.setText("Minecraft " + profile.versionId()
-                        + " is running (" + profile.name() + ")");
+                statusLabel.setText(Lang.tr("launch.running",
+                        profile.versionId(), profile.name()));
                 Stage launcherStage = (Stage) root.getScene().getWindow();
                 launcherStage.hide();
                 monitorProcess(result.process().orElseThrow(),
                         profile.versionId(), launcherStage);
             } else if (result.status() == LaunchResult.Status.FILE_CHECK_FAILED) {
-                // Rare race (files vanished between verify and launch)
+                // Редкая гонка (файлы исчезли между проверкой и запуском)
                 ModdedProfileVerificationService.VerificationReport report =
                         new ModdedProfileVerificationService.VerificationReport(
                                 false, List.of(result.message()), List.of(),
-                                java.util.Optional.of(metadata));
+                                Optional.of(metadata));
                 repairProfileAndLaunch(profile, account, storage, report);
             } else {
                 refreshLaunchButtons();
-                String msg = "Launch failed: " + result.message();
+                String msg = Lang.tr("launch.launch.failed", result.message());
                 statusLabel.setText(msg);
                 Stage launcherStage = (Stage) root.getScene().getWindow();
-                ErrorDialog.show(launcherStage, "Launch Failed",
+                ErrorDialog.show(launcherStage,
+                        Lang.tr("launch.launch.failed.title"),
                         result.status() + ": " + result.message());
             }
         });
         launchTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            String msg = "Launch error: " + launchTask.getException().getMessage();
+            String msg = Lang.tr("launch.launch.error",
+                    launchTask.getException().getMessage());
             statusLabel.setText(msg);
             Stage launcherStage = (Stage) root.getScene().getWindow();
-            ErrorDialog.show(launcherStage, "Launch Error",
+            ErrorDialog.show(launcherStage,
+                    Lang.tr("launch.launch.error.title"),
                     launchTask.getException().getClass().getSimpleName() + ": "
                             + launchTask.getException().getMessage());
         });
@@ -2158,21 +2473,21 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Java 8 auto-download (legacy instances)
+    //  Автозагрузка Java 8 (legacy-инстансы)
     // ------------------------------------------------------------------
 
     /**
-     * Downloads and installs a managed JRE 8 for a legacy instance
-     * whose only problem is the missing runtime, then re-verifies and
-     * launches.
+     * Скачивает и устанавливает управляемую JRE 8 для legacy-инстанса,
+     * единственная проблема которого — отсутствующий рантайм, затем перепроверяет
+     * и запускает.
      */
     private void downloadAndInstallJava8ForInstance(ModdedProfile profile,
                                                     GameProfile account,
                                                     GameDirectory storage,
                                                     VersionMetadata meta) {
-        statusLabel.setText("Java 8 required for " + profile.name()
-                + ". Downloading JRE 8...");
-        setLaunchStatus(profile.id(), "Installing Java...");
+        statusLabel.setText(
+                Lang.tr("launch.java.needed", profile.name()));
+        setLaunchStatus(profile.id(), Lang.tr("launch.installing"));
 
         Task<JavaRuntime> installTask = new Task<>() {
             @Override
@@ -2183,8 +2498,8 @@ public class MainView {
         };
         installTask.setOnSucceeded(e -> {
             JavaRuntime rt = installTask.getValue();
-            statusLabel.setText("Java 8 installed. Verifying " + profile.name()
-                    + " again...");
+            statusLabel.setText(
+                    Lang.tr("launch.java.installed", profile.name()));
 
             if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
                 svc.setCustomJavaPath(rt.javaExecutable());
@@ -2193,15 +2508,14 @@ public class MainView {
         });
         installTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            String msg = "Java 8 download failed: "
-                    + installTask.getException().getMessage();
+            String msg = Lang.tr("launch.java.failed",
+                    installTask.getException().getMessage());
             statusLabel.setText(msg);
             Stage launcherStage = (Stage) root.getScene().getWindow();
-            ErrorDialog.show(launcherStage, "Java Download Failed",
+            ErrorDialog.show(launcherStage, Lang.tr("launch.java.failed.title"),
                     installTask.getException().getClass().getSimpleName() + ": "
                             + installTask.getException().getMessage()
-                            + "\n\nPlease install Java 8 manually from adoptium.net"
-                            + " and restart the launcher.");
+                            + Lang.tr("launch.java.manual"));
         });
         var thread = new Thread(installTask, "java-install");
         thread.setDaemon(true);
@@ -2218,14 +2532,14 @@ public class MainView {
                 selectedProfile = profiles.get(0);
                 return selectedProfile;
             }
-        } catch (java.io.IOException e) {
-            // Fall through to create default
+        } catch (IOException e) {
+            // Проваливаемся к созданию умолчания
         }
         GameProfile defaultProfile = GameProfile.offline("Player");
         try {
             profileService.addOfflineProfile("Player");
-        } catch (java.io.IOException e) {
-            // Non-fatal — proceed with in-memory profile
+        } catch (IOException e) {
+            // Некритично — продолжаем с профилем в памяти
         }
         selectedProfile = defaultProfile;
         return defaultProfile;
@@ -2236,21 +2550,22 @@ public class MainView {
         Thread monitor = new Thread(() -> {
             try {
                 int exitCode = process.waitFor();
-                javafx.application.Platform.runLater(() -> {
+                Platform.runLater(() -> {
                     launcherStage.show();
                     if (exitCode == 0) {
-                        statusLabel.setText("Minecraft " + versionId + " exited cleanly");
+                        statusLabel.setText(
+                                Lang.tr("launch.exited", versionId));
                     } else {
-                        statusLabel.setText("Minecraft " + versionId
-                                + " crashed (exit code " + exitCode + ")");
+                        statusLabel.setText(Lang.tr("launch.crashed",
+                                versionId, exitCode));
                         String err = process.stderr();
                         if (err.isBlank()) {
                             err = process.stdout();
                         }
                         if (!err.isBlank()) {
                             ErrorDialog.show(launcherStage,
-                                    "Minecraft Crashed",
-                                    "Exit code: " + exitCode + "\n\n"
+                                    Lang.tr("launch.crash.title"),
+                                    Lang.tr("launch.crash.code", exitCode)
                                             + err.lines().limit(30)
                                                     .reduce("", (a, b) -> a + b + "\n"));
                         }
@@ -2258,9 +2573,9 @@ public class MainView {
                     refreshLaunchButtons();
                 });
             } catch (InterruptedException e) {
-                javafx.application.Platform.runLater(() -> {
+                Platform.runLater(() -> {
                     launcherStage.show();
-                    statusLabel.setText("Process monitoring interrupted");
+                    statusLabel.setText(Lang.tr("launch.monitor"));
                     refreshLaunchButtons();
                 });
             }
@@ -2270,6 +2585,6 @@ public class MainView {
     }
 
     // ------------------------------------------------------------------
-    //  Utilities
+    //  Утилиты
     // ------------------------------------------------------------------
 }

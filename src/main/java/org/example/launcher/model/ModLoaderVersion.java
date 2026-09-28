@@ -6,20 +6,20 @@ import java.util.Optional;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * A single mod loader version, resolved for one specific Minecraft
- * version (e.g. Fabric Loader 0.16.9 for Minecraft 1.21.4).
+ * Одна версия загрузчика модов, разрешённая для конкретной версии
+ * Minecraft (например, Fabric Loader 0.16.9 для Minecraft 1.21.4).
  * <p>
- * Instances are produced by {@link org.example.launcher.service.modloader.ModLoaderVersionProvider}
- * implementations, which guarantee compatibility: every entry in the
- * list returned for a Minecraft version is installable for that version.
+ * Экземпляры создаются реализациями {@link org.example.launcher.service.modloader.ModLoaderVersionProvider},
+ * гарантирующими совместимость: каждая запись списка, возвращённого для версии
+ * Minecraft, устанавливаема для этой версии.
  *
- * @param loaderType     the loader family (Fabric, Forge, …)
- * @param loaderVersion  the loader's own version (e.g. {@code "0.16.9"},
+ * @param loaderType     семейство загрузчика (Fabric, Forge, …)
+ * @param loaderVersion  собственная версия загрузчика (например, {@code "0.16.9"},
  *                       {@code "47.4.10"})
- * @param minecraftVersion the Minecraft version this entry was resolved for
- * @param stable         whether the version is marked stable/recommended
- * @param installerUrl   direct URL of the installer JAR (Forge/NeoForge),
- *                       or {@code null} for meta-API based loaders
+ * @param minecraftVersion версия Minecraft, для которой разрешена запись
+ * @param stable         признак стабильной/рекомендуемой версии
+ * @param installerUrl   прямой URL JAR установщика (Forge/NeoForge)
+ *                       либо {@code null} для загрузчиков на основе meta-API
  *                       (Fabric/Quilt)
  */
 public record ModLoaderVersion(
@@ -36,16 +36,16 @@ public record ModLoaderVersion(
     }
 
     /**
-     * The installer JAR URL wrapped as an Optional
-     * ({@code Optional.empty()} for meta-API based loaders).
+     * URL JAR установщика, обёрнутый в Optional
+     * ({@code Optional.empty()} для загрузчиков на основе meta-API).
      */
     public Optional<String> installerUrlOpt() {
         return Optional.ofNullable(installerUrl);
     }
 
     /**
-     * The resulting installed version id, following each loader's
-     * convention:
+     * Результирующий идентификатор установленной версии согласно соглашению
+     * каждого загрузчика:
      * <ul>
      *   <li>Fabric: {@code fabric-loader-0.16.9-1.21.4}</li>
      *   <li>Quilt: {@code quilt-loader-0.26.0-1.21.4}</li>

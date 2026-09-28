@@ -5,45 +5,45 @@ import java.nio.file.Path;
 import org.example.launcher.model.JavaRuntime;
 
 /**
- * Installs Java runtimes into the launcher's managed directory.
+ * Устанавливает рантаймы Java в управляемый каталог лаунчера.
  * <p>
- * This interface is a seam for future functionality: when
- * {@link JavaResolutionService} reports that no suitable runtime is
- * available, the launcher can invoke an installer to download and
- * extract a compatible JRE (e.g. from Mojang's
- * {@code java-runtime-manifest} or Eclipse Adoptium).
+ * Интерфейс — точка расширения для будущей функциональности: когда
+ * {@link JavaResolutionService} сообщает об отсутствии подходящего рантайма,
+ * лаунчер может вызвать установщик для скачивания и распаковки
+ * совместимого JRE (например, из Mojang
+ * {@code java-runtime-manifest} или Eclipse Adoptium).
  * <p>
- * The initial implementation will be a stub; a concrete implementation
- * can be added later without changing any call sites.
+ * Первая реализация будет заглушкой; конкретную реализацию
+ * можно добавить позже без изменения точек вызова.
  */
 public interface JavaRuntimeInstaller {
 
     /**
-     * Installs a Java runtime for the given Mojang component identifier.
+     * Устанавливает рантайм Java под заданный идентификатор компонента Mojang.
      * <p>
-     * Mojang's runtime manifest maps component names like
-     * {@code "java-runtime-gamma"} to platform-specific downloads.
+     * Манифест рантаймов Mojang отображает имена компонентов вида
+     * {@code "java-runtime-gamma"} на платформенные загрузки.
      *
-     * @param component the Mojang runtime component (e.g.
+     * @param component компонент рантайма Mojang (например,
      *                  {@code "java-runtime-gamma"})
-     * @param targetDir the directory to install into
-     * @return the installed {@link JavaRuntime}, or {@code null} if
-     *         installation failed
-     * @throws Exception if an unrecoverable error occurs
+     * @param targetDir каталог для установки
+     * @return установленный {@link JavaRuntime} или {@code null}, если
+     *         установка не удалась
+     * @throws Exception при невосстановимой ошибке
      */
     JavaRuntime install(String component, Path targetDir) throws Exception;
 
     /**
-     * Installs a Java runtime with at least the given major version.
+     * Устанавливает рантайм Java как минимум с заданной major-версией.
      * <p>
-     * This is used when the version metadata does not carry a Mojang
-     * component identifier (legacy versions).
+     * Используется, когда метаданные версии не содержат идентификатор
+     * компонента Mojang (старые версии).
      *
-     * @param requiredMajor the minimum major version (e.g. 17)
-     * @param targetDir     the directory to install into
-     * @return the installed {@link JavaRuntime}, or {@code null} if
-     *         installation failed
-     * @throws Exception if an unrecoverable error occurs
+     * @param requiredMajor минимальная major-версия (например, 17)
+     * @param targetDir     каталог для установки
+     * @return установленный {@link JavaRuntime} или {@code null}, если
+     *         установка не удалась
+     * @throws Exception при невосстановимой ошибке
      */
     JavaRuntime install(int requiredMajor, Path targetDir) throws Exception;
 }

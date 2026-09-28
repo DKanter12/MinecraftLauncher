@@ -28,40 +28,42 @@ import javafx.stage.StageStyle;
 
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.util.JvmArgs;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
 import org.example.launcher.version.StandardVersionType;
+import org.example.launcher.i18n.Lang;
 
 /**
- * Modal dialog for creating a new game instance — one simple screen,
- * everything chosen from lists (no typing required):
+ * Модальный диалог создания нового игрового инстанса — один простой экран,
+ * всё выбирается из списков (ввод с клавиатуры не требуется):
  * <ol>
- *   <li><b>Loader</b> — chips: Vanilla, Fabric, Forge, NeoForge, Quilt.</li>
- *   <li><b>Version type</b> — chips (Release, Snapshot, Old Beta, Old
- *       Alpha), offered for Vanilla only — mod loaders run on
- *       releases.</li>
- *   <li><b>Version</b> — a list of the matching versions, newest
- *       first (e.g. {@code 1.21.4}, {@code 25w14a}).</li>
- *   <li><b>Loader version</b> — for modded loaders, fetched
- *       asynchronously from the loader's provider (all entries are
- *       guaranteed compatible with the chosen version).</li>
+ *   <li><b>Загрузчик</b> — чипы: Vanilla, Fabric, Forge, NeoForge, Quilt.</li>
+ *   <li><b>Тип версии</b> — чипы (Release, Snapshot, Old Beta, Old
+ *       Alpha), предлагаются только для Vanilla — модовые загрузчики
+ *       работают на релизах.</li>
+ *   <li><b>Версия</b> — список подходящих версий, сначала новые
+ *       (например, {@code 1.21.4}, {@code 25w14a}).</li>
+ *   <li><b>Версия загрузчика</b> — для модовых загрузчиков, загружается
+ *       асинхронно от провайдера загрузчика (все записи
+ *       гарантированно совместимы с выбранной версией).</li>
  * </ol>
- * Extra JVM arguments (e.g. {@code -Xmx4G}) can be given; the
- * instance name is typed in freely and defaults to the loader and
- * the Minecraft version when left empty.
+ * Можно указать дополнительные JVM-аргументы (например, {@code -Xmx4G});
+ * имя инстанса вводится свободно и по умолчанию состоит из загрузчика
+ * и версии Minecraft, если оставлено пустым.
  */
 public class NewInstanceDialog extends Stage {
 
     /**
-     * The created instance's parameters.
+     * Параметры созданного инстанса.
      *
-     * @param type         vanilla or the mod loader family
-     * @param mcVersion    the target Minecraft version
-     * @param loader       the selected loader version ({@code null}
-     *                     for vanilla)
-     * @param extraJvmArgs additional JVM launch parameters
-     * @param name         instance display name (blank means the
-     *                     automatic "Loader MC" name)
+     * @param type         ванилла или семейство модового загрузчика
+     * @param mcVersion    целевая версия Minecraft
+     * @param loader       выбранная версия загрузчика ({@code null}
+     *                     для ваниллы)
+     * @param extraJvmArgs дополнительные параметры запуска JVM
+     * @param name         отображаемое имя инстанса (пустое означает
+     *                     автоматическое имя «Загрузчик МК»)
      */
     public record Result(ModLoaderType type,
                          MinecraftVersion mcVersion,
@@ -85,20 +87,20 @@ public class NewInstanceDialog extends Stage {
     private final TextField nameField = new TextField();
     private final ProgressIndicator loaderProgress = new ProgressIndicator();
     private final Label loaderStatusLabel = new Label();
-    private final Button createButton = new Button("Create");
+    private final Button createButton = new Button();
 
     private final VBox loaderChipsBox;
     private final VBox categoryBox;
     private final VBox versionListBox;
     private final VBox loaderBox;
 
-    /** Last requested loader-version fetch (deduplicates requests). */
+    /** Последний запрошенный список версий загрузчика (защита от дублей). */
     private ModLoaderType fetchedLoader;
     private String fetchedMcId;
 
     /**
-     * Full picker mode: loader chips, version type chips, version
-     * list and loader version list.
+     * Полный режим выбора: чипы загрузчиков, чипы типов версий, список
+     * версий и список версий загрузчика.
      */
     public NewInstanceDialog(Stage owner,
                              ModLoaderRegistry registry,
@@ -113,19 +115,19 @@ public class NewInstanceDialog extends Stage {
         MinecraftVersion shownVersion =
                 (manifestVersions != null && !manifestVersions.isEmpty()
                         ? manifestVersions.get(0) : null);
-        setTitle("New Instance"
+        setTitle(Lang.tr("new.title")
                 + (shownVersion != null ? ": " + shownVersion.id() : ""));
 
-        // -- 0. Instance name (optional — automatic when empty) --
-        Label nameTitle = new Label("Instance name");
+        // -- 0. Имя инстанса (необязательно — при пустом подставится автоматически) --
+        Label nameTitle = new Label(Lang.tr("new.name"));
         nameTitle.getStyleClass().add("section-title");
-        nameField.setPromptText("e.g. My Pack (optional)");
+        nameField.setPromptText(Lang.tr("new.name.prompt"));
         nameField.getStyleClass().add("search-field");
         nameField.setMaxWidth(Double.MAX_VALUE);
         VBox nameBox = new VBox(4, nameTitle, nameField);
 
-        // -- 1. Loader chips --
-        Label loaderTitle = new Label("Loader");
+        // -- 1. Чипы загрузчиков --
+        Label loaderTitle = new Label(Lang.tr("new.loader"));
         loaderTitle.getStyleClass().add("section-title");
         List<ModLoaderType> loaders = new ArrayList<>();
         loaders.add(ModLoaderType.VANILLA);
@@ -156,13 +158,13 @@ public class NewInstanceDialog extends Stage {
         });
         loaderChipsBox = new VBox(4, loaderTitle, loaderChips);
 
-        // -- 2. Version type chips (vanilla only) --
-        Label categoryTitle = new Label("Version type");
+        // -- 2. Чипы типов версий (только ванилла) --
+        Label categoryTitle = new Label(Lang.tr("new.category"));
         categoryTitle.getStyleClass().add("section-title");
         for (StandardVersionType type : List.of(StandardVersionType.RELEASE,
                 StandardVersionType.SNAPSHOT, StandardVersionType.OLD_BETA,
                 StandardVersionType.OLD_ALPHA)) {
-            ToggleButton chip = new ToggleButton(type.displayName());
+            ToggleButton chip = new ToggleButton(categoryLabel(type));
             chip.getStyleClass().add("filter-button");
             chip.setToggleGroup(categoryGroup);
             chip.setUserData(type);
@@ -182,12 +184,12 @@ public class NewInstanceDialog extends Stage {
         });
         categoryBox = new VBox(4, categoryTitle, categoryChips);
 
-        // -- 3. Version list --
-        Label versionTitle = new Label("Version");
+        // -- 3. Список версий --
+        Label versionTitle = new Label(Lang.tr("new.version"));
         versionTitle.getStyleClass().add("section-title");
         versionList.getStyleClass().add("profile-list");
         versionList.setPrefHeight(230);
-        versionList.setPlaceholder(new Label("No versions in this category."));
+        versionList.setPlaceholder(new Label(Lang.tr("new.empty")));
         versionList.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(MinecraftVersion item, boolean empty) {
@@ -213,8 +215,8 @@ public class NewInstanceDialog extends Stage {
                 (obs, old, val) -> onInputsChanged());
         versionListBox = new VBox(4, versionTitle, versionList);
 
-        // -- 4. Loader version (modded only) --
-        Label loaderVersionTitle = new Label("Loader version");
+        // -- 4. Версия загрузчика (только для модовых) --
+        Label loaderVersionTitle = new Label(Lang.tr("new.loaderversion"));
         loaderVersionTitle.getStyleClass().add("section-title");
         loaderCombo.setMaxWidth(Double.MAX_VALUE);
         loaderCombo.setDisable(true);
@@ -224,7 +226,7 @@ public class NewInstanceDialog extends Stage {
             public String toString(ModLoaderVersion v) {
                 if (v == null) return "";
                 return v.loaderVersion()
-                        + (v.stable() ? "" : "  (beta)");
+                        + (v.stable() ? "" : Lang.tr("new.beta"));
             }
 
             @Override
@@ -240,9 +242,8 @@ public class NewInstanceDialog extends Stage {
         loaderBox = new VBox(4, loaderVersionTitle, loaderCombo,
                 loaderStatusRow);
 
-        // -- JVM args --
-        Label jvmLabel = new Label(
-                "Extra JVM arguments (one per line, optional)");
+        // -- JVM-аргументы --
+        Label jvmLabel = new Label(Lang.tr("new.jvm"));
         jvmLabel.getStyleClass().add("section-title");
         jvmArgsArea.setPromptText("-Xmx4G");
         jvmArgsArea.setPrefRowCount(3);
@@ -250,9 +251,10 @@ public class NewInstanceDialog extends Stage {
         jvmArgsArea.setWrapText(false);
         jvmArgsArea.getStyleClass().add("profile-jvm-args");
 
-        // -- Buttons --
+        // -- Кнопки --
         createButton.getStyleClass().add("install-close-button");
         createButton.setDefaultButton(true);
+        createButton.setText(Lang.tr("button.create"));
         createButton.setOnAction(e -> {
             ModLoaderType type = selectedLoader();
             result = new Result(
@@ -264,7 +266,7 @@ public class NewInstanceDialog extends Stage {
                     nameField.getText().trim());
             close();
         });
-        Button cancelButton = new Button("Cancel");
+        Button cancelButton = new Button(Lang.tr("button.cancel"));
         cancelButton.getStyleClass().add("install-close-button");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> close());
@@ -272,7 +274,7 @@ public class NewInstanceDialog extends Stage {
         buttons.setAlignment(Pos.CENTER_RIGHT);
         buttons.setPadding(new Insets(8, 0, 0, 0));
 
-        // -- Initial state: newest release preselected --
+        // -- Начальное состояние: новейший релиз предвыбран --
         refreshVersionList();
         if (versionList.getSelectionModel().getSelectedItem() == null) {
             onInputsChanged();
@@ -297,7 +299,21 @@ public class NewInstanceDialog extends Stage {
         setScene(scene);
     }
 
-    /** The currently selected loader family (Vanilla by default). */
+    /** Локализованная подпись чипа типа версии. */
+    private static String categoryLabel(StandardVersionType type) {
+        if (type == StandardVersionType.RELEASE) {
+            return Lang.tr("new.type.release");
+        }
+        if (type == StandardVersionType.SNAPSHOT) {
+            return Lang.tr("new.type.snapshot");
+        }
+        if (type == StandardVersionType.OLD_BETA) {
+            return Lang.tr("new.type.oldbeta");
+        }
+        return Lang.tr("new.type.oldalpha");
+    }
+
+    /** Текущее выбранное семейство загрузчиков (по умолчанию Vanilla). */
     private ModLoaderType selectedLoader() {
         var selected = loaderGroup.getSelectedToggle();
         if (selected instanceof ToggleButton btn
@@ -307,15 +323,15 @@ public class NewInstanceDialog extends Stage {
         return ModLoaderType.VANILLA;
     }
 
-    /** The MC version of the instance to create. */
+    /** Версия МК создаваемого инстанса. */
     private MinecraftVersion effectiveVersion() {
         return versionList.getSelectionModel().getSelectedItem();
     }
 
     /**
-     * Loader switch: modded loaders run on releases only (the version
-     * type chips are hidden and Release is forced); vanilla offers
-     * all version types.
+     * Переключение загрузчика: модовые работают только на релизах (чипы типов
+     * версий скрываются и принудительно выбирается Release); ванилла предлагает
+     * все типы версий.
      */
     private void onLoaderChanged() {
         boolean modded = selectedLoader() != ModLoaderType.VANILLA;
@@ -344,9 +360,9 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Rebuilds the version list for the active loader + category,
-     * keeping the current selection when it still matches and
-     * selecting the newest version otherwise.
+     * Перестраивает список версий под активные загрузчик + категорию,
+     * сохраняя текущий выбор, если он подходит, и выбирая новейшую версию
+     * в противном случае.
      */
     private void refreshVersionList() {
         boolean modded = selectedLoader() != ModLoaderType.VANILLA;
@@ -372,15 +388,15 @@ public class NewInstanceDialog extends Stage {
                 }
             }
         }
-        // Newest first (the manifest is newest-first)
+        // Сначала новые (манифест уже отсортирован от новых к старым)
         versionList.getSelectionModel().selectFirst();
     }
 
     /**
-     * Reacts to loader/version changes: shows the loader version row
-     * only for modded loaders, fetches their versions asynchronously
-     * (deduplicated per loader + version) and keeps the Create button
-     * in sync.
+     * Реакция на смену загрузчика/версии: строка версии загрузчика
+     * показывается только для модовых, их версии подгружаются асинхронно
+     * (с дедупликацией по паре загрузчик + версия), кнопка создания
+     * держится в актуальном состоянии.
      */
     private void onInputsChanged() {
         ModLoaderType loader = selectedLoader();
@@ -398,8 +414,8 @@ public class NewInstanceDialog extends Stage {
             return;
         }
 
-        // Same loader + version: items are already loaded or the
-        // request is in flight — no second fetch
+        // Тот же загрузчик + версия: элементы уже загружены или запрос
+        // в пути — повторный запрос не нужен
         if (loader == fetchedLoader && mc.id().equals(fetchedMcId)) {
             loaderCombo.setDisable(loaderCombo.getItems().isEmpty());
             return;
@@ -407,16 +423,16 @@ public class NewInstanceDialog extends Stage {
 
         var regEntry = registry.get(loader).orElse(null);
         if (regEntry == null) {
-            loaderStatusLabel.setText(loader.displayName()
-                    + " is not available in this launcher");
+            loaderStatusLabel.setText(Lang.tr("new.unavailable",
+                    loader.displayName()));
             return;
         }
 
         fetchedLoader = loader;
         fetchedMcId = mc.id();
         loaderProgress.setVisible(true);
-        loaderStatusLabel.setText("Loading " + loader.displayName()
-                + " versions for MC " + mc.id() + "...");
+        loaderStatusLabel.setText(Lang.tr("new.loading",
+                loader.displayName(), mc.id()));
 
         Thread fetch = new Thread(() -> {
             List<ModLoaderVersion> versions;
@@ -426,8 +442,8 @@ public class NewInstanceDialog extends Stage {
                 Platform.runLater(() -> {
                     if (selectedLoader() == loader && isCurrent(mc)) {
                         loaderProgress.setVisible(false);
-                        loaderStatusLabel.setText("Failed to load versions: "
-                                + ex.getMessage());
+                        loaderStatusLabel.setText(Lang.tr("new.loadfailed",
+                                ex.getMessage()));
                         fetchedLoader = null;
                         fetchedMcId = null;
                         updateCreateButtonState();
@@ -437,19 +453,18 @@ public class NewInstanceDialog extends Stage {
             }
             Platform.runLater(() -> {
                 if (selectedLoader() != loader || !isCurrent(mc)) {
-                    return; // selection changed meanwhile
+                    return; // выбор тем временем изменился
                 }
                 loaderProgress.setVisible(false);
                 if (versions.isEmpty()) {
-                    loaderStatusLabel.setText("No " + loader.displayName()
-                            + " versions for MC " + mc.id());
+                    loaderStatusLabel.setText(Lang.tr("new.none",
+                            loader.displayName(), mc.id()));
                 } else {
                     loaderCombo.getItems().setAll(versions);
                     loaderCombo.getSelectionModel().selectFirst();
                     loaderCombo.setDisable(false);
-                    loaderStatusLabel.setText(versions.size()
-                            + " versions for MC " + mc.id()
-                            + " (all compatible)");
+                    loaderStatusLabel.setText(Lang.tr("new.count",
+                            versions.size(), mc.id()));
                 }
                 updateCreateButtonState();
             });
@@ -458,7 +473,7 @@ public class NewInstanceDialog extends Stage {
         fetch.start();
     }
 
-    /** True if {@code mc} is the version the dialog would create now. */
+    /** True, если {@code mc} — версия, которая будет создана сейчас. */
     private boolean isCurrent(MinecraftVersion mc) {
         MinecraftVersion current = effectiveVersion();
         return current != null && current.id().equals(mc.id());
@@ -490,20 +505,12 @@ public class NewInstanceDialog extends Stage {
     }
 
     private static List<String> parseJvmArgs(String text) {
-        List<String> args = new ArrayList<>();
-        if (text == null) return List.of();
-        for (String line : text.split("\\R")) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty()) {
-                args.add(trimmed);
-            }
-        }
-        return List.copyOf(args);
+        return JvmArgs.parse(text);
     }
 
     /**
-     * Shows the dialog and returns the creation parameters, or
-     * {@code null} if it was cancelled.
+     * Показывает диалог и возвращает параметры создания, либо
+     * {@code null}, если он был отменён.
      */
     public static Result show(Stage owner,
                               ModLoaderRegistry registry,

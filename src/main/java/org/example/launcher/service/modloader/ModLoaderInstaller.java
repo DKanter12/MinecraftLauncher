@@ -11,32 +11,32 @@ import org.example.launcher.model.ModLoaderVersion;
 import org.example.launcher.model.VersionMetadata;
 
 /**
- * Installs a mod loader for a specific vanilla Minecraft version,
- * fully automatic (no manual installer run required).
+ * Устанавливает мод-загрузчик под конкретную ванильную версию Minecraft,
+ * полностью автоматически (ручной запуск установщика не требуется).
  * <p>
- * Implementations must:
+ * Реализации обязаны:
  * <ol>
- *   <li>download the necessary loader files (and dependencies);</li>
- *   <li>create a launch configuration (local version JSON following
- *       the {@code versions/{id}/{id}.json} layout);</li>
- *   <li>ensure the vanilla base is installed;</li>
- *   <li>verify the installation (hash checks).</li>
+ *   <li>скачать необходимые файлы загрузчика (и зависимости);</li>
+ *   <li>создать конфигурацию запуска (локальный JSON версии в раскладке
+ *       {@code versions/{id}/{id}.json});</li>
+ *   <li>обеспечить установку ванильной базы;</li>
+ *   <li>проверить установку (проверки хэшей).</li>
  * </ol>
  */
 public interface ModLoaderInstaller {
 
     /**
-     * Installs the given mod loader version.
+     * Устанавливает заданную версию мод-загрузчика.
      *
-     * @param vanillaVersion   the vanilla manifest entry for the target
-     *                         Minecraft version
-     * @param vanillaMetadata  pre-fetched vanilla metadata for that version
-     * @param loader           the loader version to install
-     * @param gameDir          the game directory layout
-     * @param progress         progress callback
-     * @return install result including the created version id
-     * @throws IOException on critical failures (network, IO, installer
-     *                     process errors)
+     * @param vanillaVersion   ванильная запись манифеста целевой версии
+     *                         Minecraft
+     * @param vanillaMetadata  предзагруженные ванильные метаданные этой версии
+     * @param loader           устанавливаемая версия загрузчика
+     * @param gameDir          раскладка игрового каталога
+     * @param progress         колбэк прогресса
+     * @return результат установки, включая созданный id версии
+     * @throws IOException при критических сбоях (сеть, ввод-вывод, ошибки
+     *                     процесса установщика)
      */
     ModLoaderInstallResult install(MinecraftVersion vanillaVersion,
                                    VersionMetadata vanillaMetadata,
@@ -45,13 +45,13 @@ public interface ModLoaderInstaller {
                                    InstallationProgress progress) throws IOException;
 
     /**
-     * Result of a mod loader installation.
+     * Результат установки мод-загрузчика.
      *
-     * @param versionId   the installed modded version id
-     *                    (e.g. {@code fabric-loader-0.16.9-1.21.4})
-     * @param fileResult  aggregate result of the file installation
-     *                    (downloads + hash verification), or {@code null}
-     *                    when the loader performs its own file management
+     * @param versionId   id установленной модовой версии
+     *                    (например, {@code fabric-loader-0.16.9-1.21.4})
+     * @param fileResult  сводный результат установки файлов
+     *                    (скачивания + проверка хэшей) либо {@code null},
+     *                    когда загрузчик ведёт собственное управление файлами
      */
     record ModLoaderInstallResult(String versionId, InstallationResult fileResult) {
 

@@ -5,7 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 
 import org.example.launcher.install.ChecksumVerifier;
 import org.example.launcher.install.GameDirectory;
@@ -19,17 +19,18 @@ import org.example.launcher.model.LaunchResult;
 import org.example.launcher.model.Library;
 import org.example.launcher.model.MinecraftProcess;
 import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.util.LibraryPaths;
 import org.example.launcher.util.OsDetector;
 
 /**
- * Default {@link MinecraftLaunchService}.
+ * Реализация {@link MinecraftLaunchService} по умолчанию.
  * <p>
- * Performs pre-launch verification (file existence + SHA-1 integrity),
- * Java runtime resolution, argument building, and process management.
+ * Выполняет предстартовую проверку (наличие файлов + целостность по SHA-1),
+ * разрешение рантайма Java, построение аргументов и управление процессом.
  * <p>
- * File verification reuses the same path-resolution logic as
- * {@link MinecraftInstaller} to ensure consistency between what was
- * installed and what is verified at launch time.
+ * Проверка файлов переиспользует ту же логику разрешения путей, что и
+ * {@link MinecraftInstaller}, чтобы гарантировать соответствие между тем,
+ * что было установлено, и тем, что проверяется при запуске.
  */
 public class MinecraftLauncher implements MinecraftLaunchService {
 
@@ -40,13 +41,13 @@ public class MinecraftLauncher implements MinecraftLaunchService {
     public MinecraftLauncher(LaunchArgumentBuilder argumentBuilder,
                              JavaResolutionService javaResolutionService,
                              ChecksumVerifier checksumVerifier) {
-        this.argumentBuilder = argumentBuilder;
-        this.javaResolutionService = javaResolutionService;
-        this.checksumVerifier = checksumVerifier;
+        this.argumentBuilder = Objects.requireNonNull(argumentBuilder, "argumentBuilder");
+        this.javaResolutionService = Objects.requireNonNull(javaResolutionService, "javaResolutionService");
+        this.checksumVerifier = Objects.requireNonNull(checksumVerifier, "checksumVerifier");
     }
 
     // ------------------------------------------------------------------
-    //  Launch
+    //  Запуск
     // ------------------------------------------------------------------
 
     @Override
@@ -63,7 +64,7 @@ public class MinecraftLauncher implements MinecraftLaunchService {
                                 Path runtimeDirectory,
                                 List<String> extraJvmArgs) {
 
-        // 1. Verify files
+        // 1. Проверка файлов
         List<String> missing = verifyFiles(metadata, gameDir);
         if (!missing.isEmpty()) {
             return LaunchResult.fileCheckFailed(
@@ -71,7 +72,7 @@ public class MinecraftLauncher implements MinecraftLaunchService {
                             + String.join(", ", missing));
         }
 
-        // 2. Resolve Java
+        // 2. Подбор Java
         JavaResolutionResult javaResult = javaResolutionService.resolve(metadata);
         if (!javaResult.isFound()) {
             return LaunchResult.javaNotFound(
@@ -80,7 +81,7 @@ public class MinecraftLauncher implements MinecraftLaunchService {
 
         JavaRuntime javaRuntime = javaResult.runtime().orElseThrow();
 
-        // 3. Extract natives
+        // 3. Распаковка нативов
         try {
             NativeExtractor.extractNatives(metadata, gameDir);
         } catch (IOException e) {
@@ -88,13 +89,13 @@ public class MinecraftLauncher implements MinecraftLaunchService {
                     "Failed to extract native libraries: " + e.getMessage());
         }
 
-        // 4. Build arguments (runtime dir + extra JVM args for modded
-        //    profiles; defaults for vanilla launches)
+        // 4. Построение аргументов (рабочий каталог + доп. JVM-аргументы для
+        //    модовых профилей; значения по умолчанию для ванильных запусков)
         LaunchArguments args = argumentBuilder.build(
                 metadata, gameDir, profile, javaRuntime,
                 runtimeDirectory, extraJvmArgs);
 
-        // 5. Start process
+        // 5. Старт процесса
         try {
             ProcessBuilder pb = new ProcessBuilder(args.fullCommand());
             pb.directory(args.workingDirectory().toFile());
@@ -103,8 +104,8 @@ public class MinecraftLauncher implements MinecraftLaunchService {
             Process process = pb.start();
             MinecraftProcess mcProcess = new MinecraftProcess(process);
 
-            // Brief delay to catch immediate crashes (e.g. wrong Java version,
-            // missing main class) so we can return a useful error
+            // Короткая пауза для поимки мгновенных падений (например, неверная версия
+            // Java, отсутствующий main-класс), чтобы вернуть полезную ошибку
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
@@ -131,28 +132,28 @@ public class MinecraftLauncher implements MinecraftLaunchService {
     }
 
     // ------------------------------------------------------------------
-    //  File verification
+    //  Проверка файлов
     // ------------------------------------------------------------------
 
     /**
-     * Verifies that all files required by the version metadata exist
-     * locally and (where a SHA-1 hash is known) match the expected
-     * checksum.
+     * Проверяет, что все файлы, требуемые метаданными версии, существуют
+     * локально и (где известен SHA-1 хэш) совпадают с ожидаемой
+     * контрольной суммой.
      *
-     * @return a list of human-readable descriptions of missing/corrupt
-     *         files; empty if everything is OK
+     * @return список человекочитаемых описаний отсутствующих/повреждённых
+     *         файлов; пуст, если всё в порядке
      */
     public List<String> verifyFiles(VersionMetadata metadata, GameDirectory gameDir) {
         List<String> problems = new ArrayList<>();
         String osName = OsDetector.mojangName();
 
-        // Client JAR
+        // Клиентский JAR
         metadata.clientDownload().ifPresent(dl -> {
             Path jar = gameDir.clientJar(metadata.id());
             checkFile(jar, dl.sha1().orElse(null), "client JAR", problems);
         });
 
-        // Libraries + native JARs for current OS
+        // Библиотеки + нативные JAR под текущую ОС
         for (Library lib : metadata.libraries()) {
             lib.artifact().ifPresent(artifact -> {
                 Path libPath = resolveLibraryPath(gameDir, artifact);
@@ -160,16 +161,14 @@ public class MinecraftLauncher implements MinecraftLaunchService {
                         "library " + lib.name(), problems);
             });
 
-            var nativeDl = lib.nativeDownload(osName);
-            if (nativeDl.isPresent()) {
-                DownloadInfo dl = nativeDl.get();
+            lib.nativeDownload(osName).ifPresent(dl -> {
                 Path nativePath = resolveLibraryPath(gameDir, dl);
                 checkFile(nativePath, dl.sha1().orElse(null),
                         "native " + lib.name() + " (" + osName + ")", problems);
-            }
+            });
         }
 
-        // Asset index file
+        // Файл asset-индекса
         metadata.assetIndex().ifPresent(ai -> {
             Path indexFile = gameDir.assetIndexFile(ai.id());
             checkFile(indexFile, ai.sha1().orElse(null),
@@ -193,16 +192,6 @@ public class MinecraftLauncher implements MinecraftLaunchService {
     }
 
     private Path resolveLibraryPath(GameDirectory gameDir, DownloadInfo dl) {
-        Optional<String> pathOpt = dl.path();
-        if (pathOpt.isPresent()) {
-            return gameDir.library(pathOpt.get());
-        }
-        String url = dl.url();
-        if (url != null && !url.isBlank()) {
-            int idx = url.lastIndexOf('/');
-            String fileName = (idx >= 0) ? url.substring(idx + 1) : url;
-            return gameDir.librariesDir().resolve(fileName);
-        }
-        return gameDir.librariesDir().resolve("unknown.jar");
+        return LibraryPaths.resolve(gameDir, dl);
     }
 }

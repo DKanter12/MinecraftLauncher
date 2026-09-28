@@ -11,20 +11,20 @@ import org.example.launcher.model.JavaVersion;
 import org.example.launcher.model.VersionMetadata;
 
 /**
- * Default {@link JavaResolutionService}.
+ * Реализация {@link JavaResolutionService} по умолчанию.
  * <p>
- * Delegates runtime discovery to a {@link JavaDetector} and selects
- * the runtime with the lowest major version that still satisfies the
- * requirement (to avoid unnecessarily running on a much newer JDK).
+ * Делегирует поиск рантаймов {@link JavaDetector} и выбирает
+ * рантайм с минимальной major-версией, которая ещё удовлетворяет
+ * требованию (чтобы не запускать игру на излишне новом JDK).
  * <p>
- * If the version metadata does not carry a {@link JavaVersion}, a
- * configurable fallback major version is used (default: 8, since
- * legacy Minecraft versions were designed for Java 8).
+ * Если метаданные версии не содержат {@link JavaVersion},
+ * используется настраиваемая запасная major-версия (по умолчанию: 8,
+ * т.к. старые версии Minecraft рассчитаны на Java 8).
  * <p>
- * A user-specified custom Java path can be set via
- * {@link #setCustomJavaPath(Path)}; when set, the detector probes
- * that path and the resulting runtime is included in the candidate
- * list alongside any system-detected runtimes.
+ * Пользовательский путь к Java задаётся через
+ * {@link #setCustomJavaPath(Path)}; при установке детектор проверяет
+ * этот путь, и найденный рантайм включается в список кандидатов
+ * наряду с системными.
  */
 public class DefaultJavaResolutionService implements JavaResolutionService {
 
@@ -42,10 +42,10 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
     }
 
     /**
-     * Sets a user-specified Java executable path to include in
-     * future resolution calls. Pass {@code null} to clear.
+     * Задаёт пользовательский путь к исполняемому файлу Java для
+     * учёта в будущих вызовах разрешения. {@code null} сбрасывает настройку.
      *
-     * @param javaExe path to a {@code java}/{@code java.exe} executable
+     * @param javaExe путь к исполняемому файлу {@code java}/{@code java.exe}
      */
     public void setCustomJavaPath(Path javaExe) {
         this.customJavaPath = javaExe;
@@ -63,7 +63,7 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
     public JavaResolutionResult resolve(int requiredMajor) {
         List<JavaRuntime> runtimes = new ArrayList<>(detector.detectInstalledRuntimes());
 
-        // Add custom Java path if set
+        // Добавить пользовательский путь к Java, если задан
         if (customJavaPath != null) {
             JavaRuntime custom = detector.detectFromPath(
                     customJavaPath.getParent().getParent(),
@@ -78,11 +78,11 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
                     "No Java runtime was found on this system.");
         }
 
-        // Old Minecraft versions (beta, alpha, 1.6–1.12) use
-        // net.minecraft.launchwrapper.Launch which casts the system
-        // ClassLoader to URLClassLoader — that cast fails on Java 9+.
-        // For those versions (majorVersion <= 8) we must use Java 8
-        // exactly, not just "8 or higher".
+        // Старые версии Minecraft (beta, alpha, 1.6–1.12) используют
+        // net.minecraft.launchwrapper.Launch, который приводит системный
+        // ClassLoader к URLClassLoader — это приведение падает на Java 9+.
+        // Для таких версий (majorVersion <= 8) нужен ровно Java 8,
+        // а не просто «8 или выше».
         boolean exactMatch = requiredMajor <= 8;
 
         var compatible = runtimes.stream()

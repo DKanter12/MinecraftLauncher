@@ -14,12 +14,14 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
+import org.example.launcher.util.Json;
+
 /**
- * Reads and writes {@link org.example.launcher.model.GameProfile}s
- * to the local {@code launcher_profiles.json} file.
+ * Читает и пишет {@link org.example.launcher.model.GameProfile}s
+ * в локальный файл {@code launcher_profiles.json}.
  * <p>
- * JSON parsing is isolated in {@link #parseProfiles(String)} for
- * unit testing without file I/O.
+ * Разбор JSON выделен в {@link #parseProfiles(String)} для
+ * юнит-тестирования без файлового ввода-вывода.
  */
 public class ProfileService {
 
@@ -36,8 +38,8 @@ public class ProfileService {
     }
 
     /**
-     * Loads all profiles from the profiles file. Returns an empty
-     * list if the file does not exist or is empty.
+     * Загружает все профили из файла профилей. Возвращает пустой
+     * список, если файл отсутствует или пуст.
      */
     public List<org.example.launcher.model.GameProfile> loadProfiles() throws IOException {
         if (!Files.isRegularFile(profilesFile)) {
@@ -48,8 +50,8 @@ public class ProfileService {
     }
 
     /**
-     * Saves the given profiles to the profiles file, overwriting any
-     * existing content. Parent directories are created as needed.
+     * Сохраняет заданные профили в файл профилей, перезаписывая всё
+     * существующее содержимое. Родительские каталоги создаются при необходимости.
      */
     public void saveProfiles(List<org.example.launcher.model.GameProfile> profiles) throws IOException {
         Path parent = profilesFile.getParent();
@@ -60,7 +62,7 @@ public class ProfileService {
     }
 
     /**
-     * Adds an offline profile and saves.
+     * Добавляет офлайн-профиль и сохраняет.
      */
     public org.example.launcher.model.GameProfile addOfflineProfile(String name) throws IOException {
         var profiles = new ArrayList<>(loadProfiles());
@@ -72,7 +74,7 @@ public class ProfileService {
     }
 
     /**
-     * Finds a profile by name.
+     * Ищет профиль по имени.
      */
     public Optional<org.example.launcher.model.GameProfile> findByName(String name) throws IOException {
         return loadProfiles().stream()
@@ -81,9 +83,9 @@ public class ProfileService {
     }
 
     /**
-     * Removes the profile with the given name and saves.
+     * Удаляет профиль с заданным именем и сохраняет.
      *
-     * @return true when a profile was removed
+     * @return true, если профиль был удалён
      */
     public boolean deleteProfile(String name) throws IOException {
         var profiles = new ArrayList<>(loadProfiles());
@@ -95,11 +97,11 @@ public class ProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  Parsing (pure, testable)
+    //  Разбор (чистый, тестируемый)
     // ------------------------------------------------------------------
 
     /**
-     * Parses a raw {@code launcher_profiles.json} string.
+     * Разбирает сырую строку {@code launcher_profiles.json}.
      */
     public List<org.example.launcher.model.GameProfile> parseProfiles(String json) throws IOException {
         if (json == null || json.isBlank()) {
@@ -145,7 +147,7 @@ public class ProfileService {
     }
 
     /**
-     * Serialises profiles to JSON.
+     * Сериализует профили в JSON.
      */
     public String serializeProfiles(List<org.example.launcher.model.GameProfile> profiles) {
         JsonObject root = new JsonObject();
@@ -182,20 +184,14 @@ public class ProfileService {
     }
 
     // ------------------------------------------------------------------
-    //  JSON helpers
+    //  JSON-помощники
     // ------------------------------------------------------------------
 
     private static String getStr(JsonObject obj, String key, String fallback) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive()) {
-            return obj.get(key).getAsString();
-        }
-        return fallback;
+        return Json.getStringOrDefault(obj, key, fallback);
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        if (obj.has(key) && obj.get(key).isJsonPrimitive() && !obj.get(key).isJsonNull()) {
-            return obj.get(key).getAsString();
-        }
-        return null;
+        return Json.getStringOrNull(obj, key);
     }
 }

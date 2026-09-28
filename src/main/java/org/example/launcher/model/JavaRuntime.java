@@ -5,29 +5,29 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Represents a Java runtime discovered on the local system.
+ * Представляет среду Java, обнаруженную в локальной системе.
  * <p>
- * Instances are produced by {@code JavaDetector} implementations and
- * consumed by {@code JavaResolutionService} to select the appropriate
- * runtime for launching a given Minecraft version.
+ * Экземпляры создаются реализациями {@code JavaDetector} и
+ * используются службой {@code JavaResolutionService} для выбора подходящей
+ * среды запуска указанной версии Minecraft.
  */
 public final class JavaRuntime {
 
     /**
-     * Where the runtime was discovered.
+     * Место обнаружения среды.
      */
     public enum Source {
-        /** Discovered via the {@code JAVA_HOME} environment variable. */
+        /** Обнаружена через переменную окружения {@code JAVA_HOME}. */
         JAVA_HOME,
-        /** Discovered by scanning the system {@code PATH}. */
+        /** Обнаружена при сканировании системного {@code PATH}. */
         PATH,
-        /** Discovered via the Windows registry. */
+        /** Обнаружена через реестр Windows. */
         REGISTRY,
-        /** Discovered in a well-known installation directory. */
+        /** Обнаружена в общеизвестном каталоге установки. */
         COMMON_LOCATION,
-        /** Installed by this launcher into the managed runtimes directory. */
+        /** Установлена лаунчером в управляемый каталог сред. */
         MANAGED,
-        /** Provided explicitly by the user. */
+        /** Явно указана пользователем. */
         CUSTOM
     }
 
@@ -47,12 +47,12 @@ public final class JavaRuntime {
         this(javaExecutable, majorVersion, source, null);
     }
 
-    /** Absolute path to the {@code java} (or {@code java.exe}) executable. */
+    /** Абсолютный путь к исполняемому файлу {@code java} (или {@code java.exe}). */
     public Path javaExecutable() {
         return javaExecutable;
     }
 
-    /** Major Java version, e.g. {@code 17} or {@code 21}. */
+    /** Мажорная версия Java, например {@code 17} или {@code 21}. */
     public int majorVersion() {
         return majorVersion;
     }
@@ -66,7 +66,7 @@ public final class JavaRuntime {
     }
 
     /**
-     * Whether this runtime satisfies the given minimum major version.
+     * Проверяет, удовлетворяет ли среда требуемой минимальной мажорной версии.
      */
     public boolean satisfies(int requiredMajor) {
         return majorVersion >= requiredMajor;

@@ -6,21 +6,21 @@ import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionMetadata;
 
 /**
- * Provides per-version metadata (client JAR, libraries, assets, arguments…).
+ * Предоставляет метаданные отдельной версии (клиентский JAR, библиотеки, ассеты, аргументы…).
  * <p>
- * This is the second-level fetch: the {@link VersionService} gives the
- * list of versions, and this service resolves a specific version's
- * detailed metadata from its individual JSON URL.
+ * Это выборка второго уровня: {@link VersionService} даёт список
+ * версий, а этот сервис разрешает детальные метаданные конкретной версии
+ * по её индивидуальному URL JSON.
  */
 public interface VersionMetadataService {
 
     /**
-     * Fetches and parses the metadata for the given version.
+     * Загружает и разбирает метаданные заданной версии.
      *
-     * @param version the version to resolve (must have a non-null
-     *                metadata URL)
-     * @return parsed metadata, never {@code null}
-     * @throws IOException if the metadata could not be retrieved or parsed
+     * @param version разрешаемая версия (должна иметь не-null
+     *                URL метаданных)
+     * @return разобранные метаданные, никогда {@code null}
+     * @throws IOException если метаданные не удалось получить или разобрать
      */
     VersionMetadata fetchMetadata(MinecraftVersion version) throws IOException;
 }

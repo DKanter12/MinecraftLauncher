@@ -3,21 +3,21 @@ package org.example.launcher.model;
 import java.util.Optional;
 
 /**
- * Result of attempting to resolve a suitable Java runtime for a
- * Minecraft version.
+ * Результат попытки подбора подходящей среды Java для
+ * версии Minecraft.
  * <p>
- * The status indicates whether a runtime was found, is missing, or was
- * found but is incompatible. When a runtime is found, {@link #runtime()}
- * contains it; otherwise {@link #reason()} explains the problem.
+ * Статус показывает, найдена ли среда, отсутствует или
+ * найдена, но несовместима. Если среда найдена, метод {@link #runtime()}
+ * содержит её, иначе метод {@link #reason()} поясняет проблему.
  */
 public final class JavaResolutionResult {
 
     public enum Status {
-        /** A suitable Java runtime was found. */
+        /** Подходящая среда Java найдена. */
         FOUND,
-        /** No Java runtime was found on the system at all. */
+        /** Среда Java в системе вообще не найдена. */
         NOT_FOUND,
-        /** Java runtimes were found but none satisfy the required version. */
+        /** Среды Java найдены, но ни одна не удовлетворяет требуемой версии. */
         INCOMPATIBLE
     }
 

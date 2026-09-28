@@ -1,11 +1,11 @@
 package org.example.launcher.model;
 
 /**
- * Describes a single asset object within the asset index.
+ * Описывает один объект ресурсов внутри индекса ресурсов.
  * <p>
- * Assets are addressed by their SHA1 hash. The first two characters
- * of the hash form the subdirectory in both the remote URL and the
- * local storage path.
+ * Ресурсы адресуются по SHA1-хэшу. Первые два символа
+ * хэша образуют подкаталог как в удалённом URL, так и в
+ * локальном пути хранения.
  */
 public final class AssetObject {
 
@@ -26,8 +26,8 @@ public final class AssetObject {
     }
 
     /**
-     * Two-character prefix used for directory partitioning, e.g.
-     * {@code "ab"} for hash {@code "abcdef..."}.
+     * Двухсимвольный префикс для разбиения по каталогам, например
+     * {@code "ab"} для хэша {@code "abcdef..."}.
      */
     public String hashPrefix() {
         return hash != null && hash.length() >= 2 ? hash.substring(0, 2) : "00";
