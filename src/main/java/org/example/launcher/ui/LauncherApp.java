@@ -32,6 +32,8 @@ import org.example.launcher.service.SystemJavaDetector;
 import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
 import org.example.launcher.service.ModdedProfileService;
+import org.example.launcher.build.BuildCreator;
+import org.example.launcher.build.MinecraftVersionManager;
 import org.example.launcher.service.modloader.ModLoaderMetadataMerger;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
@@ -133,12 +135,19 @@ public class LauncherApp extends Application {
                         mojangMetadataService, modLoaderRegistry,
                         launcher, javaResolutionService, installationService);
 
+        // Создание сборок по схеме UI: isBuildAvailable -> createBuild
+        // [isVersionDownloaded -> downloadVersion -> createBuildDirectory]
+        MinecraftVersionManager versionManager = new MinecraftVersionManager(
+                metadataService, installationService, modLoaderRegistry, defaultGameDir);
+        BuildCreator buildCreator = new BuildCreator(
+                versionManager, moddedProfileService, defaultGameDir);
+
         MainView view = new MainView(
                 versionService, metadataService, installationService,
                 launchService, javaResolutionService, javaRuntimeInstaller,
                 profileService, preferences, elyAuthService, skinService,
                 modLoaderRegistry, moddedVersionService,
-                moddedProfileService, profileVerificationService);
+                moddedProfileService, profileVerificationService, buildCreator);
 
         Scene scene = new Scene(view.getView(), 1180, 680);
         var css = getClass().getResource("/styles.css");

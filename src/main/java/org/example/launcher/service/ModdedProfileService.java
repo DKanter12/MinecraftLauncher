@@ -31,13 +31,18 @@ import org.example.launcher.service.modloader.ModLoaderType;
  * <p>
  * Инстансы хранятся в {@code instances.json} в корне хранилища
  * (устаревший {@code modded_profiles.json} читается как запасной вариант). Каждый
- * инстанс владеет игровым каталогом в {@code profiles/{id}/} со
+ * инстанс владеет игровым каталогом в {@code profiles/<группа-версии>/<id>/} —
+ * например {@code profiles/fabric-1.21.1/Моя сборка/} — со
  * стандартной раскладкой сборки ({@code mods}, {@code config},
  * {@code resourcepacks}, {@code shaderpacks}, {@code saves},
- * {@code logs}), создаваемой автоматически. Разные инстансы никогда
+ * {@code logs}), создаваемой автоматически. Все сборки на одну версию
+ * (загрузчик + Minecraft) лежат в одной группе-папке. Разные инстансы никогда
  * не делят эти каталоги и потому не конфликтуют; общие
  * ресурсы (клиентский JAR, библиотеки, ассеты) лежат в корне хранилища
  * и переиспользуются.
+ * <p>
+ * Старые плоские записи {@code profiles/<id>} (без группы) продолжают
+ * читаться и работают как раньше; новые создаются уже с группировкой.
  */
 public class ModdedProfileService {
 
@@ -132,11 +137,13 @@ public class ModdedProfileService {
      * Инстанс может быть ванильным ({@code loaderType == VANILLA},
      * {@code loaderVersion} пуст) или установкой мод-загрузчика.
      * Отображаемое имя по умолчанию состоит из загрузчика и версии Minecraft,
-     * но выбирается свободно и позже переименовывается; имя каталога
-     * выводится из него (очищенное) и делается уникальным добавлением
-     * числового суффикса при необходимости. Стандартная раскладка папок
-     * создаётся сразу, чтобы пользователь мог тут же складывать моды в
-     * {@code mods/}.
+     * но выбирается свободно и позже переименовывается; папка сборки создаётся
+     * внутри группы версии {@code profiles/<загрузчик>-<mc>/} (например
+     * {@code profiles/fabric-1.21.1/Моя сборка/}), имя каталога
+     * выводится из отображаемого имени (очищенное) и делается уникальным
+     * в пределах группы добавлением числового суффикса при необходимости.
+     * Стандартная раскладка папок создаётся сразу, чтобы пользователь мог
+     * тут же складывать моды в {@code mods/}.
      *
      * @param loaderType      тип инстанса (VANILLA или загрузчик)
      * @param loaderVersion   версия загрузчика (пустая для ваниллы)
@@ -165,15 +172,16 @@ public class ModdedProfileService {
                 : displayName.trim();
 
         List<ModdedProfile> existing = loadProfiles();
-        // Папка следует за именем в лаунчере (кириллица
-        // транслитерируется); когда в имени вообще нет пригодных символов,
-        // используется загрузчик + версия MC — поэтому бессмысленная
-        // папка «profile-N» почти никогда не появляется
+        // Папка сборки лежит в группе версии: profiles/<loader>-<mc>/<имя>/.
+        // Имя папки следует за именем в лаунчере; уникальность — в пределах
+        // группы, поэтому одинаковые имена на разных версиях не конфликтуют.
+        String group = versionGroup(loaderType, minecraftVersion);
         String dirBase = sanitize(name);
         if (dirBase.isBlank()) {
             dirBase = defaultDisplayName(loaderType, minecraftVersion);
         }
-        String dirName = uniqueDirectoryName(dirBase, existing);
+        String leaf = uniqueLeafName(group, dirBase, existing, null);
+        String fullId = group + "/" + leaf;
         String now = OffsetDateTime.now().format(TIME_FORMAT);
 
         List<String> components = new ArrayList<>();
@@ -184,13 +192,13 @@ public class ModdedProfileService {
         }
 
         ModdedProfile profile = new ModdedProfile(
-                dirName,
+                fullId,
                 name,
                 loaderType,
                 vanilla ? "" : loaderVersion,
                 minecraftVersion,
                 versionId,
-                "profiles/" + dirName,
+                "profiles/" + fullId,
                 List.copyOf(components),
                 extraJvmArgs == null ? List.of() : List.copyOf(extraJvmArgs),
                 normalizeMemory(memoryMb),
@@ -198,7 +206,7 @@ public class ModdedProfileService {
                 null);
 
         // Создать игровой каталог профиля со стандартной раскладкой
-        ensureProfileFolders(storage.moddedProfileDir(dirName));
+        ensureProfileFolders(storage.moddedProfileDir(fullId));
 
         existing.add(profile);
         saveProfiles(existing);
@@ -225,19 +233,21 @@ public class ModdedProfileService {
         }
         profiles.removeIf(p -> p.id().equals(id));
         saveProfiles(profiles);
-        return Optional.of(storage.moddedProfileDir(removed.get().id()));
+        return Optional.of(resolveGameDir(removed.get()));
     }
 
     /**
      * Обновляет отображаемое имя профиля, доп. JVM-аргументы запуска
      * и лимит памяти.
      * <p>
-     * Переименование также переименовывает игровой каталог (и id профиля,
-     * который следует за папкой), поэтому папка всегда совпадает с
-     * именем в лаунчере; моды, сохранения и сборки переезжают нетронутыми.
-     * Пустое имя сохраняет текущее. Когда целевую папку переименовать
-     * нельзя (например, игра запущена из неё), ничего не сохраняется
-     * и выбрасывается ошибка.
+     * Переименование также переименовывает папку сборки внутри её группы
+     * версии (и id профиля, который следует за папкой), поэтому папка всегда
+     * совпадает с именем в лаунчере; моды, сохранения и сборки переезжают
+     * нетронутыми. Версия/группа при переименовании не меняются — сборка
+     * не переезжает в чужую версию. Пустое имя сохраняет текущее. Когда
+     * целевую папку переименовать нельзя (например, игра запущена из неё),
+     * ничего не сохраняется и выбрасывается ошибка. Старые плоские записи
+     * без группы переименовываются на месте как раньше.
      *
      * @param id            обновляемый профиль
      * @param extraJvmArgs  новые JVM-параметры запуска (могут быть пустыми)
@@ -258,9 +268,7 @@ public class ModdedProfileService {
             if (p.id().equals(id)) {
                 String name = (displayName == null || displayName.isBlank())
                         ? p.name() : displayName.trim();
-                // Переименование также переименовывает папку, чтобы она всегда
-                // совпадала с именем в лаунчере; id следует за
-                // папкой. Моды, сохранения и сборки переезжают нетронутыми.
+                String group = parentGroup(p);
                 // Имя без пригодных символов откатывается на
                 // загрузчик + версию MC вместо «profile-N».
                 String dirBase = sanitize(name);
@@ -268,12 +276,20 @@ public class ModdedProfileService {
                     dirBase = defaultDisplayName(p.loaderType(),
                             p.minecraftVersion());
                 }
-                String dirName = uniqueDirectoryName(dirBase, profiles, p.id());
-                if (!dirName.equals(p.id())) {
+                String fullId;
+                if (group.isEmpty()) {
+                    // Плоская legacy-запись: старое поведение без группы.
+                    fullId = uniqueDirectoryName(dirBase, profiles, p.id());
+                } else {
+                    String leaf = uniqueLeafName(group, dirBase, profiles, p.id());
+                    fullId = group + "/" + leaf;
+                }
+                if (!fullId.equals(p.id())) {
                     Path source = storage.moddedProfileDir(p.id());
-                    Path target = storage.moddedProfileDir(dirName);
+                    Path target = storage.moddedProfileDir(fullId);
                     try {
                         if (Files.exists(source)) {
+                            Files.createDirectories(target.getParent());
                             Files.move(source, target);
                         }
                     } catch (IOException e) {
@@ -284,9 +300,9 @@ public class ModdedProfileService {
                     }
                 }
                 ModdedProfile updated = new ModdedProfile(
-                        dirName, name, p.loaderType(), p.loaderVersion(),
+                        fullId, name, p.loaderType(), p.loaderVersion(),
                         p.minecraftVersion(), p.versionId(),
-                        "profiles/" + dirName,
+                        "profiles/" + fullId,
                         p.components(),
                         extraJvmArgs == null ? List.of()
                                 : List.copyOf(extraJvmArgs),
@@ -345,10 +361,41 @@ public class ModdedProfileService {
     // ------------------------------------------------------------------
 
     /**
+     * Группа версии для раскладки на диске: {@code <загрузчик>-<mc>},
+     * например {@code fabric-1.21.1}, {@code forge-1.20.1},
+     * {@code vanilla-1.21.4}. Все сборки на одну версию лежат в
+     * {@code profiles/<группа>/}.
+     */
+    public static String versionGroup(ModLoaderType loaderType, String minecraftVersion) {
+        String loader = loaderType == null
+                ? "unknown"
+                : loaderType.name().toLowerCase(Locale.ROOT);
+        String mc = sanitize(minecraftVersion);
+        if (mc.isBlank()) {
+            mc = "unknown";
+        }
+        String group = sanitize(loader + "-" + mc);
+        return group.isBlank() ? "unknown" : group;
+    }
+
+    /** Родительская группа id ({@code fabric-1.21.1} для {@code fabric-1.21.1/Сборка}); пусто для плоских legacy. */
+    static String parentGroup(ModdedProfile profile) {
+        return parentGroupOfId(profile.id());
+    }
+
+    static String parentGroupOfId(String id) {
+        if (id == null) return "";
+        int slash = id.lastIndexOf('/');
+        if (slash <= 0) return "";
+        return id.substring(0, slash);
+    }
+
+    /**
      * Выводит уникальное имя каталога из отображаемого имени: само имя,
      * когда оно безопасно для файловой системы (чтобы папка совпадала с именем
      * в лаунчере), числовые суффиксы против существующих профилей и
      * существующих каталогов на диске.
+     * Оставлено для плоских legacy-записей без группы.
      */
     private String uniqueDirectoryName(String displayName,
                                        List<ModdedProfile> existing) {
@@ -384,6 +431,42 @@ public class ModdedProfileService {
             return true;
         }
         Path dir = storage.moddedProfileDir(dirName);
+        if (excludeId != null
+                && dir.equals(storage.moddedProfileDir(excludeId))) {
+            return false;
+        }
+        return Files.exists(dir);
+    }
+
+    /**
+     * Уникальное имя папки сборки внутри группы версии.
+     * Одинаковые имена на разных версиях не конфликтуют.
+     */
+    private String uniqueLeafName(String group, String leafBase,
+                                  List<ModdedProfile> existing,
+                                  String excludeId) {
+        String base = sanitize(leafBase);
+        if (base.isBlank()) {
+            base = "profile";
+        }
+        String candidate = base;
+        int suffix = 2;
+        while (isLeafTaken(group, candidate, existing, excludeId)) {
+            candidate = base + "-" + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean isLeafTaken(String group, String leaf,
+                                List<ModdedProfile> existing,
+                                String excludeId) {
+        String fullId = group + "/" + leaf;
+        if (existing.stream().anyMatch(p -> p.id().equals(fullId)
+                && !p.id().equals(excludeId))) {
+            return true;
+        }
+        Path dir = storage.moddedProfileDir(fullId);
         if (excludeId != null
                 && dir.equals(storage.moddedProfileDir(excludeId))) {
             return false;

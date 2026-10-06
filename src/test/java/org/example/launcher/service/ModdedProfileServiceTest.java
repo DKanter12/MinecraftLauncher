@@ -41,8 +41,8 @@ class ModdedProfileServiceTest {
 
         // The name is used as-is for the folder: "Fabric 1.21.4"
         assertEquals("Fabric 1.21.4", profile.name());
-        assertEquals("Fabric 1.21.4", profile.id());
-        assertEquals("profiles/Fabric 1.21.4", profile.gameDirPath());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4", profile.id());
+        assertEquals("profiles/fabric-1.21.4/Fabric 1.21.4", profile.gameDirPath());
         assertEquals("fabric-loader-0.16.9-1.21.4", profile.versionId());
 
         // Profile metadata
@@ -72,8 +72,8 @@ class ModdedProfileServiceTest {
         ModdedProfile first = createFabricProfile(gameDir);
         ModdedProfile second = createFabricProfile(gameDir);
 
-        assertEquals("Fabric 1.21.4", first.id());
-        assertEquals("Fabric 1.21.4-2", second.id());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4", first.id());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4-2", second.id());
         // Same automatic display name, different directories
         assertEquals(first.name(), second.name());
         assertNotEqualsDirs(gameDir, first, second);
@@ -94,7 +94,7 @@ class ModdedProfileServiceTest {
                 "1.20.1-forge-47.4.23", List.of(), null, 0);
 
         assertEquals("Forge 1.20.1", profile.name());
-        assertEquals("Forge 1.20.1", profile.id());
+        assertEquals("forge-1.20.1/Forge 1.20.1", profile.id());
     }
 
     @Test
@@ -126,7 +126,7 @@ class ModdedProfileServiceTest {
                 ModLoaderType.VANILLA, "", "1.21.4", "1.21.4", List.of(),
                 null, 0);
 
-        assertEquals("Vanilla 1.21.4", profile.id());
+        assertEquals("vanilla-1.21.4/Vanilla 1.21.4", profile.id());
         assertEquals("Vanilla 1.21.4", profile.name());
         assertEquals(ModLoaderType.VANILLA, profile.loaderType());
         assertTrue(profile.isVanilla());
@@ -223,9 +223,9 @@ class ModdedProfileServiceTest {
                 updated.get().extraJvmArgs());
 
         // The folder follows the launcher name; the id follows the folder
-        assertEquals("My Renamed Pack", updated.get().id());
-        assertEquals("profiles/My Renamed Pack", updated.get().gameDirPath());
-        Path newDir = gameDir.moddedProfileDir("My Renamed Pack");
+        assertEquals("fabric-1.21.4/My Renamed Pack", updated.get().id());
+        assertEquals("profiles/fabric-1.21.4/My Renamed Pack", updated.get().gameDirPath());
+        Path newDir = gameDir.moddedProfileDir("fabric-1.21.4/My Renamed Pack");
         assertFalse(Files.exists(oldDir));
         assertEquals("fake",
                 Files.readString(newDir.resolve("mods").resolve("mymod.jar")));
@@ -239,7 +239,7 @@ class ModdedProfileServiceTest {
         List<ModdedProfile> reloaded = svc.loadProfiles();
         assertEquals(1, reloaded.size());
         assertEquals("My Renamed Pack", reloaded.get(0).name());
-        assertEquals("My Renamed Pack", reloaded.get(0).id());
+        assertEquals("fabric-1.21.4/My Renamed Pack", reloaded.get(0).id());
         assertEquals(6144, reloaded.get(0).memoryMb());
         assertEquals(1, reloaded.get(0).extraJvmArgs().size());
     }
@@ -250,19 +250,19 @@ class ModdedProfileServiceTest {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfileService svc = service(gameDir);
         createFabricProfile(gameDir);
-        ModdedProfile second = svc.createProfile(ModLoaderType.FORGE,
-                "47.4.23", "1.20.1", "1.20.1-forge-47.4.23",
-                List.of(), null, 0);
+        ModdedProfile second = svc.createProfile(ModLoaderType.FABRIC,
+                "0.16.9", "1.21.4", "fabric-loader-0.16.9-1.21.4",
+                List.of(), "Second Pack", 0);
 
         Optional<ModdedProfile> updated = svc.updateProfile(second.id(),
                 List.of(), "Fabric 1.21.4", 0);
 
         assertTrue(updated.isPresent());
         assertEquals("Fabric 1.21.4", updated.get().name());
-        assertEquals("Fabric 1.21.4-2", updated.get().id());
-        assertEquals("profiles/Fabric 1.21.4-2", updated.get().gameDirPath());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4-2", updated.get().id());
+        assertEquals("profiles/fabric-1.21.4/Fabric 1.21.4-2", updated.get().gameDirPath());
         assertTrue(Files.isDirectory(
-                gameDir.moddedProfileDir("Fabric 1.21.4-2")));
+                gameDir.moddedProfileDir("fabric-1.21.4/Fabric 1.21.4-2")));
     }
 
     @Test
@@ -312,8 +312,8 @@ class ModdedProfileServiceTest {
                 List.of(), "My NeoForge Pack", 8192);
 
         assertEquals("My NeoForge Pack", profile.name());
-        assertEquals("My NeoForge Pack", profile.id());
-        assertEquals("profiles/My NeoForge Pack", profile.gameDirPath());
+        assertEquals("neoforge-1.21.4/My NeoForge Pack", profile.id());
+        assertEquals("profiles/neoforge-1.21.4/My NeoForge Pack", profile.gameDirPath());
         assertEquals(8192, profile.memoryMb());
 
         List<ModdedProfile> loaded = svc.loadProfiles();
@@ -331,7 +331,7 @@ class ModdedProfileServiceTest {
                 "fabric-loader-0.16.9-1.21.4", List.of(), "  ", -100);
 
         assertEquals("Fabric 1.21.4", profile.name());
-        assertEquals("Fabric 1.21.4", profile.id());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4", profile.id());
         assertEquals(0, profile.memoryMb());
     }
 
@@ -345,9 +345,9 @@ class ModdedProfileServiceTest {
 
         // The display name stays as typed, but the folder is meaningful
         assertEquals("???", profile.name());
-        assertEquals("Forge 1.20.1", profile.id());
-        assertEquals("profiles/Forge 1.20.1", profile.gameDirPath());
-        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("Forge 1.20.1")));
+        assertEquals("forge-1.20.1/Forge 1.20.1", profile.id());
+        assertEquals("profiles/forge-1.20.1/Forge 1.20.1", profile.gameDirPath());
+        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("forge-1.20.1/Forge 1.20.1")));
     }
 
     @Test
@@ -358,7 +358,7 @@ class ModdedProfileServiceTest {
         ModdedProfile profile = svc.createProfile(ModLoaderType.FABRIC,
                 "0.16.9", "1.21.4", "fabric-loader-0.16.9-1.21.4",
                 List.of(), "My Pack", 0);
-        Path oldDir = gameDir.moddedProfileDir("My Pack");
+        Path oldDir = gameDir.moddedProfileDir("fabric-1.21.4/My Pack");
         assertTrue(Files.isDirectory(oldDir));
 
         Optional<ModdedProfile> updated = svc.updateProfile(profile.id(),
@@ -366,9 +366,9 @@ class ModdedProfileServiceTest {
 
         assertTrue(updated.isPresent());
         assertEquals("???", updated.get().name());
-        assertEquals("Fabric 1.21.4", updated.get().id());
+        assertEquals("fabric-1.21.4/Fabric 1.21.4", updated.get().id());
         assertFalse(Files.exists(oldDir));
-        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("Fabric 1.21.4")));
+        assertTrue(Files.isDirectory(gameDir.moddedProfileDir("fabric-1.21.4/Fabric 1.21.4")));
     }
 
     @Test
@@ -427,7 +427,7 @@ class ModdedProfileServiceTest {
         GameDirectory gameDir = new GameDirectory(tempDir);
         ModdedProfile profile = createFabricProfile(gameDir);
 
-        assertEquals(tempDir.resolve("profiles/Fabric 1.21.4"),
+        assertEquals(tempDir.resolve("profiles/fabric-1.21.4/Fabric 1.21.4"),
                 service(gameDir).resolveGameDir(profile));
     }
 

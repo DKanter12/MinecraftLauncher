@@ -81,6 +81,8 @@ import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.build.BuildCreator;
+import org.example.launcher.build.BuildRequest;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
 import org.example.launcher.update.AppVersion;
@@ -133,6 +135,7 @@ public class MainView {
     private final ModLoaderRegistry modLoaderRegistry;
     private final ModdedProfileService moddedProfileService;
     private final ModdedProfileVerificationService profileVerificationService;
+    private final BuildCreator buildCreator;
 
     private BorderPane root;
     private Label statusLabel;
@@ -220,7 +223,8 @@ public class MainView {
                     ModLoaderRegistry modLoaderRegistry,
                     ModdedVersionService moddedVersionService,
                     ModdedProfileService moddedProfileService,
-                    ModdedProfileVerificationService profileVerificationService) {
+                    ModdedProfileVerificationService profileVerificationService,
+                    BuildCreator buildCreator) {
         this.versionService = versionService;
         this.metadataService = metadataService;
         this.installationService = installationService;
@@ -234,6 +238,7 @@ public class MainView {
         this.modLoaderRegistry = modLoaderRegistry;
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
+        this.buildCreator = buildCreator;
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -2020,19 +2025,36 @@ public class MainView {
      */
     private void createInstance(NewInstanceDialog.Result result,
                                 boolean playWhenReady) {
-        ModLoaderType type = result.type();
-        MinecraftVersion mc = result.mcVersion();
-        ModLoaderVersion loader = result.loader();
-        GameDirectory storage = GameDirectory.defaultDirectory();
+        BuildRequest request = new BuildRequest(
+                result.type(),
+                result.mcVersion(),
+                result.loader(),
+                result.extraJvmArgs(),
+                result.name());
+        String versionId = request.versionId();
+
+        try {
+            if (!buildCreator.isBuildAvailable(versionId, request.effectiveName())) {
+                statusLabel.setText(Lang.tr("instance.create.failed",
+                        "Build already exists: " + request.effectiveName() + " " + versionId));
+                ErrorDialog.show((Stage) root.getScene().getWindow(),
+                        Lang.tr("instance.create.failed.title"),
+                        "Build already exists: " + request.effectiveName()
+                                + " (" + versionId + ")");
+                return;
+            }
+        } catch (IOException e) {
+            LOG.warning("Build availability check failed, continuing: " + e.getMessage());
+        }
 
         // Несколько инстансов могут делить одну версию (у каждого свои
         // имя, игровой каталог, моды и сборки) — каждое создание
         // делает новый; имя каталога остаётся уникальным
         // автоматически
         statusLabel.setText(Lang.tr("instance.creating",
-                type == ModLoaderType.VANILLA ? "vanilla " + mc.id()
-                        : type.displayName() + " " + loader.loaderVersion()
-                                + " for MC " + mc.id()));
+                request.type() == ModLoaderType.VANILLA ? "vanilla " + request.mcVersion().id()
+                        : request.type().displayName() + " " + request.loader().loaderVersion()
+                                + " for MC " + request.mcVersion().id()));
 
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
@@ -2042,35 +2064,10 @@ public class MainView {
         Task<ModdedProfile> task = new Task<>() {
             @Override
             protected ModdedProfile call() throws Exception {
-                String versionId = type == ModLoaderType.VANILLA
-                        ? mc.id() : loader.installedVersionId();
-                // Уже установленным версиям не нужны ни загрузка метаданных,
-                // ни скачивание — создание инстанса тогда работает офлайн
-                boolean alreadyInstalled = type == ModLoaderType.VANILLA
-                        ? Files.isRegularFile(storage.clientJar(mc.id()))
-                        : Files.isRegularFile(storage.versionMetadata(versionId));
-                if (!alreadyInstalled) {
-                    VersionMetadata vanillaMetadata =
-                            metadataService.fetchMetadata(mc);
-                    if (type == ModLoaderType.VANILLA) {
-                        installationService.install(mc, vanillaMetadata,
-                                storage, progressDialog);
-                    } else {
-                        var entry = modLoaderRegistry.get(type).orElseThrow(
-                                () -> new IOException(type.displayName()
-                                        + " support is not registered"));
-                        entry.installer().install(mc, vanillaMetadata, loader,
-                                storage, progressDialog);
-                    }
-                }
-                // Отображаемое имя вводится свободно (автоматическое
-                // «Загрузчик МК», если пусто); лимит памяти по умолчанию
-                // автоматический и настраивается в диалоге редактирования
-                return moddedProfileService.createProfile(
-                        type,
-                        type == ModLoaderType.VANILLA ? "" : loader.loaderVersion(),
-                        mc.id(), versionId, result.extraJvmArgs(),
-                        result.name(), 0);
+                // Весь пайплайн — в BuildCreator:
+                // isVersionDownloaded -> downloadVersion + повторная проверка
+                // -> createBuildDirectory + populateBuildDirectories
+                return buildCreator.createBuild(request, progressDialog);
             }
         };
         task.setOnSucceeded(e -> {
