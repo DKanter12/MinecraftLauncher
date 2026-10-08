@@ -1,4 +1,4 @@
-package org.example.launcher.service.modloader;
+package org.example.launcher.infrastructure.loaders;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

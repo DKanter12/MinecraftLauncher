@@ -1,4 +1,4 @@
-package org.example.launcher.distribution;
+package org.example.launcher.infrastructure.server;
 
 import java.io.IOException;
 import java.nio.file.Files;

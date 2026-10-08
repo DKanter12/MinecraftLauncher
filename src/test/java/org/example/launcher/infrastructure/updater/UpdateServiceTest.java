@@ -1,4 +1,4 @@
-package org.example.launcher.update;
+package org.example.launcher.infrastructure.updater;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

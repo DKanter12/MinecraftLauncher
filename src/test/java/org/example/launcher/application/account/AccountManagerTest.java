@@ -1,4 +1,4 @@
-package org.example.launcher.service;
+package org.example.launcher.application.account;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

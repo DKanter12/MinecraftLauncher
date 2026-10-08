@@ -1,4 +1,4 @@
-package org.example.launcher.distribution;
+package org.example.launcher.infrastructure.server;
 
 import org.junit.jupiter.api.Test;
 import org.example.launcher.infrastructure.server.BuildVersions;
