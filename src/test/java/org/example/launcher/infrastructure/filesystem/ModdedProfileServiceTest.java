@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.example.launcher.application.build.BuildRepository;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.ModLoaderType;
@@ -178,7 +179,7 @@ class ModdedProfileServiceTest {
         ModdedProfile profile = createFabricProfile(gameDir);
         Path dir = gameDir.moddedProfileDir(profile.id());
 
-        Optional<Path> kept = svc.deleteProfile(profile.id());
+        Optional<Path> kept = svc.delete(profile.id());
 
         assertTrue(kept.isPresent());
         assertEquals(dir, kept.get());
@@ -420,6 +421,34 @@ class ModdedProfileServiceTest {
         FileSystemBuildRepository svc = service(gameDir);
 
         assertTrue(svc.updateProfile("ghost", List.of(), null, 0).isEmpty());
+    }
+
+    @Test
+    @DisplayName("BuildRepository contract: save, findById, delete via interface")
+    void repositoryContract(@TempDir Path tempDir) throws IOException {
+        GameDirectory gameDir = new GameDirectory(tempDir);
+        BuildRepository repo = service(gameDir);
+        ModdedProfile created = createFabricProfile(gameDir);
+
+        Optional<ModdedProfile> found = repo.findById(created.id());
+        assertTrue(found.isPresent());
+        assertEquals(created.name(), found.get().name());
+        assertEquals(1, repo.findAll().size());
+
+        ModdedProfile renamed = new ModdedProfile(created.id(),
+                "Renamed", created.loaderType(), created.loaderVersion(),
+                created.minecraftVersion(), created.versionId(),
+                created.gameDirPath(), created.components(),
+                created.extraJvmArgs(), created.memoryMb(),
+                created.createdTimeRaw(), created.lastPlayedTimeRaw());
+        repo.save(renamed);
+        assertEquals("Renamed",
+                repo.findById(created.id()).orElseThrow().name());
+        assertEquals(1, repo.findAll().size());
+
+        assertTrue(repo.delete(created.id()).isPresent());
+        assertTrue(repo.findById(created.id()).isEmpty());
+        assertTrue(repo.delete("ghost").isEmpty());
     }
 
     @Test

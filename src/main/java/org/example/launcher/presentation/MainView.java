@@ -64,6 +64,7 @@ import org.example.launcher.infrastructure.http.UrlFetcher;
 import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.domain.model.LauncherPreferences;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
@@ -238,13 +239,14 @@ public class MainView {
         String yandexLink = DistributionSources.YANDEX_BUILDS_LINK_DEFAULT;
         String token = "";
         try {
-            mode = preferences.getBuildsSourceMode().orElse("YANDEX");
-            gitUrl = preferences.getBuildsGitUrl().orElse(null);
-            String savedLink = preferences.getYandexDiskLink().orElse(null);
+            LauncherPreferences saved = preferences.loadPreferences();
+            mode = saved.buildsSourceMode() != null ? saved.buildsSourceMode() : "YANDEX";
+            gitUrl = saved.buildsGitUrl();
+            String savedLink = saved.yandexDiskLink();
             if (savedLink != null && !savedLink.isBlank()) {
                 yandexLink = savedLink;
             }
-            token = preferences.getBuildsToken().orElse("");
+            token = saved.buildsToken() != null ? saved.buildsToken() : "";
         } catch (IOException ignored) {
             // оставляем умолчания: yandex со встроенной ссылкой
         }
@@ -1267,8 +1269,9 @@ public class MainView {
         }
         if (buildsStatusLabel != null) {
             try {
-                String mode = preferences.getBuildsSourceMode()
-                        .orElse("YANDEX");
+                LauncherPreferences saved = preferences.loadPreferences();
+                String mode = saved.buildsSourceMode() != null
+                        ? saved.buildsSourceMode() : "YANDEX";
                 DistributionSources.BuildsSource selected;
                 try {
                     selected = DistributionSources.BuildsSource
@@ -1277,13 +1280,13 @@ public class MainView {
                     selected = DistributionSources.BuildsSource.YANDEX;
                 }
                 buildsModeCombo.getSelectionModel().select(selected);
-                String gitUrl =
-                        preferences.getBuildsGitUrl().orElse(null);
+                String gitUrl = saved.buildsGitUrl();
                 if (buildsGitField != null && gitUrl != null) {
                     buildsGitField.setText(gitUrl);
                 }
-                String yandexLink = preferences.getYandexDiskLink().orElse(
-                        DistributionSources.YANDEX_BUILDS_LINK_DEFAULT);
+                String yandexLink = saved.yandexDiskLink() != null
+                        ? saved.yandexDiskLink()
+                        : DistributionSources.YANDEX_BUILDS_LINK_DEFAULT;
                 if (yandexLinkField != null
                         && yandexLinkField.getText().isBlank()) {
                     yandexLinkField.setText(yandexLink);
@@ -1441,10 +1444,12 @@ public class MainView {
         String token = buildsTokenField.getText() == null ? ""
                 : buildsTokenField.getText();
         try {
-            preferences.setBuildsSourceMode(mode.name());
-            preferences.setBuildsGitUrl(gitUrl);
-            preferences.setYandexDiskLink(yandexLink);
-            preferences.setBuildsToken(token);
+            LauncherPreferences saved = preferences.loadPreferences();
+            preferences.savePreferences(new LauncherPreferences(
+                    saved.lastSelectedVersion(),
+                    saved.lastSelectedAccount(),
+                    gitUrl, mode.name(), yandexLink, token,
+                    saved.language()));
             applyDistributionSettings();
             updateBuildsStatus();
             statusLabel.setText(Lang.tr("settings.builds.relogin",
@@ -1752,7 +1757,12 @@ public class MainView {
     private void saveLastSelectedAccount(String accountName) {
         if (preferences == null) return;
         try {
-            preferences.setLastSelectedAccount(accountName);
+            LauncherPreferences saved = preferences.loadPreferences();
+            preferences.savePreferences(new LauncherPreferences(
+                    saved.lastSelectedVersion(), accountName,
+                    saved.buildsGitUrl(), saved.buildsSourceMode(),
+                    saved.yandexDiskLink(), saved.buildsToken(),
+                    saved.language()));
         } catch (IOException e) {
             // Некритично
         }
@@ -1795,7 +1805,8 @@ public class MainView {
                         ? selectedProfile.uuid().orElse(null) : null;
                 String savedName = null;
                 if (preferences != null && selectedUuid == null) {
-                    savedName = preferences.getLastSelectedAccount().orElse(null);
+                    savedName = preferences.loadPreferences()
+                            .lastSelectedAccount();
                 }
 
                 var toSelect = accountManager
@@ -2114,7 +2125,7 @@ public class MainView {
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    var keptDir = buildRepository.deleteProfile(profile.id());
+                    var keptDir = buildRepository.delete(profile.id());
                     refreshModdedProfiles(null);
                     statusLabel.setText(Lang.tr("instance.delete.done",
                             keptDir.map(d -> Lang.tr("instance.delete.kept", d))

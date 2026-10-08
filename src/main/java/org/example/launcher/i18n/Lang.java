@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
+import org.example.launcher.domain.model.LauncherPreferences;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 
 /**
@@ -117,16 +118,22 @@ public final class Lang {
             return;
         }
         try {
-            setLanguage(preferences.getLanguage()
-                    .map(Language::fromCode)
-                    .orElseGet(Lang::systemDefault));
+            String code = preferences.loadPreferences().language();
+            setLanguage(code != null && !code.isBlank()
+                    ? Language.fromCode(code)
+                    : systemDefault());
         } catch (IOException e) {
             setLanguage(systemDefault());
         }
     }
 
-    /** Сохраняет текущий язык. */
+    /** Сохраняет текущий язык, не трогая остальные настройки. */
     public static void save(FileSettingsRepository preferences) throws IOException {
-        preferences.setLanguage(current.code());
+        var saved = preferences.loadPreferences();
+        preferences.savePreferences(new LauncherPreferences(
+                saved.lastSelectedVersion(), saved.lastSelectedAccount(),
+                saved.buildsGitUrl(), saved.buildsSourceMode(),
+                saved.yandexDiskLink(), saved.buildsToken(),
+                current.code()));
     }
 }

@@ -82,7 +82,7 @@ public class UpdateService {
                     ? "Update download failed" : result.error());
         }
         try {
-            DownloadVerifier.verify(tmp, version);
+            UpdateVerifier.verify(tmp, version);
             return tmp;
         } catch (IOException e) {
             Files.deleteIfExists(tmp);

@@ -1,6 +1,7 @@
 package org.example.launcher.infrastructure.settings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -10,7 +11,8 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.example.launcher.infrastructure.settings.FileSettingsRepository;
+
+import org.example.launcher.domain.model.LauncherPreferences;
 
 @DisplayName("FileSettingsRepository")
 class LauncherPreferencesTest {
@@ -18,66 +20,53 @@ class LauncherPreferencesTest {
     @TempDir
     Path tempDir;
 
-    @Test
-    @DisplayName("returns empty when file does not exist")
-    void emptyWhenNoFile() throws IOException {
-        FileSettingsRepository prefs = new FileSettingsRepository(tempDir.resolve("prefs.json"));
-        assertTrue(prefs.getLastSelectedVersion().isEmpty());
+    private LauncherPreferences full() {
+        return new LauncherPreferences("b1.8.1", "Steve",
+                "https://raw.githubusercontent.com/o/r/main/", "YANDEX",
+                "https://disk.yandex.ru/d/abc", "tok", "ru");
     }
 
     @Test
-    @DisplayName("saves and loads last selected version")
+    @DisplayName("returns empty preferences when file does not exist")
+    void emptyWhenNoFile() throws IOException {
+        FileSettingsRepository prefs = new FileSettingsRepository(tempDir.resolve("prefs.json"));
+        assertEquals(LauncherPreferences.empty(), prefs.loadPreferences());
+    }
+
+    @Test
+    @DisplayName("saves and loads all settings in one write")
     void saveAndLoad() throws IOException {
         Path file = tempDir.resolve("prefs.json");
         FileSettingsRepository prefs = new FileSettingsRepository(file);
 
-        prefs.setLastSelectedVersion("b1.8.1");
+        prefs.savePreferences(full());
 
-        assertEquals("b1.8.1", prefs.getLastSelectedVersion().orElseThrow());
+        assertEquals(full(), prefs.loadPreferences());
     }
 
     @Test
-    @DisplayName("overwrites previous value")
-    void overwrite() throws IOException {
+    @DisplayName("blank and null values load as null")
+    void blankAndNull() throws IOException {
         Path file = tempDir.resolve("prefs.json");
         FileSettingsRepository prefs = new FileSettingsRepository(file);
 
-        prefs.setLastSelectedVersion("1.21");
-        prefs.setLastSelectedVersion("1.20.4");
+        prefs.savePreferences(new LauncherPreferences("", null, "  ",
+                null, null, null, null));
 
-        assertEquals("1.20.4", prefs.getLastSelectedVersion().orElseThrow());
+        LauncherPreferences loaded = prefs.loadPreferences();
+        assertNull(loaded.lastSelectedVersion());
+        assertNull(loaded.lastSelectedAccount());
+        assertNull(loaded.buildsGitUrl());
     }
 
     @Test
-    @DisplayName("returns empty for blank value")
-    void blankValue() throws IOException {
-        Path file = tempDir.resolve("prefs.json");
-        FileSettingsRepository prefs = new FileSettingsRepository(file);
-
-        prefs.setLastSelectedVersion("");
-
-        assertTrue(prefs.getLastSelectedVersion().isEmpty());
-    }
-
-    @Test
-    @DisplayName("returns empty for null value")
-    void nullValue() throws IOException {
-        Path file = tempDir.resolve("prefs.json");
-        FileSettingsRepository prefs = new FileSettingsRepository(file);
-
-        prefs.setLastSelectedVersion(null);
-
-        assertTrue(prefs.getLastSelectedVersion().isEmpty());
-    }
-
-    @Test
-    @DisplayName("handles corrupt JSON gracefully")
+    @DisplayName("handles corrupt JSON gracefully without rewriting it")
     void corruptJson() throws IOException {
         Path file = tempDir.resolve("prefs.json");
         Files.writeString(file, "not valid json {{{");
 
         FileSettingsRepository prefs = new FileSettingsRepository(file);
-        assertTrue(prefs.getLastSelectedVersion().isEmpty());
+        assertEquals(LauncherPreferences.empty(), prefs.loadPreferences());
     }
 
     @Test
@@ -86,89 +75,42 @@ class LauncherPreferencesTest {
         Path file = tempDir.resolve("sub").resolve("dir").resolve("prefs.json");
         FileSettingsRepository prefs = new FileSettingsRepository(file);
 
-        prefs.setLastSelectedVersion("1.21");
+        prefs.savePreferences(new LauncherPreferences("1.21", null, null,
+                null, null, null, null));
 
         assertTrue(Files.isRegularFile(file));
-        assertEquals("1.21", prefs.getLastSelectedVersion().orElseThrow());
+        assertEquals("1.21", prefs.loadPreferences().lastSelectedVersion());
     }
 
     @Test
-    @DisplayName("saves and loads last selected account")
-    void saveAndLoadAccount() throws IOException {
+    @DisplayName("partial update keeps other settings")
+    void partialUpdate() throws IOException {
         Path file = tempDir.resolve("prefs.json");
         FileSettingsRepository prefs = new FileSettingsRepository(file);
+        prefs.savePreferences(full());
 
-        prefs.setLastSelectedAccount("Steve");
+        LauncherPreferences saved = prefs.loadPreferences();
+        prefs.savePreferences(new LauncherPreferences(
+                saved.lastSelectedVersion(), "Alex", saved.buildsGitUrl(),
+                saved.buildsSourceMode(), saved.yandexDiskLink(),
+                saved.buildsToken(), saved.language()));
 
-        assertEquals("Steve", prefs.getLastSelectedAccount().orElseThrow());
+        LauncherPreferences loaded = prefs.loadPreferences();
+        assertEquals("Alex", loaded.lastSelectedAccount());
+        assertEquals("b1.8.1", loaded.lastSelectedVersion());
+        assertEquals("tok", loaded.buildsToken());
     }
 
     @Test
-    @DisplayName("version and account persist together")
-    void bothPersistTogether() throws IOException {
+    @DisplayName("file format stays compatible with previous versions")
+    void fileFormat() throws IOException {
         Path file = tempDir.resolve("prefs.json");
         FileSettingsRepository prefs = new FileSettingsRepository(file);
+        prefs.savePreferences(full());
 
-        prefs.setLastSelectedVersion("1.21");
-        prefs.setLastSelectedAccount("Alex");
-
-        assertEquals("1.21", prefs.getLastSelectedVersion().orElseThrow());
-        assertEquals("Alex", prefs.getLastSelectedAccount().orElseThrow());
-    }
-
-    @Test
-    @DisplayName("builds git url round-trip")
-    void buildsGitUrlRoundTrip() throws IOException {
-        Path file = tempDir.resolve("prefs.json");
-        FileSettingsRepository prefs = new FileSettingsRepository(file);
-
-        assertTrue(prefs.getBuildsGitUrl().isEmpty());
-
-        prefs.setBuildsGitUrl("https://raw.githubusercontent.com/o/r/main/");
-
-        assertEquals("https://raw.githubusercontent.com/o/r/main/",
-                prefs.getBuildsGitUrl().orElseThrow());
-
-        prefs.setBuildsGitUrl("");
-
-        assertTrue(prefs.getBuildsGitUrl().isEmpty());
-    }
-
-    @Test
-    @DisplayName("builds source settings round-trip")
-    void buildsSourceRoundTrip() throws IOException {
-        Path file = tempDir.resolve("prefs.json");
-        FileSettingsRepository prefs = new FileSettingsRepository(file);
-
-        assertTrue(prefs.getBuildsSourceMode().isEmpty());
-        assertTrue(prefs.getYandexDiskLink().isEmpty());
-        assertTrue(prefs.getBuildsToken().isEmpty());
-
-        prefs.setBuildsSourceMode("YANDEX");
-        prefs.setYandexDiskLink("https://disk.yandex.ru/d/abc");
-        prefs.setBuildsToken("tok");
-
-        assertEquals("YANDEX", prefs.getBuildsSourceMode().orElseThrow());
-        assertEquals("https://disk.yandex.ru/d/abc",
-                prefs.getYandexDiskLink().orElseThrow());
-        assertEquals("tok", prefs.getBuildsToken().orElseThrow());
-    }
-
-    @Test
-    @DisplayName("language round-trip")
-    void languageRoundTrip() throws IOException {
-        Path file = tempDir.resolve("prefs.json");
-        FileSettingsRepository prefs = new FileSettingsRepository(file);
-
-        assertTrue(prefs.getLanguage().isEmpty());
-
-        prefs.setLanguage("ru");
-
-        assertEquals("ru", prefs.getLanguage().orElseThrow());
-
-        prefs.setLanguage("");
-
-        assertTrue(prefs.getLanguage().isEmpty());
+        String json = Files.readString(file);
+        assertTrue(json.contains("\"lastSelectedVersion\""));
+        assertTrue(json.contains("\"buildsSourceMode\""));
+        assertTrue(json.contains("\"language\""));
     }
 }
-

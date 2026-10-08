@@ -22,6 +22,7 @@ import org.example.launcher.infrastructure.common.JsonStrings;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.application.build.BuildRepository;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.ModLoaderType;
 
@@ -44,7 +45,7 @@ import org.example.launcher.domain.model.ModLoaderType;
  * Старые плоские записи {@code profiles/<id>} (без группы) продолжают
  * читаться и работают как раньше; новые создаются уже с группировкой.
  */
-public class FileSystemBuildRepository {
+public class FileSystemBuildRepository implements BuildRepository {
 
     /**
      * Стандартные каталоги в каждом игровом каталоге инстанса.
@@ -72,6 +73,31 @@ public class FileSystemBuildRepository {
     // ------------------------------------------------------------------
     //  Хранение
     // ------------------------------------------------------------------
+
+    /**
+     * Загружает все инстансы; пустой список, если их пока нет. Устаревший
+     * {@code modded_profiles.json} читается, когда {@code instances.json}
+     * ещё не существует.
+     */
+    @Override
+    public List<ModdedProfile> findAll() throws IOException {
+        return loadProfiles();
+    }
+
+    @Override
+    public Optional<ModdedProfile> findById(String id) throws IOException {
+        return loadProfiles().stream()
+                .filter(p -> p.id().equals(id))
+                .findFirst();
+    }
+
+    @Override
+    public void save(ModdedProfile profile) throws IOException {
+        List<ModdedProfile> profiles = loadProfiles();
+        profiles.removeIf(p -> p.id().equals(profile.id()));
+        profiles.add(profile);
+        saveProfiles(profiles);
+    }
 
     /**
      * Загружает все инстансы; пустой список, если их пока нет. Устаревший
@@ -223,7 +249,8 @@ public class FileSystemBuildRepository {
      *
      * @return осиротевший игровой каталог, если профиль существовал
      */
-    public Optional<Path> deleteProfile(String id) throws IOException {
+    @Override
+    public Optional<Path> delete(String id) throws IOException {
         List<ModdedProfile> profiles = loadProfiles();
         Optional<ModdedProfile> removed = profiles.stream()
                 .filter(p -> p.id().equals(id))

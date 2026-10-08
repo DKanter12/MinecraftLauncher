@@ -3,11 +3,12 @@ package org.example.launcher.infrastructure.settings;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+
+import org.example.launcher.domain.model.LauncherPreferences;
 
 /**
  * Сохраняет лёгкие настройки лаунчера (например, последнюю выбранную версию,
@@ -48,94 +49,49 @@ public class FileSettingsRepository {
         Files.writeString(prefsFile, gson.toJson(root));
     }
 
-    public Optional<String> getLastSelectedVersion() throws IOException {
+    /**
+     * Читает все настройки разом. Отсутствующие и пустые значения —
+     * {@code null}. Повреждённый файл читается как пустые настройки,
+     * сам файл при чтении не перезаписывается.
+     */
+    public LauncherPreferences loadPreferences() throws IOException {
         JsonObject root = readRoot();
-        if (!root.has("lastSelectedVersion")) return Optional.empty();
-        String val = root.get("lastSelectedVersion").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+        return new LauncherPreferences(
+                str(root, "lastSelectedVersion"),
+                str(root, "lastSelectedAccount"),
+                str(root, "buildsGitUrl"),
+                str(root, "buildsSourceMode"),
+                str(root, "yandexDiskLink"),
+                str(root, "buildsToken"),
+                str(root, "language"));
     }
 
-    public void setLastSelectedVersion(String versionId) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("lastSelectedVersion", versionId != null ? versionId : "");
+    /**
+     * Сохраняет все настройки разом одной записью (вместо семи
+     * чтений-записей). Пустые значения пишутся как {@code ""},
+     * формат файла совместим со старыми версиями.
+     */
+    public void savePreferences(LauncherPreferences prefs) throws IOException {
+        JsonObject root = new JsonObject();
+        root.addProperty("lastSelectedVersion", orEmpty(prefs.lastSelectedVersion()));
+        root.addProperty("lastSelectedAccount", orEmpty(prefs.lastSelectedAccount()));
+        root.addProperty("buildsGitUrl", orEmpty(prefs.buildsGitUrl()));
+        root.addProperty("buildsSourceMode", orEmpty(prefs.buildsSourceMode()));
+        root.addProperty("yandexDiskLink", orEmpty(prefs.yandexDiskLink()));
+        root.addProperty("buildsToken", orEmpty(prefs.buildsToken()));
+        root.addProperty("language", orEmpty(prefs.language()));
         writeRoot(root);
     }
 
-    public Optional<String> getLastSelectedAccount() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("lastSelectedAccount")) return Optional.empty();
-        String val = root.get("lastSelectedAccount").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
+    private static String str(JsonObject root, String key) {
+        if (!root.has(key) || !root.get(key).isJsonPrimitive()) {
+            return null;
+        }
+        String val = root.get(key).getAsString();
+        return (val == null || val.isBlank()) ? null : val;
     }
 
-    public void setLastSelectedAccount(String accountName) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("lastSelectedAccount", accountName != null ? accountName : "");
-        writeRoot(root);
-    }
-
-    public Optional<String> getBuildsGitUrl() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("buildsGitUrl")) return Optional.empty();
-        String val = root.get("buildsGitUrl").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
-    }
-
-    public void setBuildsGitUrl(String url) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("buildsGitUrl", url != null ? url : "");
-        writeRoot(root);
-    }
-
-    public Optional<String> getBuildsSourceMode() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("buildsSourceMode")) return Optional.empty();
-        String val = root.get("buildsSourceMode").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
-    }
-
-    public void setBuildsSourceMode(String mode) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("buildsSourceMode", mode != null ? mode : "");
-        writeRoot(root);
-    }
-
-    public Optional<String> getYandexDiskLink() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("yandexDiskLink")) return Optional.empty();
-        String val = root.get("yandexDiskLink").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
-    }
-
-    public void setYandexDiskLink(String link) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("yandexDiskLink", link != null ? link : "");
-        writeRoot(root);
-    }
-
-    public Optional<String> getBuildsToken() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("buildsToken")) return Optional.empty();
-        String val = root.get("buildsToken").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
-    }
-
-    public void setBuildsToken(String token) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("buildsToken", token != null ? token : "");
-        writeRoot(root);
-    }
-
-    public Optional<String> getLanguage() throws IOException {
-        JsonObject root = readRoot();
-        if (!root.has("language")) return Optional.empty();
-        String val = root.get("language").getAsString();
-        return (val == null || val.isBlank()) ? Optional.empty() : Optional.of(val);
-    }
-
-    public void setLanguage(String code) throws IOException {
-        JsonObject root = readRoot();
-        root.addProperty("language", code != null ? code : "");
-        writeRoot(root);
+    private static String orEmpty(String val) {
+        return val != null ? val : "";
     }
 }

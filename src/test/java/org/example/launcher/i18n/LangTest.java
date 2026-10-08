@@ -76,7 +76,7 @@ class LangTest {
         Lang.setLanguage(Lang.Language.RUSSIAN);
         try {
             Lang.save(prefs);
-            assertEquals("ru", prefs.getLanguage().orElseThrow());
+            assertEquals("ru", prefs.loadPreferences().language());
 
             Lang.setLanguage(Lang.Language.ENGLISH);
             Lang.load(prefs);
