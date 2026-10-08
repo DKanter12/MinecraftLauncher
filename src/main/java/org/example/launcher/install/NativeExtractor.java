@@ -11,8 +11,8 @@ import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import org.example.launcher.model.Library;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.Library;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.util.OsDetector;
 
 /**
@@ -87,7 +87,7 @@ public final class NativeExtractor {
     }
 
     private static Path resolveNativeJarPath(GameDirectory gameDir,
-                                             org.example.launcher.model.DownloadInfo dl) {
+                                             org.example.launcher.domain.model.DownloadInfo dl) {
         var pathOpt = dl.path();
         if (pathOpt.isPresent()) {
             return gameDir.library(pathOpt.get());

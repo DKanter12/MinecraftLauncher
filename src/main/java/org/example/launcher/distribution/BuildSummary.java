@@ -1,6 +1,6 @@
 package org.example.launcher.distribution;
 
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * Публичное описание сборки, как её отдаёт сервер лаунчера

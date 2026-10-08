@@ -1,4 +1,4 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -19,7 +19,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.distribution.api.LauncherServerApi;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * Устанавливает и обновляет сборки, распространяемые администратором через

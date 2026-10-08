@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.MojangVersionMetadataService;
 
 /**
@@ -56,7 +56,7 @@ public class ModLoaderMetadataMerger {
         String id = loader.id();
         String mainClass = loader.mainClass().orElse(vanilla.mainClass().orElse(null));
 
-        List<org.example.launcher.model.Library> libraries =
+        List<org.example.launcher.domain.model.Library> libraries =
                 mergeLibraries(loader.libraries(), vanilla.libraries());
 
         // Официальная семантика inheritsFrom: сначала аргументы родителя,
@@ -68,12 +68,12 @@ public class ModLoaderMetadataMerger {
         String legacyArgs = loader.legacyMinecraftArguments()
                 .orElseGet(() -> vanilla.legacyMinecraftArguments().orElse(null));
 
-        org.example.launcher.model.AssetIndex assetIndex = loader.assetIndex()
+        org.example.launcher.domain.model.AssetIndex assetIndex = loader.assetIndex()
                 .orElse(vanilla.assetIndex().orElse(null));
         String assets = loader.assets().orElse(vanilla.assets().orElse(null));
         JavaVersion javaVersion = loader.javaVersion()
                 .orElse(vanilla.javaVersion().orElse(null));
-        org.example.launcher.model.DownloadInfo clientDownload = loader.clientDownload()
+        org.example.launcher.domain.model.DownloadInfo clientDownload = loader.clientDownload()
                 .orElse(vanilla.clientDownload().orElse(null));
 
         return new VersionMetadata(
@@ -96,18 +96,18 @@ public class ModLoaderMetadataMerger {
      * библиотеки, например пропатченный бридж авторизации), иначе ванильные
      * добавляются в конец.
      */
-    private List<org.example.launcher.model.Library> mergeLibraries(
-            List<org.example.launcher.model.Library> loaderLibs,
-            List<org.example.launcher.model.Library> vanillaLibs) {
-        List<org.example.launcher.model.Library> result = new ArrayList<>();
+    private List<org.example.launcher.domain.model.Library> mergeLibraries(
+            List<org.example.launcher.domain.model.Library> loaderLibs,
+            List<org.example.launcher.domain.model.Library> vanillaLibs) {
+        List<org.example.launcher.domain.model.Library> result = new ArrayList<>();
         java.util.Set<String> seenNames = new java.util.HashSet<>();
 
-        for (org.example.launcher.model.Library lib : loaderLibs) {
+        for (org.example.launcher.domain.model.Library lib : loaderLibs) {
             if (seenNames.add(lib.name())) {
                 result.add(lib);
             }
         }
-        for (org.example.launcher.model.Library lib : vanillaLibs) {
+        for (org.example.launcher.domain.model.Library lib : vanillaLibs) {
             if (seenNames.add(lib.name())) {
                 result.add(lib);
             }

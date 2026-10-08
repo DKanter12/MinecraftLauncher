@@ -6,10 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.example.launcher.model.JavaResolutionResult;
-import org.example.launcher.model.JavaRuntime;
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

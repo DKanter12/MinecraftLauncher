@@ -13,9 +13,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.model.AssetIndex;
-import org.example.launcher.model.AssetIndexContent;
-import org.example.launcher.model.AssetObject;
+import org.example.launcher.domain.model.AssetIndex;
+import org.example.launcher.domain.model.AssetIndexContent;
+import org.example.launcher.domain.model.AssetObject;
 import org.example.launcher.net.HttpDefaults;
 import org.example.launcher.util.Json;
 

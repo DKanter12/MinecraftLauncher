@@ -3,7 +3,7 @@ package org.example.launcher.install;
 import java.io.IOException;
 
 import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Оркестрирует полную установку версии Minecraft:

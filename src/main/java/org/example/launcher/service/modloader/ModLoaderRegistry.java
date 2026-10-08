@@ -5,6 +5,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.example.launcher.install.FileDownloader;
 import org.example.launcher.install.InstallationService;

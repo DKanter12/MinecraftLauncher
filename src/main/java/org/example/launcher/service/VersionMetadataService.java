@@ -3,7 +3,7 @@ package org.example.launcher.service;
 import java.io.IOException;
 
 import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Предоставляет метаданные отдельной версии (клиентский JAR, библиотеки, ассеты, аргументы…).

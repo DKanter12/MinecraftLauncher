@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.example.launcher.distribution.api.LauncherServerApi;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * In-memory launcher server for tests: serves a configurable catalog,

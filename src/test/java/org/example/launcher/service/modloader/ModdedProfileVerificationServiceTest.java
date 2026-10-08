@@ -3,6 +3,7 @@ package org.example.launcher.service.modloader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,21 +11,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.install.InstallationProgress;
 import org.example.launcher.install.Sha1ChecksumVerifier;
-import org.example.launcher.model.JavaResolutionResult;
-import org.example.launcher.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.ModLoaderVersion;
-import org.example.launcher.model.ModdedProfile;
+import org.example.launcher.domain.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.JavaResolutionService;
 import org.example.launcher.service.MinecraftLaunchArgumentBuilder;
 import org.example.launcher.service.MinecraftLauncher;
@@ -32,6 +35,7 @@ import org.example.launcher.service.MojangVersionMetadataService;
 import org.example.launcher.service.MojangVersionService;
 import org.example.launcher.version.StandardVersionType;
 import org.example.launcher.version.VersionTypeRegistry;
+import org.example.launcher.domain.model.ModLoaderType;
 
 @DisplayName("ModdedProfileVerificationService")
 class ModdedProfileVerificationServiceTest {

@@ -1,4 +1,4 @@
-package org.example.launcher.service.modloader;
+package org.example.launcher.domain.model;
 
 /**
  * Определяет поддерживаемый тип игры (инстанса).

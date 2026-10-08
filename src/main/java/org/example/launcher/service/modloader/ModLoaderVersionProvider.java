@@ -3,7 +3,7 @@ package org.example.launcher.service.modloader;
 import java.io.IOException;
 import java.util.List;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 
 /**
  * Предоставляет список доступных версий мод-загрузчика, совместимых

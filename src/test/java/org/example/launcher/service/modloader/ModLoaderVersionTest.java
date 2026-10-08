@@ -4,13 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import java.util.Optional;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.example.launcher.domain.model.ModLoaderType;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderType;
 
 @DisplayName("ModLoaderVersion")
 class ModLoaderVersionTest {

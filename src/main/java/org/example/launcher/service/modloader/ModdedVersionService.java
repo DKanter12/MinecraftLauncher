@@ -8,14 +8,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.ModLoaderVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.ModLoaderVersion;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.MojangVersionMetadataService;
 import org.example.launcher.service.MojangVersionService;
 import org.example.launcher.version.ModLoaderFamilyType;

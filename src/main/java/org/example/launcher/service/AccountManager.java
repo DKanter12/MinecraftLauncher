@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.example.launcher.model.GameProfile;
+import org.example.launcher.domain.model.GameProfile;
 
 /**
  * Аккаунты игроков без UI: валидация, persistence и выбор активного.

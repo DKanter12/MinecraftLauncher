@@ -37,7 +37,7 @@ import org.example.launcher.build.BuildCreator;
 import org.example.launcher.build.MinecraftVersionManager;
 import org.example.launcher.service.modloader.ModLoaderMetadataMerger;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
 import org.example.launcher.i18n.Lang;

@@ -1,9 +1,9 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 import java.util.Objects;
 import java.util.Optional;
 
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * Одна версия загрузчика модов, разрешённая для конкретной версии

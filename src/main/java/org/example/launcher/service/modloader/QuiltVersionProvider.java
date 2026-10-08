@@ -8,13 +8,14 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.util.Json;
 
 /**

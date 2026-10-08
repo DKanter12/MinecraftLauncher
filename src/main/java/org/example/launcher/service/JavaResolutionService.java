@@ -1,8 +1,8 @@
 package org.example.launcher.service;
 
-import org.example.launcher.model.JavaResolutionResult;
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Определяет, какой рантайм Java использовать для запуска заданной версии

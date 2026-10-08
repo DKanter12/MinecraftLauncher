@@ -17,7 +17,7 @@ import com.google.gson.JsonSyntaxException;
 import org.example.launcher.util.Json;
 
 /**
- * Читает и пишет {@link org.example.launcher.model.GameProfile}s
+ * Читает и пишет {@link org.example.launcher.domain.model.GameProfile}s
  * в локальный файл {@code launcher_profiles.json}.
  * <p>
  * Разбор JSON выделен в {@link #parseProfiles(String)} для
@@ -41,7 +41,7 @@ public class ProfileService {
      * Загружает все профили из файла профилей. Возвращает пустой
      * список, если файл отсутствует или пуст.
      */
-    public List<org.example.launcher.model.GameProfile> loadProfiles() throws IOException {
+    public List<org.example.launcher.domain.model.GameProfile> loadProfiles() throws IOException {
         if (!Files.isRegularFile(profilesFile)) {
             return List.of();
         }
@@ -53,7 +53,7 @@ public class ProfileService {
      * Сохраняет заданные профили в файл профилей, перезаписывая всё
      * существующее содержимое. Родительские каталоги создаются при необходимости.
      */
-    public void saveProfiles(List<org.example.launcher.model.GameProfile> profiles) throws IOException {
+    public void saveProfiles(List<org.example.launcher.domain.model.GameProfile> profiles) throws IOException {
         Path parent = profilesFile.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
@@ -64,9 +64,9 @@ public class ProfileService {
     /**
      * Добавляет офлайн-профиль и сохраняет.
      */
-    public org.example.launcher.model.GameProfile addOfflineProfile(String name) throws IOException {
+    public org.example.launcher.domain.model.GameProfile addOfflineProfile(String name) throws IOException {
         var profiles = new ArrayList<>(loadProfiles());
-        var profile = org.example.launcher.model.GameProfile.offline(name);
+        var profile = org.example.launcher.domain.model.GameProfile.offline(name);
         profiles.removeIf(p -> p.name().equals(name));
         profiles.add(profile);
         saveProfiles(profiles);
@@ -76,7 +76,7 @@ public class ProfileService {
     /**
      * Ищет профиль по имени.
      */
-    public Optional<org.example.launcher.model.GameProfile> findByName(String name) throws IOException {
+    public Optional<org.example.launcher.domain.model.GameProfile> findByName(String name) throws IOException {
         return loadProfiles().stream()
                 .filter(p -> p.name().equals(name))
                 .findFirst();
@@ -103,7 +103,7 @@ public class ProfileService {
     /**
      * Разбирает сырую строку {@code launcher_profiles.json}.
      */
-    public List<org.example.launcher.model.GameProfile> parseProfiles(String json) throws IOException {
+    public List<org.example.launcher.domain.model.GameProfile> parseProfiles(String json) throws IOException {
         if (json == null || json.isBlank()) {
             return List.of();
         }
@@ -115,7 +115,7 @@ public class ProfileService {
         }
         if (root == null) return List.of();
 
-        List<org.example.launcher.model.GameProfile> result = new ArrayList<>();
+        List<org.example.launcher.domain.model.GameProfile> result = new ArrayList<>();
 
         if (root.has("profiles") && root.get("profiles").isJsonObject()) {
             JsonObject profilesObj = root.getAsJsonObject("profiles");
@@ -131,13 +131,13 @@ public class ProfileService {
                 String profileProps = getStrOrNull(p, "profileProperties");
 
                 if ("ely_by".equalsIgnoreCase(type)) {
-                    result.add(org.example.launcher.model.GameProfile.elyBy(
+                    result.add(org.example.launcher.domain.model.GameProfile.elyBy(
                             name, uuid, token, getStrOrNull(p, "clientToken"),
                             skinUrl, skinModel, profileProps));
                 } else {
                     boolean online = "Mojang".equalsIgnoreCase(type)
                             || "microsoft".equalsIgnoreCase(type);
-                    result.add(new org.example.launcher.model.GameProfile(
+                    result.add(new org.example.launcher.domain.model.GameProfile(
                             name, uuid, token, online));
                 }
             }
@@ -149,7 +149,7 @@ public class ProfileService {
     /**
      * Сериализует профили в JSON.
      */
-    public String serializeProfiles(List<org.example.launcher.model.GameProfile> profiles) {
+    public String serializeProfiles(List<org.example.launcher.domain.model.GameProfile> profiles) {
         JsonObject root = new JsonObject();
         JsonObject profilesObj = new JsonObject();
 

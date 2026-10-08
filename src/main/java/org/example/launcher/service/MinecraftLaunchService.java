@@ -4,9 +4,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.GameProfile;
-import org.example.launcher.model.LaunchResult;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.GameProfile;
+import org.example.launcher.domain.model.LaunchResult;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Оркестрирует полную последовательность запуска Minecraft:
@@ -19,7 +19,7 @@ import org.example.launcher.model.VersionMetadata;
  * </ol>
  * <p>
  * Вызывающий получает {@link LaunchResult} с либо работающим
- * {@link org.example.launcher.model.MinecraftProcess}, либо ошибкой
+ * {@link org.example.launcher.domain.model.MinecraftProcess}, либо ошибкой
  * с объяснением причины.
  */
 public interface MinecraftLaunchService {

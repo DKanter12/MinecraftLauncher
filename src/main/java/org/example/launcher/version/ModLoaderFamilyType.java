@@ -3,7 +3,7 @@ package org.example.launcher.version;
 import java.util.EnumMap;
 import java.util.Map;
 
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * Тип версии для локально установленных версий загрузчиков модов (Fabric,

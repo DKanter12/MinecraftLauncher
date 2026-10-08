@@ -17,7 +17,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.example.launcher.model.GameProfile;
+import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.net.HttpDefaults;
 import org.example.launcher.util.Json;
 

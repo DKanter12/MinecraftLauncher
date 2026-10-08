@@ -9,8 +9,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import org.example.launcher.model.Library;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.Library;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.MojangVersionMetadataService;
 
 @DisplayName("ModLoaderMetadataMerger")

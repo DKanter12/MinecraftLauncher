@@ -3,6 +3,7 @@ package org.example.launcher.service.modloader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,18 +11,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.domain.model.ModLoaderType;
 
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionManifest;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.MojangVersionMetadataService;
 import org.example.launcher.service.MojangVersionService;
 import org.example.launcher.version.VersionTypeRegistry;
+import org.example.launcher.domain.model.ModLoaderType;
 
 @DisplayName("ModdedVersionService")
 class ModdedVersionServiceTest {

@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import javax.imageio.ImageIO;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.GameProfile;
+import org.example.launcher.domain.model.GameProfile;
 
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;

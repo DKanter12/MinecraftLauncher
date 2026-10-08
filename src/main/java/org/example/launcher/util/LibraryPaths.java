@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.DownloadInfo;
+import org.example.launcher.domain.model.DownloadInfo;
 
 /**
  * Единое место разрешения артефакта библиотеки в локальный путь.

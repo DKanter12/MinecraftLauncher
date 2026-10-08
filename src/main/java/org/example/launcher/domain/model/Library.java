@@ -1,4 +1,4 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 import java.util.Map;
 import java.util.Optional;

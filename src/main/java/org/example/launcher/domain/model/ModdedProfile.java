@@ -1,4 +1,4 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * Игровой экземпляр: именованная изолированная игровая среда.

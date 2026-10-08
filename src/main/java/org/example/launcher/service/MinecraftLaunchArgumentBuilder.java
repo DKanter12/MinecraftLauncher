@@ -12,12 +12,12 @@ import java.util.Objects;
 import java.util.UUID;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.DownloadInfo;
-import org.example.launcher.model.GameProfile;
-import org.example.launcher.model.JavaRuntime;
-import org.example.launcher.model.LaunchArguments;
-import org.example.launcher.model.Library;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.DownloadInfo;
+import org.example.launcher.domain.model.GameProfile;
+import org.example.launcher.domain.model.JavaRuntime;
+import org.example.launcher.domain.model.LaunchArguments;
+import org.example.launcher.domain.model.Library;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.util.LibraryPaths;
 import org.example.launcher.util.OsDetector;
 

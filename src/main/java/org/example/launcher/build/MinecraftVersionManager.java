@@ -7,7 +7,7 @@ import java.util.Objects;
 import org.example.launcher.install.GameDirectory;
 import org.example.launcher.install.InstallationProgress;
 import org.example.launcher.install.InstallationService;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 

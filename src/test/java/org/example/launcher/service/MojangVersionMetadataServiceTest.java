@@ -10,11 +10,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
-import org.example.launcher.model.AssetIndex;
-import org.example.launcher.model.DownloadInfo;
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.Library;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.AssetIndex;
+import org.example.launcher.domain.model.DownloadInfo;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.Library;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

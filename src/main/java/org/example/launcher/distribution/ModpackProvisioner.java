@@ -6,10 +6,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.service.ModdedProfileService;
-import org.example.launcher.service.modloader.ModLoaderType;
-import org.example.launcher.model.ModdedProfile;
+import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.domain.model.ModdedProfile;
 
 /**
  * Превращает скачанную сборку в запускаемый игровой инстанс: выбирает

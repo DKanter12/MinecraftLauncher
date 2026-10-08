@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.GameProfile;
-import org.example.launcher.model.JavaRuntime;
-import org.example.launcher.model.LaunchArguments;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.GameProfile;
+import org.example.launcher.domain.model.JavaRuntime;
+import org.example.launcher.domain.model.LaunchArguments;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

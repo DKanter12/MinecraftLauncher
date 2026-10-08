@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.ModdedProfile;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModdedProfile;
+import org.example.launcher.domain.model.ModLoaderType;
 
 @DisplayName("ModdedProfileService")
 class ModdedProfileServiceTest {

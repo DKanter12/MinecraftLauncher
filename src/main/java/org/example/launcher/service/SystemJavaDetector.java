@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.util.OsDetector;
 
 /**

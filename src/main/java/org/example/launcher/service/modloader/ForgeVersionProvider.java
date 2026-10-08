@@ -11,8 +11,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.example.launcher.domain.model.ModLoaderType;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 
 /**
  * Поставщик {@link ModLoaderVersionProvider} для Forge на метаданных

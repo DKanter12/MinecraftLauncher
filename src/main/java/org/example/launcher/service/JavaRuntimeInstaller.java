@@ -2,7 +2,7 @@ package org.example.launcher.service;
 
 import java.nio.file.Path;
 
-import org.example.launcher.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaRuntime;
 
 /**
  * Устанавливает рантаймы Java в управляемый каталог лаунчера.

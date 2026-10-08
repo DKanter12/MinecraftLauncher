@@ -1,4 +1,4 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 /**
  * Описывает один объект ресурсов внутри индекса ресурсов.

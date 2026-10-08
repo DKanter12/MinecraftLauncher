@@ -3,7 +3,7 @@ package org.example.launcher.distribution;
 import java.util.List;
 import java.util.Optional;
 
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 
 /**
  * Перебирает версии загрузчика от новейшей к старейшей, когда игра

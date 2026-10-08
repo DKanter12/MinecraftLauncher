@@ -2,8 +2,8 @@ package org.example.launcher.service;
 
 import java.io.IOException;
 
-import org.example.launcher.model.AssetIndex;
-import org.example.launcher.model.AssetIndexContent;
+import org.example.launcher.domain.model.AssetIndex;
+import org.example.launcher.domain.model.AssetIndexContent;
 
 /**
  * Загружает и разбирает asset-индекс версии Minecraft.

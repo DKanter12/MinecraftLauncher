@@ -14,8 +14,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.model.ModLoaderVersion;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.util.Json;
 
 /**

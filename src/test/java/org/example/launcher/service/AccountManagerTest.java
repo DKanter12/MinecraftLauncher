@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.GameProfile;
+import org.example.launcher.domain.model.GameProfile;
 
 @DisplayName("AccountManager")
 class AccountManagerTest {

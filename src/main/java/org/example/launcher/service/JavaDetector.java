@@ -3,7 +3,7 @@ package org.example.launcher.service;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.example.launcher.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaRuntime;
 
 /**
  * Обнаруживает установки Java, доступные в системе хоста.

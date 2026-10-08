@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import org.example.launcher.model.JavaResolutionResult;
-import org.example.launcher.model.JavaRuntime;
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaRuntime;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Реализация {@link JavaResolutionService} по умолчанию.

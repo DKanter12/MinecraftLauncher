@@ -21,12 +21,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.AssetIndex;
-import org.example.launcher.model.DownloadInfo;
-import org.example.launcher.model.JavaVersion;
-import org.example.launcher.model.Library;
+import org.example.launcher.domain.model.AssetIndex;
+import org.example.launcher.domain.model.DownloadInfo;
+import org.example.launcher.domain.model.JavaVersion;
+import org.example.launcher.domain.model.Library;
 import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.net.HttpDefaults;
 import org.example.launcher.util.Json;
 import org.example.launcher.util.OsDetector;

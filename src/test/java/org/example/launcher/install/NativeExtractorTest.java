@@ -9,9 +9,9 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
-import org.example.launcher.model.DownloadInfo;
-import org.example.launcher.model.Library;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.DownloadInfo;
+import org.example.launcher.domain.model.Library;
+import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

@@ -1,4 +1,4 @@
-package org.example.launcher.model;
+package org.example.launcher.domain.model;
 
 import java.io.BufferedReader;
 import java.io.IOException;

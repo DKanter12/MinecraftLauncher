@@ -21,7 +21,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import org.example.launcher.model.ModdedProfile;
+import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.i18n.Lang;
 
 /**

@@ -26,7 +26,7 @@ import org.example.launcher.distribution.BuildSummary;
 import org.example.launcher.distribution.ServerSession;
 import org.example.launcher.distribution.UserRole;
 import org.example.launcher.net.UrlFetcher;
-import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.domain.model.ModLoaderType;
 
 /**
  * {@link LauncherServerApi} на основе папки Яндекс Диска

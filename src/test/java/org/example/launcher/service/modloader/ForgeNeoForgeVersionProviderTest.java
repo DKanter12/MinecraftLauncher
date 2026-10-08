@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.example.launcher.model.ModLoaderVersion;
+import org.example.launcher.domain.model.ModLoaderVersion;
 
 @DisplayName("Forge / NeoForge version providers parsing")
 class ForgeNeoForgeVersionProviderTest {

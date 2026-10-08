@@ -4,10 +4,10 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.example.launcher.install.GameDirectory;
-import org.example.launcher.model.GameProfile;
-import org.example.launcher.model.JavaRuntime;
-import org.example.launcher.model.LaunchArguments;
-import org.example.launcher.model.VersionMetadata;
+import org.example.launcher.domain.model.GameProfile;
+import org.example.launcher.domain.model.JavaRuntime;
+import org.example.launcher.domain.model.LaunchArguments;
+import org.example.launcher.domain.model.VersionMetadata;
 
 /**
  * Строит полную командную строку запуска версии Minecraft.
