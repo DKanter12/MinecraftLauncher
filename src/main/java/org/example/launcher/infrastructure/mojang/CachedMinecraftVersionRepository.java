@@ -12,6 +12,7 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 
 import org.example.launcher.domain.model.MinecraftVersion;
+import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.domain.port.MinecraftVersionRepository;
 import org.example.launcher.infrastructure.http.HttpDefaults;
@@ -67,6 +68,8 @@ public class CachedMinecraftVersionRepository implements MinecraftVersionReposit
                 d.type = v.type().name();
                 d.releaseTime = v.releaseTime().map(Object::toString).orElse(null);
                 d.metadataUrl = v.metadataUrl();
+                d.core = v.core().name();
+                d.loaderVersion = v.loaderVersion();
                 return d;
             }).toList();
             Files.writeString(cacheFile, gson.toJson(dtos), StandardCharsets.UTF_8);
@@ -89,7 +92,8 @@ public class CachedMinecraftVersionRepository implements MinecraftVersionReposit
             return dtos.stream()
                     .filter(d -> d.id != null && !d.id.isBlank())
                     .map(d -> MinecraftVersion.of(d.id, safeType(d.type),
-                            d.releaseTime, d.metadataUrl))
+                            d.releaseTime, d.metadataUrl,
+                            safeCore(d.core), d.loaderVersion))
                     .toList();
         } catch (IOException | JsonSyntaxException | IllegalArgumentException e) {
             return null;
@@ -107,11 +111,24 @@ public class CachedMinecraftVersionRepository implements MinecraftVersionReposit
         }
     }
 
+    private static ModLoaderType safeCore(String name) {
+        if (name == null) {
+            return ModLoaderType.VANILLA;
+        }
+        try {
+            return ModLoaderType.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return ModLoaderType.VANILLA;
+        }
+    }
+
     /** Плоская форма доменной версии для кэша. */
     private static final class CachedDto {
         String id;
         String type;
         String releaseTime;
         String metadataUrl;
+        String core;
+        String loaderVersion;
     }
 }
