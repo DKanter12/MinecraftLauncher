@@ -13,6 +13,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.GameProfile;
+import org.example.launcher.application.account.AccountManager;
+import org.example.launcher.infrastructure.filesystem.ProfileService;
 
 @DisplayName("AccountManager")
 class AccountManagerTest {
@@ -74,3 +76,4 @@ class AccountManagerTest {
         assertEquals("Player", mgr.getOrCreateDefault(null).name());
     }
 }
+

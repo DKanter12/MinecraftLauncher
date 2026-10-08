@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
-import org.example.launcher.service.LauncherPreferences;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 
 /**
  * Язык интерфейса лаунчера: английский и русский. Все видимые пользователю
@@ -111,7 +111,7 @@ public final class Lang {
     }
 
     /** Восстанавливает сохранённый язык (или системный по умолчанию). */
-    public static void load(LauncherPreferences preferences) {
+    public static void load(FileSettingsRepository preferences) {
         if (preferences == null) {
             setLanguage(systemDefault());
             return;
@@ -126,7 +126,7 @@ public final class Lang {
     }
 
     /** Сохраняет текущий язык. */
-    public static void save(LauncherPreferences preferences) throws IOException {
+    public static void save(FileSettingsRepository preferences) throws IOException {
         preferences.setLanguage(current.code());
     }
 }

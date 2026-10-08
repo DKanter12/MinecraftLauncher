@@ -49,11 +49,11 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import org.example.launcher.distribution.DistributionSources;
-import org.example.launcher.distribution.ServerAuthService;
-import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.distribution.api.LauncherServerApi;
-import org.example.launcher.distribution.api.OfflineLauncherServerApi;
+import org.example.launcher.infrastructure.server.DistributionSources;
+import org.example.launcher.infrastructure.server.ServerAuthService;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.api.LauncherServerApi;
+import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
@@ -67,29 +67,29 @@ import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.net.UrlFetcher;
-import org.example.launcher.service.DefaultJavaResolutionService;
-import org.example.launcher.service.ElyAuthService;
-import org.example.launcher.service.JavaResolutionService;
-import org.example.launcher.service.JavaRuntimeInstaller;
-import org.example.launcher.service.LauncherPreferences;
-import org.example.launcher.service.MinecraftLaunchService;
-import org.example.launcher.service.ModdedProfileService;
-import org.example.launcher.service.ProfileService;
-import org.example.launcher.service.SkinService;
-import org.example.launcher.service.VersionMetadataService;
-import org.example.launcher.service.VersionService;
-import org.example.launcher.service.modloader.ModLoaderRegistry;
+import org.example.launcher.infrastructure.http.UrlFetcher;
+import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
+import org.example.launcher.infrastructure.elyby.ElyAuthService;
+import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
+import org.example.launcher.application.launch.LaunchService;
+import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
+import org.example.launcher.infrastructure.filesystem.ProfileService;
+import org.example.launcher.infrastructure.skins.SkinService;
+import org.example.launcher.infrastructure.mojang.VersionMetadataService;
+import org.example.launcher.infrastructure.mojang.VersionService;
+import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.application.build.Build;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.BuildRequest;
-import org.example.launcher.service.AccountManager;
-import org.example.launcher.service.modloader.ModdedProfileVerificationService;
-import org.example.launcher.service.modloader.ModdedVersionService;
-import org.example.launcher.update.AppVersion;
-import org.example.launcher.update.LauncherUpdate;
-import org.example.launcher.update.UpdateService;
+import org.example.launcher.application.account.AccountManager;
+import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
+import org.example.launcher.infrastructure.loaders.ModdedVersionService;
+import org.example.launcher.infrastructure.updater.AppVersion;
+import org.example.launcher.infrastructure.updater.LauncherUpdate;
+import org.example.launcher.infrastructure.updater.UpdateService;
 import org.example.launcher.i18n.Lang;
 import org.example.launcher.version.StandardVersionType;
 import org.example.launcher.version.VersionType;
@@ -127,15 +127,15 @@ public class MainView {
     private final VersionService versionService;
     private final VersionMetadataService metadataService;
     private final InstallationService installationService;
-    private final MinecraftLaunchService launchService;
+    private final LaunchService launchService;
     private final JavaResolutionService javaResolutionService;
     private final JavaRuntimeInstaller javaRuntimeInstaller;
     private final ProfileService profileService;
-    private final LauncherPreferences preferences;
+    private final FileSettingsRepository preferences;
     private final ElyAuthService elyAuthService;
     private final SkinService skinService;
     private final ModLoaderRegistry modLoaderRegistry;
-    private final ModdedProfileService moddedProfileService;
+    private final FileSystemBuildRepository FileSystemBuildRepository;
     private final ModdedProfileVerificationService profileVerificationService;
     private final CreateBuildUseCase CreateBuildUseCase;
     private final AccountManager accountManager;
@@ -216,16 +216,16 @@ public class MainView {
     public MainView(VersionService versionService,
                     VersionMetadataService metadataService,
                     InstallationService installationService,
-                    MinecraftLaunchService launchService,
+                    LaunchService launchService,
                     JavaResolutionService javaResolutionService,
                     JavaRuntimeInstaller javaRuntimeInstaller,
                      ProfileService profileService,
-                     LauncherPreferences preferences,
+                     FileSettingsRepository preferences,
                     ElyAuthService elyAuthService,
                     SkinService skinService,
                     ModLoaderRegistry modLoaderRegistry,
                     ModdedVersionService moddedVersionService,
-                    ModdedProfileService moddedProfileService,
+                    FileSystemBuildRepository FileSystemBuildRepository,
                     ModdedProfileVerificationService profileVerificationService,
                     CreateBuildUseCase CreateBuildUseCase,
                     AccountManager accountManager) {
@@ -240,7 +240,7 @@ public class MainView {
         this.elyAuthService = elyAuthService;
         this.skinService = skinService;
         this.modLoaderRegistry = modLoaderRegistry;
-        this.moddedProfileService = moddedProfileService;
+        this.FileSystemBuildRepository = FileSystemBuildRepository;
         this.profileVerificationService = profileVerificationService;
         this.CreateBuildUseCase = CreateBuildUseCase;
         this.accountManager = accountManager;
@@ -828,11 +828,11 @@ public class MainView {
                 : "MC " + profile.minecraftVersion() + "  ·  "
                         + profile.loaderType().displayName() + " "
                         + profile.loaderVersion()));
-        Path dir = moddedProfileService.resolveGameDir(profile);
+        Path dir = FileSystemBuildRepository.resolveGameDir(profile);
         details.getChildren().add(detailLine(Lang.tr("card.gamedir",
                 shortGameDir(dir))));
         details.getChildren().add(detailLine(Lang.tr("card.memory",
-                ModdedProfileService.formatMemory(profile.memoryMb()))));
+                FileSystemBuildRepository.formatMemory(profile.memoryMb()))));
         details.getChildren().add(detailLine(Lang.tr("card.jvm",
                 profile.extraJvmArgs().isEmpty() ? Lang.tr("card.none")
                         : String.join(" ", profile.extraJvmArgs()))));
@@ -920,7 +920,7 @@ public class MainView {
     /** Считает jar-моды; отрицательное — когда не читается. */
     private int modsCount(ModdedProfile profile) {
         try {
-            Path mods = moddedProfileService.resolveGameDir(profile)
+            Path mods = FileSystemBuildRepository.resolveGameDir(profile)
                     .resolve("mods");
             if (!Files.isDirectory(mods)) {
                 return profile.isVanilla() ? -1 : 0;
@@ -2086,7 +2086,7 @@ public class MainView {
      */
     private void refreshModdedProfiles(String selectId) {
         try {
-            moddedProfiles = moddedProfileService.loadProfiles();
+            moddedProfiles = FileSystemBuildRepository.loadProfiles();
             if (selectId != null) {
                 selectedInstanceId = selectId;
             } else if (selectedInstance() == null) {
@@ -2107,8 +2107,8 @@ public class MainView {
     private void onOpenProfileFolder(ModdedProfile profile) {
         if (profile == null) return;
         try {
-            Path dir = moddedProfileService.resolveGameDir(profile);
-            ModdedProfileService.ensureProfileFolders(dir);
+            Path dir = FileSystemBuildRepository.resolveGameDir(profile);
+            FileSystemBuildRepository.ensureProfileFolders(dir);
             java.awt.Desktop.getDesktop().open(dir.toFile());
             statusLabel.setText(Lang.tr("folder.opened", dir));
         } catch (Exception ex) {
@@ -2135,14 +2135,14 @@ public class MainView {
         try {
             // Переименование также переименовывает папку (моды/сохранения/сборки
             // переезжают вместе), поэтому далее выбираем по новому id
-            Optional<ModdedProfile> updated = moddedProfileService.updateProfile(
+            Optional<ModdedProfile> updated = FileSystemBuildRepository.updateProfile(
                     profile.id(), result.extraJvmArgs(), result.name(),
                     result.memoryMb());
             if (updated.isPresent()) {
                 refreshModdedProfiles(updated.get().id());
                 statusLabel.setText(Lang.tr("instance.updated",
                         updated.get().name(),
-                        ModdedProfileService.formatMemory(
+                        FileSystemBuildRepository.formatMemory(
                                 updated.get().memoryMb()),
                         result.extraJvmArgs().isEmpty() ? ""
                                 : Lang.tr("instance.updated.jvm",
@@ -2170,7 +2170,7 @@ public class MainView {
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    var keptDir = moddedProfileService.deleteProfile(profile.id());
+                    var keptDir = FileSystemBuildRepository.deleteProfile(profile.id());
                     refreshModdedProfiles(null);
                     statusLabel.setText(Lang.tr("instance.delete.done",
                             keptDir.map(d -> Lang.tr("instance.delete.kept", d))
@@ -2389,17 +2389,17 @@ public class MainView {
             protected LaunchResult call() throws Exception {
                 // Игровой каталог профиля должен существовать до запуска
                 // процесса внутри него
-                ModdedProfileService.ensureProfileFolders(runtimeDir);
+                FileSystemBuildRepository.ensureProfileFolders(runtimeDir);
                 return launchService.launch(metadata, storage, account,
                         runtimeDir,
-                        ModdedProfileService.effectiveJvmArgs(profile));
+                        FileSystemBuildRepository.effectiveJvmArgs(profile));
             }
         };
         launchTask.setOnSucceeded(e -> {
             LaunchResult result = launchTask.getValue();
             if (result.isSuccess()) {
                 try {
-                    moddedProfileService.touchLastPlayed(profile.id());
+                    FileSystemBuildRepository.touchLastPlayed(profile.id());
                 } catch (IOException ignored) {
                     // Некритично
                 }

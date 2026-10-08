@@ -16,12 +16,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.net.UrlFetcher;
+import org.example.launcher.infrastructure.http.UrlFetcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.infrastructure.updater.AppVersion;
+import org.example.launcher.infrastructure.updater.LauncherUpdate;
+import org.example.launcher.infrastructure.updater.UpdateApplier;
+import org.example.launcher.infrastructure.updater.UpdateService;
 
 class UpdateServiceTest {
 
@@ -225,3 +229,4 @@ class UpdateApplierTest {
         assertTrue(Files.isDirectory(stage));
     }
 }
+

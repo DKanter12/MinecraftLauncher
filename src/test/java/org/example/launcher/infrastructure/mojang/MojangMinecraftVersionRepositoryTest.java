@@ -15,7 +15,7 @@ import com.google.gson.Gson;
 
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionType;
-import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.infrastructure.http.HttpDefaults;
 
 @DisplayName("MojangMinecraftVersionRepository")
 class MojangMinecraftVersionRepositoryTest {

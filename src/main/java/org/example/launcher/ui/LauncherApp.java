@@ -12,36 +12,36 @@ import org.example.launcher.infrastructure.download.HttpFileDownloader;
 import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.infrastructure.download.MinecraftInstaller;
 import org.example.launcher.infrastructure.download.Sha1ChecksumVerifier;
-import org.example.launcher.service.AssetIndexService;
-import org.example.launcher.service.AdoptiumJavaRuntimeInstaller;
-import org.example.launcher.service.AuthlibInjectorManager;
-import org.example.launcher.service.DefaultJavaResolutionService;
-import org.example.launcher.service.ElyAuthService;
-import org.example.launcher.service.JavaResolutionService;
-import org.example.launcher.service.JavaRuntimeInstaller;
-import org.example.launcher.service.LauncherPreferences;
-import org.example.launcher.service.MinecraftLaunchArgumentBuilder;
-import org.example.launcher.service.MinecraftLaunchService;
-import org.example.launcher.service.MinecraftLauncher;
-import org.example.launcher.service.MojangAssetIndexService;
-import org.example.launcher.service.MojangVersionMetadataService;
-import org.example.launcher.service.MojangVersionService;
-import org.example.launcher.service.ProfileService;
-import org.example.launcher.service.SkinService;
-import org.example.launcher.service.SystemJavaDetector;
-import org.example.launcher.service.VersionMetadataService;
-import org.example.launcher.service.VersionService;
-import org.example.launcher.service.ModdedProfileService;
-import org.example.launcher.service.AccountManager;
+import org.example.launcher.infrastructure.mojang.AssetIndexService;
+import org.example.launcher.infrastructure.java.AdoptiumJavaRuntimeInstaller;
+import org.example.launcher.infrastructure.minecraft.AuthlibInjectorManager;
+import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
+import org.example.launcher.infrastructure.elyby.ElyAuthService;
+import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
+import org.example.launcher.application.launch.LaunchCommandBuilder;
+import org.example.launcher.application.launch.LaunchService;
+import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.infrastructure.mojang.MojangAssetIndexService;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
+import org.example.launcher.infrastructure.mojang.MojangVersionService;
+import org.example.launcher.infrastructure.filesystem.ProfileService;
+import org.example.launcher.infrastructure.skins.SkinService;
+import org.example.launcher.infrastructure.java.SystemJavaDetector;
+import org.example.launcher.infrastructure.mojang.VersionMetadataService;
+import org.example.launcher.infrastructure.mojang.VersionService;
+import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
+import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.MinecraftVersionManager;
-import org.example.launcher.service.modloader.ModLoaderMetadataMerger;
-import org.example.launcher.service.modloader.ModLoaderRegistry;
+import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
+import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
-import org.example.launcher.service.modloader.ModdedProfileVerificationService;
-import org.example.launcher.service.modloader.ModdedVersionService;
+import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
+import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.i18n.Lang;
-import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.infrastructure.http.HttpDefaults;
 import org.example.launcher.version.ModLoaderFamilyType;
 import org.example.launcher.version.VersionTypeRegistry;
 
@@ -57,7 +57,7 @@ import org.example.launcher.version.VersionTypeRegistry;
  *   <li>{@link ChecksumVerifier} — проверяет SHA1-хэши локальных файлов</li>
  * <li>{@link InstallationService} — управляет полной установкой</li>
  * <li>{@link JavaResolutionService} — находит и выбирает подходящий Java-рантайм</li>
- * <li>{@link MinecraftLaunchService} — запускает игру и следит за процессом</li>
+ * <li>{@link LaunchService} — запускает игру и следит за процессом</li>
  * <li>{@link ProfileService} — управляет профилями игроков</li>
  * </ul>
  */ 
@@ -99,18 +99,18 @@ public class LauncherApp extends Application {
         AuthlibInjectorManager authlibInjectorManager =
                 new AuthlibInjectorManager(defaultGameDir);
 
-        MinecraftLaunchArgumentBuilder argumentBuilder =
-                new MinecraftLaunchArgumentBuilder(authlibInjectorManager);
+        LaunchCommandBuilder argumentBuilder =
+                new LaunchCommandBuilder(authlibInjectorManager);
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
                 argumentBuilder,
                 javaResolutionService,
                 checksumVerifier);
-        MinecraftLaunchService launchService = launcher;
+        LaunchService launchService = launcher;
         ProfileService profileService = new ProfileService(
                 GameDirectory.defaultDirectory().profilesFile());
 
-        LauncherPreferences preferences = new LauncherPreferences(
+        FileSettingsRepository preferences = new FileSettingsRepository(
                 GameDirectory.defaultDirectory().preferencesFile());
         Lang.load(preferences);
 
@@ -128,8 +128,8 @@ public class LauncherApp extends Application {
                 mojangVersionService, mojangMetadataService, merger);
 
         // Игровые инстансы (ванильные + модовые, у каждого свой каталог)
-        ModdedProfileService moddedProfileService =
-                new ModdedProfileService(defaultGameDir);
+        FileSystemBuildRepository FileSystemBuildRepository =
+                new FileSystemBuildRepository(defaultGameDir);
         ModdedProfileVerificationService profileVerificationService =
                 new ModdedProfileVerificationService(
                         moddedVersionService, mojangVersionService,
@@ -141,7 +141,7 @@ public class LauncherApp extends Application {
         MinecraftVersionManager versionManager = new MinecraftVersionManager(
                 metadataService, installationService, modLoaderRegistry, defaultGameDir);
         CreateBuildUseCase CreateBuildUseCase = new CreateBuildUseCase(
-                versionManager, moddedProfileService, defaultGameDir);
+                versionManager, FileSystemBuildRepository, defaultGameDir);
         AccountManager accountManager = new AccountManager(profileService);
 
         MainView view = new MainView(
@@ -149,7 +149,7 @@ public class LauncherApp extends Application {
                 launchService, javaResolutionService, javaRuntimeInstaller,
                 profileService, preferences, elyAuthService, skinService,
                 modLoaderRegistry, moddedVersionService,
-                moddedProfileService, profileVerificationService, CreateBuildUseCase,
+                FileSystemBuildRepository, profileVerificationService, CreateBuildUseCase,
                 accountManager);
 
         Scene scene = new Scene(view.getView(), 1180, 680);

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.google.gson.Gson;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 
 @DisplayName("MojangVersionMetadataService parsing")
 class MojangVersionMetadataServiceTest {
@@ -418,7 +419,7 @@ class MojangVersionMetadataServiceTest {
         assertTrue(gameArgs.contains("--always-here"));
         assertFalse(gameArgs.contains("--demo-only"));
 
-        String currentOs = org.example.launcher.util.OsDetector.mojangName();
+        String currentOs = org.example.launcher.infrastructure.common.OsDetector.mojangName();
         if ("windows".equals(currentOs)) {
             assertTrue(gameArgs.contains("--windows-only"));
             assertFalse(gameArgs.contains("--linux-only"));
@@ -428,3 +429,4 @@ class MojangVersionMetadataServiceTest {
         }
     }
 }
+

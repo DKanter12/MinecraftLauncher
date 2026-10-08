@@ -20,8 +20,12 @@ import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.application.launch.LaunchCommandBuilder;
+import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 
-@DisplayName("MinecraftLauncher")
+@DisplayName("LaunchBuildUseCase")
 class MinecraftLauncherTest {
 
     private final MojangVersionMetadataService metadataService = new MojangVersionMetadataService();
@@ -111,8 +115,8 @@ class MinecraftLauncherTest {
         createDummyFile(gameDir.library("com/mojang/logging/1.1.1/logging-1.1.1.jar"), "lib");
         createDummyFile(gameDir.assetIndexFile("21"), "{}");
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(testRuntime(Path.of("java"))),
                 (path, sha1) -> true);
 
@@ -129,8 +133,8 @@ class MinecraftLauncherTest {
         createDummyFile(gameDir.library("com/mojang/logging/1.1.1/logging-1.1.1.jar"), "lib");
         createDummyFile(gameDir.assetIndexFile("21"), "{}");
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(testRuntime(Path.of("java"))),
                 (path, sha1) -> true);
 
@@ -150,8 +154,8 @@ class MinecraftLauncherTest {
         createDummyFile(gameDir.assetIndexFile("21"), "{}");
 
         // Verifier always fails
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(testRuntime(Path.of("java"))),
                 (path, sha1) -> false);
 
@@ -170,8 +174,8 @@ class MinecraftLauncherTest {
         // Library not created
         createDummyFile(gameDir.assetIndexFile("21"), "{}");
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(testRuntime(Path.of("java"))),
                 (path, sha1) -> true);
 
@@ -191,8 +195,8 @@ class MinecraftLauncherTest {
         GameDirectory gameDir = new GameDirectory(dir);
 
         // No files created
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(testRuntime(Path.of("java"))),
                 (path, sha1) -> true);
 
@@ -213,8 +217,8 @@ class MinecraftLauncherTest {
         createDummyFile(gameDir.library("com/mojang/logging/1.1.1/logging-1.1.1.jar"), "lib");
         createDummyFile(gameDir.assetIndexFile("21"), "{}");
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 notFoundService(),
                 (path, sha1) -> true);
 
@@ -238,8 +242,8 @@ class MinecraftLauncherTest {
         JavaRuntime badRuntime = new JavaRuntime(
                 dir.resolve("nonexistent-java"), 21, JavaRuntime.Source.CUSTOM);
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(badRuntime),
                 (path, sha1) -> true);
 
@@ -269,8 +273,8 @@ class MinecraftLauncherTest {
 
         JavaRuntime realRuntime = new JavaRuntime(javaExe, 21, JavaRuntime.Source.JAVA_HOME);
 
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(),
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(),
                 foundService(realRuntime),
                 (path, sha1) -> true);
 
@@ -290,3 +294,4 @@ class MinecraftLauncherTest {
         }
     }
 }
+

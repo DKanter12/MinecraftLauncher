@@ -28,8 +28,8 @@ import javafx.stage.StageStyle;
 
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
-import org.example.launcher.util.JvmArgs;
-import org.example.launcher.service.modloader.ModLoaderRegistry;
+import org.example.launcher.infrastructure.common.JvmArgs;
+import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.version.StandardVersionType;
 import org.example.launcher.i18n.Lang;

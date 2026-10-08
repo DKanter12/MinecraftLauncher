@@ -5,6 +5,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildSummary;
+import org.example.launcher.infrastructure.server.BuildFileCategory;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.RemoteBuildService;
+import org.example.launcher.infrastructure.server.UserRole;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.application.build.Build;
 
 class RemoteBuildServiceTest {
 
@@ -182,3 +189,5 @@ class RemoteBuildServiceTest {
         assertTrue(error.getMessage().contains("unknown-build"));
     }
 }
+
+

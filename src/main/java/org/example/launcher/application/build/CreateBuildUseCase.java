@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.domain.model.ModdedProfile;
-import org.example.launcher.service.ModdedProfileService;
+import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 
 /**
  * Оркестратор создания сборок по схеме UI:
@@ -15,18 +15,18 @@ import org.example.launcher.service.ModdedProfileService;
  * отображение в интерфейсе}.
  *
  * <p>Класс не качает файлы и не строит UI сам: скачивание делегировано
- * {@link MinecraftVersionManager}, папки/реестр — {@link ModdedProfileService},
+ * {@link MinecraftVersionManager}, папки/реестр — {@link FileSystemBuildRepository},
  * отображение остаётся в {@code MainView}.
  */
 public class CreateBuildUseCase {
 
     private final MinecraftVersionManager versionManager;
-    private final ModdedProfileService profileService;
+    private final FileSystemBuildRepository profileService;
     private final GameDirectory storage;
 
     public CreateBuildUseCase(
             MinecraftVersionManager versionManager,
-            ModdedProfileService profileService,
+            FileSystemBuildRepository profileService,
             GameDirectory storage) {
         this.versionManager = Objects.requireNonNull(versionManager);
         this.profileService = Objects.requireNonNull(profileService);
@@ -112,7 +112,7 @@ public class CreateBuildUseCase {
      * shaderpacks, saves, logs}); существующие файлы не трогаются.
      */
     public void populateBuildDirectories(ModdedProfile profile) throws IOException {
-        ModdedProfileService.ensureProfileFolders(
+        FileSystemBuildRepository.ensureProfileFolders(
                 storage.moddedProfileDir(profile.id()));
     }
 }

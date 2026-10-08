@@ -15,7 +15,7 @@ import java.util.jar.JarFile;
 
 import org.example.launcher.domain.model.Library;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.util.OsDetector;
+import org.example.launcher.infrastructure.common.OsDetector;
 
 /**
  * Распаковывает нативные библиотеки из JAR-контейнеров в

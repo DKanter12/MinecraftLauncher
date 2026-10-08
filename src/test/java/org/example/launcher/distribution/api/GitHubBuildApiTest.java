@@ -1,4 +1,4 @@
-package org.example.launcher.distribution.api;
+package org.example.launcher.infrastructure.server.api;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,13 +11,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.distribution.BuildDescriptor;
-import org.example.launcher.distribution.BuildSummary;
-import org.example.launcher.distribution.DistributionSources;
-import org.example.launcher.distribution.RemoteBuildService;
-import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.distribution.UserRole;
-import org.example.launcher.net.UrlFetcher;
+import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildSummary;
+import org.example.launcher.infrastructure.server.DistributionSources;
+import org.example.launcher.infrastructure.server.RemoteBuildService;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.UserRole;
+import org.example.launcher.infrastructure.http.UrlFetcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -151,3 +151,4 @@ class GitHubBuildApiTest {
         }
     }
 }
+

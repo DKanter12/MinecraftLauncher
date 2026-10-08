@@ -11,7 +11,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.service.LauncherPreferences;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,7 +71,7 @@ class LangTest {
     @Test
     void savesAndLoads(@TempDir Path tempDir) throws Exception {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         Lang.setLanguage(Lang.Language.RUSSIAN);
         try {

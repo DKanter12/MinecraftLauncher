@@ -14,6 +14,7 @@ import org.example.launcher.domain.model.GameProfile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.infrastructure.filesystem.ProfileService;
 
 @DisplayName("ProfileService")
 class ProfileServiceTest {
@@ -159,3 +160,4 @@ class ProfileServiceTest {
         assertEquals("Keeper", loaded.get(0).name());
     }
 }
+

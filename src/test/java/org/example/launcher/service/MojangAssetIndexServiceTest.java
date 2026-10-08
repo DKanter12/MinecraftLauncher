@@ -10,6 +10,7 @@ import java.io.IOException;
 import org.example.launcher.domain.model.AssetIndexContent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.example.launcher.infrastructure.mojang.MojangAssetIndexService;
 
 @DisplayName("MojangAssetIndexService parsing")
 class MojangAssetIndexServiceTest {
@@ -103,3 +104,4 @@ class MojangAssetIndexServiceTest {
         assertThrows(IOException.class, () -> service.parseIndex(""));
     }
 }
+

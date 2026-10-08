@@ -1,6 +1,7 @@
 package org.example.launcher.distribution;
 
 import org.junit.jupiter.api.Test;
+import org.example.launcher.infrastructure.server.BuildVersions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,3 +49,4 @@ class BuildVersionsTest {
         assertFalse(BuildVersions.isNewer("1.0.0", "1.1.0"));
     }
 }
+

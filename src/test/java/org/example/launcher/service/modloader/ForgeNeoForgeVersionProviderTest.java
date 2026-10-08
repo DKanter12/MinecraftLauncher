@@ -9,6 +9,9 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.example.launcher.domain.model.ModLoaderVersion;
+import org.example.launcher.application.build.Build;
+import org.example.launcher.infrastructure.loaders.ForgeVersionProvider;
+import org.example.launcher.infrastructure.loaders.NeoForgeVersionProvider;
 
 @DisplayName("Forge / NeoForge version providers parsing")
 class ForgeNeoForgeVersionProviderTest {
@@ -208,3 +211,5 @@ class ForgeNeoForgeVersionProviderTest {
                 "0.25w14craftmine.3-beta"));
     }
 }
+
+

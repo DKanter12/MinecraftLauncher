@@ -5,6 +5,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildSummary;
+import org.example.launcher.infrastructure.server.BuildFileEntry;
+import org.example.launcher.infrastructure.server.BuildFileCategory;
+import org.example.launcher.infrastructure.server.BuildOrigin;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.RemoteBuildService;
+import org.example.launcher.infrastructure.server.ModpackProvisioner;
+import org.example.launcher.infrastructure.server.LoaderMismatchDetector;
+import org.example.launcher.infrastructure.server.LoaderFallbackPolicy;
+import org.example.launcher.infrastructure.server.UserRole;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,12 +23,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
-import org.example.launcher.service.ModdedProfileService;
+import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.domain.model.ModLoaderType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.application.build.Build;
 
 class ModpackProvisionerTest {
 
@@ -90,7 +102,7 @@ class ModpackProvisionerTest {
     @Test
     void instantiateCreatesInstanceAndCopiesFiles() throws IOException {
         GameDirectory storage = new GameDirectory(tempDir.resolve("storage"));
-        ModdedProfileService profiles = new ModdedProfileService(storage);
+        FileSystemBuildRepository profiles = new FileSystemBuildRepository(storage);
         Path staged = tempDir.resolve("staged").resolve("pack");
         Files.createDirectories(staged.resolve("mods"));
         Files.createDirectories(staged.resolve("config"));
@@ -172,3 +184,5 @@ class ModpackProvisionerTest {
                 fresh.stream().map(BuildSummary::id).toList());
     }
 }
+
+

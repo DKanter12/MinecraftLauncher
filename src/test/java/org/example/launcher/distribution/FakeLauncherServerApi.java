@@ -10,9 +10,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildSummary;
+import org.example.launcher.infrastructure.server.BuildFileEntry;
+import org.example.launcher.infrastructure.server.BuildFileCategory;
+import org.example.launcher.infrastructure.server.BuildOrigin;
+import org.example.launcher.infrastructure.server.ServerSession;
 
-import org.example.launcher.distribution.api.LauncherServerApi;
+import org.example.launcher.infrastructure.server.api.LauncherServerApi;
 import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.application.build.Build;
 
 /**
  * In-memory launcher server for tests: serves a configurable catalog,
@@ -157,3 +164,5 @@ public class FakeLauncherServerApi implements LauncherServerApi {
         }
     }
 }
+
+

@@ -1,12 +1,12 @@
-package org.example.launcher.distribution.api;
+package org.example.launcher.infrastructure.server.api;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.distribution.UserRole;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.UserRole;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,3 +46,4 @@ class OfflineLauncherServerApiTest {
         assertThrows(IOException.class, () -> api.listUsers(session));
     }
 }
+

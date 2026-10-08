@@ -10,8 +10,9 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 
-@DisplayName("LauncherPreferences")
+@DisplayName("FileSettingsRepository")
 class LauncherPreferencesTest {
 
     @TempDir
@@ -20,7 +21,7 @@ class LauncherPreferencesTest {
     @Test
     @DisplayName("returns empty when file does not exist")
     void emptyWhenNoFile() throws IOException {
-        LauncherPreferences prefs = new LauncherPreferences(tempDir.resolve("prefs.json"));
+        FileSettingsRepository prefs = new FileSettingsRepository(tempDir.resolve("prefs.json"));
         assertTrue(prefs.getLastSelectedVersion().isEmpty());
     }
 
@@ -28,7 +29,7 @@ class LauncherPreferencesTest {
     @DisplayName("saves and loads last selected version")
     void saveAndLoad() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion("b1.8.1");
 
@@ -39,7 +40,7 @@ class LauncherPreferencesTest {
     @DisplayName("overwrites previous value")
     void overwrite() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion("1.21");
         prefs.setLastSelectedVersion("1.20.4");
@@ -51,7 +52,7 @@ class LauncherPreferencesTest {
     @DisplayName("returns empty for blank value")
     void blankValue() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion("");
 
@@ -62,7 +63,7 @@ class LauncherPreferencesTest {
     @DisplayName("returns empty for null value")
     void nullValue() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion(null);
 
@@ -75,7 +76,7 @@ class LauncherPreferencesTest {
         Path file = tempDir.resolve("prefs.json");
         Files.writeString(file, "not valid json {{{");
 
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
         assertTrue(prefs.getLastSelectedVersion().isEmpty());
     }
 
@@ -83,7 +84,7 @@ class LauncherPreferencesTest {
     @DisplayName("creates parent directories if needed")
     void createsParents() throws IOException {
         Path file = tempDir.resolve("sub").resolve("dir").resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion("1.21");
 
@@ -95,7 +96,7 @@ class LauncherPreferencesTest {
     @DisplayName("saves and loads last selected account")
     void saveAndLoadAccount() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedAccount("Steve");
 
@@ -106,7 +107,7 @@ class LauncherPreferencesTest {
     @DisplayName("version and account persist together")
     void bothPersistTogether() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.setLastSelectedVersion("1.21");
         prefs.setLastSelectedAccount("Alex");
@@ -119,7 +120,7 @@ class LauncherPreferencesTest {
     @DisplayName("builds git url round-trip")
     void buildsGitUrlRoundTrip() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         assertTrue(prefs.getBuildsGitUrl().isEmpty());
 
@@ -137,7 +138,7 @@ class LauncherPreferencesTest {
     @DisplayName("builds source settings round-trip")
     void buildsSourceRoundTrip() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         assertTrue(prefs.getBuildsSourceMode().isEmpty());
         assertTrue(prefs.getYandexDiskLink().isEmpty());
@@ -157,7 +158,7 @@ class LauncherPreferencesTest {
     @DisplayName("language round-trip")
     void languageRoundTrip() throws IOException {
         Path file = tempDir.resolve("prefs.json");
-        LauncherPreferences prefs = new LauncherPreferences(file);
+        FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         assertTrue(prefs.getLanguage().isEmpty());
 
@@ -170,3 +171,4 @@ class LauncherPreferencesTest {
         assertTrue(prefs.getLanguage().isEmpty());
     }
 }
+

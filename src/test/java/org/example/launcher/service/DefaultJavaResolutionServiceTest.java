@@ -12,6 +12,8 @@ import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaDetector;
 
 @DisplayName("DefaultJavaResolutionService")
 class DefaultJavaResolutionServiceTest {
@@ -225,3 +227,4 @@ class DefaultJavaResolutionServiceTest {
         assertEquals(JavaRuntime.Source.CUSTOM, result.runtime().orElseThrow().source());
     }
 }
+

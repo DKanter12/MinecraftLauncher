@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import org.example.launcher.domain.model.Library;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.service.MojangVersionMetadataService;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
+import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 
 @DisplayName("ModLoaderMetadataMerger")
 class ModLoaderMetadataMergerTest {
@@ -208,3 +209,4 @@ class ModLoaderMetadataMergerTest {
         assertEquals(123456, artifact.size());
     }
 }
+

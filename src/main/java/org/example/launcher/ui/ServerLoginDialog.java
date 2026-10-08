@@ -16,9 +16,9 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import org.example.launcher.distribution.ServerAuthService;
-import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.distribution.UserRole;
+import org.example.launcher.infrastructure.server.ServerAuthService;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.UserRole;
 import org.example.launcher.i18n.Lang;
 
 /**

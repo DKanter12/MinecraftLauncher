@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 
 @DisplayName("GameDirectory")
 class GameDirectoryTest {
@@ -109,3 +110,4 @@ class GameDirectoryTest {
         return Path.of("x").getFileSystem().getSeparator();
     }
 }
+

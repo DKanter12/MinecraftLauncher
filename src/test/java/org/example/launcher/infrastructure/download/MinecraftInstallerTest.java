@@ -22,7 +22,7 @@ import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.Library;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.service.AssetIndexService;
+import org.example.launcher.infrastructure.mojang.AssetIndexService;
 import org.example.launcher.version.StandardVersionType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

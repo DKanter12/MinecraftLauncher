@@ -18,10 +18,10 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import org.example.launcher.update.AppVersion;
-import org.example.launcher.update.LauncherUpdate;
-import org.example.launcher.update.UpdateApplier;
-import org.example.launcher.update.UpdateService;
+import org.example.launcher.infrastructure.updater.AppVersion;
+import org.example.launcher.infrastructure.updater.LauncherUpdate;
+import org.example.launcher.infrastructure.updater.UpdateApplier;
+import org.example.launcher.infrastructure.updater.UpdateService;
 import org.example.launcher.i18n.Lang;
 
 /**

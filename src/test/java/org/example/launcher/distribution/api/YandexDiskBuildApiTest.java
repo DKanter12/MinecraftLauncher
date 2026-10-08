@@ -1,4 +1,4 @@
-package org.example.launcher.distribution.api;
+package org.example.launcher.infrastructure.server.api;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -21,17 +21,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.distribution.BuildDescriptor;
-import org.example.launcher.distribution.BuildSummary;
-import org.example.launcher.distribution.DistributionSources;
-import org.example.launcher.distribution.RemoteBuildService;
-import org.example.launcher.distribution.ServerSession;
-import org.example.launcher.net.UrlFetcher;
-import org.example.launcher.net.UrlFetcher;
+import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildSummary;
+import org.example.launcher.infrastructure.server.DistributionSources;
+import org.example.launcher.infrastructure.server.RemoteBuildService;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.http.UrlFetcher;
+import org.example.launcher.infrastructure.http.UrlFetcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.example.launcher.application.build.Build;
 
 /**
  * The whole Yandex Disk flow against a local stub of the Disk REST
@@ -350,3 +351,5 @@ class YandexDiskBuildApiTest {
         }
     }
 }
+
+

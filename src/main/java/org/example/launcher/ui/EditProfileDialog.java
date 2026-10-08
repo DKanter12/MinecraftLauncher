@@ -2,7 +2,7 @@ package org.example.launcher.ui;
 
 import java.util.List;
 
-import org.example.launcher.util.JvmArgs;
+import org.example.launcher.infrastructure.common.JvmArgs;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;

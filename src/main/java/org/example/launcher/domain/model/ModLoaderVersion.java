@@ -9,7 +9,7 @@ import org.example.launcher.domain.model.ModLoaderType;
  * Одна версия загрузчика модов, разрешённая для конкретной версии
  * Minecraft (например, Fabric Loader 0.16.9 для Minecraft 1.21.4).
  * <p>
- * Экземпляры создаются реализациями {@link org.example.launcher.service.modloader.ModLoaderVersionProvider},
+ * Экземпляры создаются реализациями {@link org.example.launcher.infrastructure.loaders.ModLoaderVersionProvider},
  * гарантирующими совместимость: каждая запись списка, возвращённого для версии
  * Minecraft, устанавливаема для этой версии.
  *

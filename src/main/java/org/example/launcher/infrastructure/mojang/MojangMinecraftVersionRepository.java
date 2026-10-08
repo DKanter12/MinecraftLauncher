@@ -16,7 +16,7 @@ import com.google.gson.JsonSyntaxException;
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.domain.port.MinecraftVersionRepository;
-import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.infrastructure.http.HttpDefaults;
 
 /**
  * Реализация {@link MinecraftVersionRepository} на официальном манифесте Mojang.

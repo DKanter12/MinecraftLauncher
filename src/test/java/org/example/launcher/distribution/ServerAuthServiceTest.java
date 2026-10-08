@@ -7,11 +7,14 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.example.launcher.infrastructure.server.ServerSession;
+import org.example.launcher.infrastructure.server.ServerAuthService;
+import org.example.launcher.infrastructure.server.UserRole;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.distribution.api.OfflineLauncherServerApi;
+import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -113,3 +116,4 @@ class ServerAuthServiceTest {
         assertTrue(service.restoreSession().isEmpty());
     }
 }
+

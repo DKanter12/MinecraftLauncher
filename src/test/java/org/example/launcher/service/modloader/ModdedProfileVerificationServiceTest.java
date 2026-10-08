@@ -28,14 +28,21 @@ import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.service.JavaResolutionService;
-import org.example.launcher.service.MinecraftLaunchArgumentBuilder;
-import org.example.launcher.service.MinecraftLauncher;
-import org.example.launcher.service.MojangVersionMetadataService;
-import org.example.launcher.service.MojangVersionService;
+import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.application.launch.LaunchCommandBuilder;
+import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
+import org.example.launcher.infrastructure.mojang.MojangVersionService;
 import org.example.launcher.version.StandardVersionType;
 import org.example.launcher.version.VersionTypeRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
+import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
+import org.example.launcher.infrastructure.loaders.ModdedVersionService;
+import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
+import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
+import org.example.launcher.infrastructure.mojang.VersionService;
+import org.example.launcher.infrastructure.loaders.ModLoaderInstaller;
 
 @DisplayName("ModdedProfileVerificationService")
 class ModdedProfileVerificationServiceTest {
@@ -186,8 +193,8 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(), javaService,
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(), javaService,
                 new Sha1ChecksumVerifier());
         ModLoaderRegistry registry = new ModLoaderRegistry();
         return new ModdedProfileVerificationService(moddedVersionService,
@@ -337,8 +344,8 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(), ALWAYS_JAVA,
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(), ALWAYS_JAVA,
                 new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
@@ -386,8 +393,8 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(), ALWAYS_JAVA,
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(), ALWAYS_JAVA,
                 new Sha1ChecksumVerifier());
 
         AtomicInteger installerCalls = new AtomicInteger();
@@ -427,8 +434,8 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        MinecraftLauncher launcher = new MinecraftLauncher(
-                new MinecraftLaunchArgumentBuilder(), ALWAYS_JAVA,
+        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
+                new LaunchCommandBuilder(), ALWAYS_JAVA,
                 new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
@@ -567,8 +574,10 @@ class ModdedProfileVerificationServiceTest {
     static final class ModdedProfileServiceTestHelper {
         static void ensureFolders(GameDirectory gameDir, String profileId)
                 throws IOException {
-            org.example.launcher.service.ModdedProfileService.ensureProfileFolders(
+            org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository.ensureProfileFolders(
                     gameDir.moddedProfileDir(profileId));
         }
     }
 }
+
+

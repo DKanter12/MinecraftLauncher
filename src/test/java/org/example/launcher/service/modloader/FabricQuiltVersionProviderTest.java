@@ -13,6 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.application.build.Build;
+import org.example.launcher.infrastructure.loaders.FabricVersionProvider;
+import org.example.launcher.infrastructure.loaders.QuiltVersionProvider;
 
 @DisplayName("Fabric / Quilt version providers parsing")
 class FabricQuiltVersionProviderTest {
@@ -115,3 +118,5 @@ class FabricQuiltVersionProviderTest {
                 () -> provider.parseGameVersions("{\"not\":\"an array\"}"));
     }
 }
+
+

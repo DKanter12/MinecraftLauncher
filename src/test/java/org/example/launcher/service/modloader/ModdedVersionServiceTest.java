@@ -22,10 +22,12 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.service.MojangVersionMetadataService;
-import org.example.launcher.service.MojangVersionService;
+import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
+import org.example.launcher.infrastructure.mojang.MojangVersionService;
 import org.example.launcher.version.VersionTypeRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.infrastructure.loaders.ModdedVersionService;
+import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 
 @DisplayName("ModdedVersionService")
 class ModdedVersionServiceTest {
@@ -230,3 +232,4 @@ class ModdedVersionServiceTest {
         Files.writeString(jsonFile, json, StandardCharsets.UTF_8);
     }
 }
+

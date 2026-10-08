@@ -16,6 +16,7 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.infrastructure.minecraft.NativeExtractor;
 
 @DisplayName("NativeExtractor")
 class NativeExtractorTest {
@@ -26,7 +27,7 @@ class NativeExtractorTest {
         GameDirectory gameDir = new GameDirectory(dir);
 
         String nativePath = "org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-" 
-                + org.example.launcher.util.OsDetector.mojangName() + ".jar";
+                + org.example.launcher.infrastructure.common.OsDetector.mojangName() + ".jar";
 
         Path nativeJar = gameDir.library(nativePath);
         Files.createDirectories(nativeJar.getParent());
@@ -39,10 +40,10 @@ class NativeExtractorTest {
                 "org.lwjgl:lwjgl:3.3.1",
                 null,
                 java.util.Map.of(
-                        "natives-" + org.example.launcher.util.OsDetector.mojangName(), nativeDl),
+                        "natives-" + org.example.launcher.infrastructure.common.OsDetector.mojangName(), nativeDl),
                 java.util.Map.of(
-                        org.example.launcher.util.OsDetector.mojangName(),
-                        "natives-" + org.example.launcher.util.OsDetector.mojangName()));
+                        org.example.launcher.infrastructure.common.OsDetector.mojangName(),
+                        "natives-" + org.example.launcher.infrastructure.common.OsDetector.mojangName()));
 
         VersionMetadata meta = new VersionMetadata(
                 "1.21", "release", "Main", "21", null, null,
@@ -70,9 +71,9 @@ class NativeExtractorTest {
         Library lib = new Library(
                 "org.lwjgl:lwjgl:3.3.1",
                 null,
-                java.util.Map.of("natives-" + org.example.launcher.util.OsDetector.mojangName(), nativeDl),
-                java.util.Map.of(org.example.launcher.util.OsDetector.mojangName(),
-                        "natives-" + org.example.launcher.util.OsDetector.mojangName()));
+                java.util.Map.of("natives-" + org.example.launcher.infrastructure.common.OsDetector.mojangName(), nativeDl),
+                java.util.Map.of(org.example.launcher.infrastructure.common.OsDetector.mojangName(),
+                        "natives-" + org.example.launcher.infrastructure.common.OsDetector.mojangName()));
 
         VersionMetadata meta = new VersionMetadata(
                 "1.21", "release", "Main", "21", null, null,
@@ -119,3 +120,4 @@ class NativeExtractorTest {
         }
     }
 }
+

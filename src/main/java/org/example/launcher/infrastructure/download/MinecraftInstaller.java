@@ -17,10 +17,10 @@ import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.Library;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.service.AssetIndexService;
-import org.example.launcher.service.MojangAssetIndexService;
-import org.example.launcher.util.LibraryPaths;
-import org.example.launcher.util.OsDetector;
+import org.example.launcher.infrastructure.mojang.AssetIndexService;
+import org.example.launcher.infrastructure.mojang.MojangAssetIndexService;
+import org.example.launcher.infrastructure.common.LibraryPaths;
+import org.example.launcher.infrastructure.common.OsDetector;
 import org.example.launcher.domain.port.RetryPolicy;
 import org.example.launcher.infrastructure.download.FixedRetryPolicy;
 

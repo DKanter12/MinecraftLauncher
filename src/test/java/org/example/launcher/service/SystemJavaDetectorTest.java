@@ -14,6 +14,7 @@ import org.example.launcher.domain.model.JavaRuntime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.example.launcher.infrastructure.java.SystemJavaDetector;
 
 @DisplayName("SystemJavaDetector")
 class SystemJavaDetectorTest {
@@ -89,3 +90,4 @@ class SystemJavaDetectorTest {
                 "No duplicate executable paths should exist");
     }
 }
+

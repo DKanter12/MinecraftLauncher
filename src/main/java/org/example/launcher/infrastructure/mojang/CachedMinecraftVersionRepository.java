@@ -14,7 +14,7 @@ import com.google.gson.reflect.TypeToken;
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.domain.port.MinecraftVersionRepository;
-import org.example.launcher.net.HttpDefaults;
+import org.example.launcher.infrastructure.http.HttpDefaults;
 
 /**
  * Декоратор {@link MinecraftVersionRepository} с дисковым кэшем.
