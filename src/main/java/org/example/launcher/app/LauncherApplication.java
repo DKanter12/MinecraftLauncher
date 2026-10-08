@@ -36,6 +36,7 @@ import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.MinecraftVersionManager;
 import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.launch.LaunchManager;
 import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
@@ -148,14 +149,17 @@ public class LauncherApplication extends Application {
         AccountManager accountManager = new AccountManager(profileService);
         JavaManager javaManager = new JavaManager(
                 javaResolutionService, javaRuntimeInstaller);
+        LaunchManager launchManager = new LaunchManager(
+                profileVerificationService, launchService, javaManager,
+                buildRepository, elyAuthService);
 
         LauncherContext context = new LauncherContext(
                 versionService,
-                launchService, javaResolutionService,
+                javaResolutionService,
                 javaManager, profileService, preferences, elyAuthService,
                 skinService, modLoaderRegistry,
-                buildRepository, profileVerificationService, createBuild,
-                accountManager);
+                buildRepository, createBuild,
+                accountManager, launchManager);
 
         MainView view = new MainView(context);
 

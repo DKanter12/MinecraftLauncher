@@ -58,7 +58,6 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaRuntime;
-import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.LaunchResult;
 import org.example.launcher.domain.model.MinecraftProcess;
 import org.example.launcher.model.MinecraftVersion;
@@ -71,7 +70,6 @@ import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
-import org.example.launcher.application.launch.LaunchService;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
 import org.example.launcher.infrastructure.skins.SkinService;
@@ -84,8 +82,8 @@ import org.example.launcher.application.build.BuildRequest;
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.ModScanner;
 import org.example.launcher.application.java.JavaManager;
-import org.example.launcher.application.launch.CrashAnalyzer;
 import org.example.launcher.application.launch.CrashReport;
+import org.example.launcher.application.launch.LaunchManager;
 import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
@@ -127,7 +125,6 @@ public class MainView {
     private static final String APP_VERSION = AppVersion.BUILT_IN;
 
     private final VersionService versionService;
-    private final LaunchService launchService;
     private final JavaResolutionService javaResolutionService;
     private final JavaManager javaManager;
     private final ProfileService profileService;
@@ -136,9 +133,9 @@ public class MainView {
     private final SkinService skinService;
     private final ModLoaderRegistry modLoaderRegistry;
     private final FileSystemBuildRepository buildRepository;
-    private final ModdedProfileVerificationService profileVerificationService;
     private final CreateBuildUseCase createBuildUseCase;
     private final AccountManager accountManager;
+    private final LaunchManager launchManager;
 
     private BorderPane root;
     private Label statusLabel;
@@ -215,7 +212,6 @@ public class MainView {
 
     public MainView(LauncherContext context) {
         this.versionService = context.versionService();
-        this.launchService = context.launchService();
         this.javaResolutionService = context.javaResolutionService();
         this.javaManager = context.javaManager();
         this.profileService = context.profileService();
@@ -224,9 +220,9 @@ public class MainView {
         this.skinService = context.skinService();
         this.modLoaderRegistry = context.modLoaderRegistry();
         this.buildRepository = context.buildRepository();
-        this.profileVerificationService = context.profileVerificationService();
         this.createBuildUseCase = context.createBuildUseCase();
         this.accountManager = context.accountManager();
+        this.launchManager = context.launchManager();
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -1765,14 +1761,6 @@ public class MainView {
         return cached;
     }
 
-    /** Требуют ли метаданные версии Java 8 или старше. */
-    private boolean needsJava8(VersionMetadata meta) {
-        int required = meta.javaVersion()
-                .map(JavaVersion::majorVersion)
-                .orElse(8);
-        return required <= 8;
-    }
-
     private void saveLastSelectedAccount(String accountName) {
         if (preferences == null) return;
         try {
@@ -2183,7 +2171,7 @@ public class MainView {
             Task<GameProfile> refreshTask = new Task<>() {
                 @Override
                 protected GameProfile call() throws Exception {
-                    return elyAuthService.refreshProfile(account);
+                    return launchManager.resolveAccount(account);
                 }
             };
             refreshTask.setOnSucceeded(e ->
@@ -2208,7 +2196,7 @@ public class MainView {
         Task<ModdedProfileVerificationService.VerificationReport> verifyTask = new Task<>() {
             @Override
             protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
-                return profileVerificationService.verify(profile, storage);
+                return launchManager.verify(profile, storage);
             }
         };
         verifyTask.setOnSucceeded(e -> {
@@ -2249,25 +2237,20 @@ public class MainView {
             GameDirectory storage,
             ModdedProfileVerificationService.VerificationReport report,
             boolean repairAttempted) {
-        // Legacy-версии: всё хорошо, кроме Java-рантайма
-        if (!javaDownloadAttempted
-                && report.metadata().isPresent()
-                && needsJava8(report.metadata().get())
-                && report.errors().stream().allMatch(e ->
-                        e.startsWith("No suitable Java runtime"))) {
-            javaDownloadAttempted = true;
-            downloadAndInstallJava8ForInstance(profile, account, storage,
-                    report.metadata().get());
-            return;
+        switch (launchManager.decide(report, repairAttempted,
+                javaDownloadAttempted)) {
+            case INSTALL_JAVA8 -> {
+                javaDownloadAttempted = true;
+                downloadAndInstallJava8ForInstance(profile, account, storage,
+                        report.metadata().orElseThrow());
+            }
+            // Автопочинка: переустановка ваниллы/загрузчика — целые файлы
+            // пропускаются, скачиваются только отсутствующие/битые — затем
+            // повторная проверка
+            case REPAIR -> repairProfileAndLaunch(profile, account, storage,
+                    report);
+            case FAIL -> showProfileVerificationErrors(profile, report);
         }
-        // Автопочинка: переустановка ваниллы/загрузчика — целые файлы
-        // пропускаются, скачиваются только отсутствующие/битые — затем
-        // повторная проверка
-        if (report.isRepairableByInstall() && !repairAttempted) {
-            repairProfileAndLaunch(profile, account, storage, report);
-            return;
-        }
-        showProfileVerificationErrors(profile, report);
     }
 
     private void repairProfileAndLaunch(ModdedProfile profile,
@@ -2286,8 +2269,8 @@ public class MainView {
         Task<ModdedProfileVerificationService.VerificationReport> repairTask = new Task<>() {
             @Override
             protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
-                profileVerificationService.repair(profile, storage, progressDialog);
-                return profileVerificationService.verify(profile, storage);
+                return launchManager.repairAndReverify(profile, storage,
+                        progressDialog);
             }
         };
         repairTask.setOnSucceeded(e -> {
@@ -2328,22 +2311,11 @@ public class MainView {
             ModdedProfileVerificationService.VerificationReport report) {
         refreshLaunchButtons();
 
-        StringBuilder msg = new StringBuilder(
-                Lang.tr("launch.cannot"));
-        for (String error : report.errors()) {
-            msg.append(" - ").append(error).append('\n');
-        }
-        if (!report.warnings().isEmpty()) {
-            msg.append(Lang.tr("launch.warnings"));
-            for (String warning : report.warnings()) {
-                msg.append(" - ").append(warning).append('\n');
-            }
-        }
         UiErrors.fail(statusLabel,
                 (Stage) root.getScene().getWindow(),
                 Lang.tr("launch.notlaunchable", report.errors().get(0)),
                 Lang.tr("launch.verify.failed.title", profile.name()),
-                msg.toString());
+                LaunchManager.verificationErrorText(report));
     }
 
     private void doLaunchProfile(ModdedProfile profile,
@@ -2352,24 +2324,19 @@ public class MainView {
                                  GameDirectory storage) {
         statusLabel.setText(Lang.tr("launch.starting", profile.name()));
         setLaunchStatus(profile.id(), Lang.tr("launch.launching"));
-        Path runtimeDir = storage.root().resolve(profile.gameDirPath());
 
         Task<LaunchResult> launchTask = new Task<>() {
             @Override
             protected LaunchResult call() throws Exception {
-                // Игровой каталог профиля должен существовать до запуска
-                // процесса внутри него
-                FileSystemBuildRepository.ensureProfileFolders(runtimeDir);
-                return launchService.launch(metadata, storage, account,
-                        runtimeDir,
-                        FileSystemBuildRepository.effectiveJvmArgs(profile));
+                return launchManager.launch(profile, account, metadata,
+                        storage);
             }
         };
         launchTask.setOnSucceeded(e -> {
             LaunchResult result = launchTask.getValue();
             if (result.isSuccess()) {
                 try {
-                    buildRepository.touchLastPlayed(profile.id());
+                    launchManager.markPlayed(profile.id());
                 } catch (IOException ignored) {
                     // Некритично
                 }
@@ -2476,8 +2443,8 @@ public class MainView {
                     } else {
                         statusLabel.setText(Lang.tr("launch.crashed",
                                 versionId, exitCode));
-                        CrashReport report = CrashAnalyzer.analyze(
-                                exitCode, process.stdout(), process.stderr());
+                        CrashReport report = launchManager.analyzeCrash(
+                                process, exitCode);
                         if (!report.logTail().isBlank()) {
                             String text = Lang.tr("launch.crash.code", exitCode)
                                     + report.reason() + "\n\n"
