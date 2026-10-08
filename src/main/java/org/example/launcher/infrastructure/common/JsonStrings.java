@@ -4,15 +4,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Небольшие помощники для безопасного чтения значений {@link JsonObject} при возможных null.
+ * Безопасное чтение строковых значений {@link JsonObject} при возможных null.
  * <p>
  * Полезные нагрузки Mojang, загрузчиков модов и дистрибутивов слабо типизированы:
  * отсутствующие ключи, явные null и неожиданные типы никогда не должны
  * ломать разбор — вместо этого они дают {@code null} / значения по умолчанию.
  */
-public final class Json {
+public final class JsonStrings {
 
-    private Json() {
+    private JsonStrings() {
     }
 
     /**

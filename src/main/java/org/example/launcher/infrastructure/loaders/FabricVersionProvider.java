@@ -16,7 +16,7 @@ import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModLoaderType;
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 
 /**
  * Поставщик {@link ModLoaderVersionProvider} для Fabric Loader на официальном
@@ -178,6 +178,6 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
     }
 
     private static String getStr(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 }

@@ -14,7 +14,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 
 /**
  * Читает и пишет {@link org.example.launcher.domain.model.GameProfile}s
@@ -188,10 +188,10 @@ public class ProfileService {
     // ------------------------------------------------------------------
 
     private static String getStr(JsonObject obj, String key, String fallback) {
-        return Json.getStringOrDefault(obj, key, fallback);
+        return JsonStrings.getStringOrDefault(obj, key, fallback);
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 }

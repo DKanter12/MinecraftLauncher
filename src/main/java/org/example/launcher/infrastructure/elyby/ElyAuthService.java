@@ -19,7 +19,7 @@ import com.google.gson.JsonParser;
 
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.infrastructure.http.HttpDefaults;
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 
 /**
  * Обрабатывает авторизацию и получение профиля через сервер авторизации Ely.by.
@@ -329,7 +329,7 @@ public class ElyAuthService {
     }
 
     private static String getStr(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 
     record SkinData(String url, String model, String propertiesJson) {}

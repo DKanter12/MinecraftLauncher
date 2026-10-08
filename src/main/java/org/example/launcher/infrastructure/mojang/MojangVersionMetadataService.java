@@ -28,7 +28,7 @@ import org.example.launcher.domain.model.Library;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.http.HttpDefaults;
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 import org.example.launcher.infrastructure.common.OsDetector;
 
 /**
@@ -375,11 +375,11 @@ public class MojangVersionMetadataService implements VersionMetadataService {
     // ------------------------------------------------------------------
 
     private static String getStr(JsonObject obj, String key, String fallback) {
-        return Json.getStringOrDefault(obj, key, fallback);
+        return JsonStrings.getStringOrDefault(obj, key, fallback);
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 
     private static long getLong(JsonObject obj, String key, long fallback) {

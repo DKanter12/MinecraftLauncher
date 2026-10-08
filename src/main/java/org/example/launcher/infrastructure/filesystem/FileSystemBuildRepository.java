@@ -18,7 +18,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 import com.google.gson.JsonSyntaxException;
 
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
@@ -580,7 +580,7 @@ public class FileSystemBuildRepository {
     }
 
     private static String optionalString(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 
     private static int optionalInt(JsonObject obj, String key) {

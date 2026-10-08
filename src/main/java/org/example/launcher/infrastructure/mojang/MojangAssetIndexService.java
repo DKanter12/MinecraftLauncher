@@ -17,7 +17,7 @@ import org.example.launcher.domain.model.AssetIndex;
 import org.example.launcher.domain.model.AssetIndexContent;
 import org.example.launcher.domain.model.AssetObject;
 import org.example.launcher.infrastructure.http.HttpDefaults;
-import org.example.launcher.infrastructure.common.Json;
+import org.example.launcher.infrastructure.common.JsonStrings;
 
 /**
  * Реализация {@link AssetIndexService} на официальном JSON asset-индекса Mojang.
@@ -96,7 +96,7 @@ public class MojangAssetIndexService implements AssetIndexService {
     }
 
     private static String getStrOrNull(JsonObject obj, String key) {
-        return Json.getStringOrNull(obj, key);
+        return JsonStrings.getStringOrNull(obj, key);
     }
 
     private static long getLong(JsonObject obj, String key, long fallback) {
