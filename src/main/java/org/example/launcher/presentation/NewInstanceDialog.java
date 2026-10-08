@@ -25,11 +25,11 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
-import org.example.launcher.version.StandardVersionType;
+import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.i18n.Lang;
 
 /**
@@ -156,16 +156,16 @@ public class NewInstanceDialog extends Stage {
         // -- 2. Чипы типов версий (только ванилла) --
         Label categoryTitle = new Label(Lang.tr("new.category"));
         categoryTitle.getStyleClass().add("section-title");
-        for (StandardVersionType type : List.of(StandardVersionType.RELEASE,
-                StandardVersionType.SNAPSHOT, StandardVersionType.OLD_BETA,
-                StandardVersionType.OLD_ALPHA)) {
+        for (VersionType type : List.of(VersionType.RELEASE,
+                VersionType.SNAPSHOT, VersionType.BETA,
+                VersionType.ALPHA)) {
             ToggleButton chip = new ToggleButton(categoryLabel(type));
             chip.getStyleClass().add("filter-button");
             chip.setToggleGroup(categoryGroup);
             chip.setUserData(type);
             chip.setOnAction(e -> refreshVersionList());
             categoryChips.getChildren().add(chip);
-            if (type == StandardVersionType.RELEASE) {
+            if (type == VersionType.RELEASE) {
                 chip.setSelected(true);
                 chip.getStyleClass().add("filter-button-active");
             }
@@ -195,7 +195,7 @@ public class NewInstanceDialog extends Stage {
                 } else {
                     Label id = new Label(item.id());
                     id.getStyleClass().add("profile-name");
-                    Label date = new Label(item.formattedReleaseTime());
+                    Label date = new Label(item.releaseDate().orElse("\u2014"));
                     date.getStyleClass().add("profile-summary");
                     Region spacer = new Region();
                     HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -284,14 +284,14 @@ public class NewInstanceDialog extends Stage {
     }
 
     /** Локализованная подпись чипа типа версии. */
-    private static String categoryLabel(StandardVersionType type) {
-        if (type == StandardVersionType.RELEASE) {
+    private static String categoryLabel(VersionType type) {
+        if (type == VersionType.RELEASE) {
             return Lang.tr("new.type.release");
         }
-        if (type == StandardVersionType.SNAPSHOT) {
+        if (type == VersionType.SNAPSHOT) {
             return Lang.tr("new.type.snapshot");
         }
-        if (type == StandardVersionType.OLD_BETA) {
+        if (type == VersionType.BETA) {
             return Lang.tr("new.type.oldbeta");
         }
         return Lang.tr("new.type.oldalpha");
@@ -323,7 +323,7 @@ public class NewInstanceDialog extends Stage {
         if (modded) {
             for (var node : categoryChips.getChildren()) {
                 if (node instanceof ToggleButton btn
-                        && btn.getUserData() == StandardVersionType.RELEASE) {
+                        && btn.getUserData() == VersionType.RELEASE) {
                     btn.setSelected(true);
                     break;
                 }
@@ -333,14 +333,14 @@ public class NewInstanceDialog extends Stage {
         onInputsChanged();
     }
 
-    private StandardVersionType activeCategory() {
+    private VersionType activeCategory() {
         for (var node : categoryChips.getChildren()) {
             if (node instanceof ToggleButton btn && btn.isSelected()
-                    && btn.getUserData() instanceof StandardVersionType type) {
+                    && btn.getUserData() instanceof VersionType type) {
                 return type;
             }
         }
-        return StandardVersionType.RELEASE;
+        return VersionType.RELEASE;
     }
 
     /**
@@ -350,8 +350,8 @@ public class NewInstanceDialog extends Stage {
      */
     private void refreshVersionList() {
         boolean modded = selectedLoader() != ModLoaderType.VANILLA;
-        StandardVersionType category =
-                modded ? StandardVersionType.RELEASE : activeCategory();
+        VersionType category =
+                modded ? VersionType.RELEASE : activeCategory();
         List<MinecraftVersion> filtered = new ArrayList<>();
         for (MinecraftVersion v : manifestVersions) {
             if (v.type() == category) {

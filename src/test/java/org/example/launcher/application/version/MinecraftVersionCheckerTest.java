@@ -25,7 +25,7 @@ import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 class MinecraftVersionCheckerTest {
 
     private static MinecraftVersionManager noNetworkManager(GameDirectory gameDir) {
-        InstallationService neverInstalls = (version, metadata, dir, progress) ->
+        InstallationService neverInstalls = (metadata, dir, progress) ->
                 new InstallationResult(0, 0, 0, 1, 0, List.of());
         var metadataService =
                 (org.example.launcher.infrastructure.mojang.VersionMetadataService)

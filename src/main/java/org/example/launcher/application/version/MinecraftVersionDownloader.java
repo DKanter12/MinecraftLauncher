@@ -43,11 +43,12 @@ public class MinecraftVersionDownloader {
     public String download(MinecraftVersion version) throws IOException {
         Objects.requireNonNull(version, "version");
         if (version.isVanilla()) {
-            org.example.launcher.model.MinecraftVersion entry =
-                    ManifestEntries.baseEntry(version, vanillaRepo);
+            MinecraftVersion entry = version.metadataUrl() != null
+                    && !version.metadataUrl().isBlank()
+                    ? version : vanillaEntry(version.id());
             BuildRequest request = new BuildRequest(
-                    new Build("", version.id(),
-                            version.core(), version.loaderVersion()),
+                    new Build("", version.id(), version.core(),
+                            version.loaderVersion()),
                     entry, null, List.of());
             return versions.downloadVersion(request, InstallationProgress.NONE);
         }
@@ -55,17 +56,26 @@ public class MinecraftVersionDownloader {
             throw new IllegalArgumentException(
                     "Modded download requires a loader version");
         }
-        org.example.launcher.model.MinecraftVersion base =
-                ManifestEntries.baseEntry(
-                        MinecraftVersion.of(version.id(),
-                                version.type(), null, null),
-                        vanillaRepo);
+        MinecraftVersion base = vanillaEntry(version.id());
         ModLoaderVersion loader = resolveLoader(version);
         BuildRequest request = new BuildRequest(
                 new Build("", version.id(), version.core(),
                         version.loaderVersion()),
                 base, loader, List.of());
         return versions.downloadVersion(request, InstallationProgress.NONE);
+    }
+
+    /**
+     * Ванильная запись с URL для скачивания: сначала URL самой версии,
+     * иначе поиск по id в репозитории.
+     */
+    MinecraftVersion vanillaEntry(String minecraftVersion) throws IOException {
+        List<MinecraftVersion> all = vanillaRepo.fetchVersions();
+        return vanillaRepo.findById(minecraftVersion, all)
+                .filter(v -> v.metadataUrl() != null
+                        && !v.metadataUrl().isBlank())
+                .orElseThrow(() -> new IOException(
+                        "Minecraft version not found: " + minecraftVersion));
     }
 
     /**

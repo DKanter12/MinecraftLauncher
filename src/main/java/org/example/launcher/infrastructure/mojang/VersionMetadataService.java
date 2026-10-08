@@ -2,7 +2,7 @@ package org.example.launcher.infrastructure.mojang;
 
 import java.io.IOException;
 
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 
 /**

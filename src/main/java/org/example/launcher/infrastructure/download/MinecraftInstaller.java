@@ -15,7 +15,6 @@ import org.example.launcher.domain.model.AssetIndexContent;
 import org.example.launcher.domain.model.AssetObject;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.Library;
-import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.mojang.AssetIndexService;
 import org.example.launcher.infrastructure.mojang.MojangAssetIndexService;
@@ -93,8 +92,7 @@ public class MinecraftInstaller implements InstallationService {
     // ------------------------------------------------------------------
 
     @Override
-    public InstallationResult install(MinecraftVersion version,
-                                      VersionMetadata metadata,
+    public InstallationResult install(VersionMetadata metadata,
                                       GameDirectory gameDir,
                                       InstallationProgress progress) throws IOException {
         gameDir.createDirectories();

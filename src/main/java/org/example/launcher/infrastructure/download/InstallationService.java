@@ -4,7 +4,6 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 
 import java.io.IOException;
 
-import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 
 /**
@@ -25,16 +24,15 @@ public interface InstallationService {
     /**
      * Устанавливает заданную версию в указанный игровой каталог.
      *
-     * @param version   устанавливаемая версия (для URL метаданных)
      * @param metadata  заранее полученные метаданные версии
+     *                  (несут id версии для раскладки путей)
      * @param gameDir   раскладка игрового каталога
      * @param progress  обратный вызов прогресса (используйте {@link InstallationProgress#NONE},
      *                  если не нужен)
      * @return сводный результат установки
      * @throws IOException при критической ошибке, мешающей установке
      */
-    InstallationResult install(MinecraftVersion version,
-                               VersionMetadata metadata,
+    InstallationResult install(VersionMetadata metadata,
                                GameDirectory gameDir,
                                InstallationProgress progress) throws IOException;
 }

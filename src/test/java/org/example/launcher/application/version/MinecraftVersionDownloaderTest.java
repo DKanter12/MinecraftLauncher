@@ -41,7 +41,6 @@ class MinecraftVersionDownloaderTest {
 
         @Override
         public InstallationResult install(
-                org.example.launcher.model.MinecraftVersion version,
                 VersionMetadata metadata, GameDirectory gameDir,
                 InstallationProgress progress) {
             calls++;
@@ -69,7 +68,7 @@ class MinecraftVersionDownloaderTest {
     }
 
     private static ModLoaderInstaller recordingInstaller() {
-        return (vanillaVersion, vanillaMetadata, loader, gameDir, progress) ->
+        return (vanillaMetadata, loader, gameDir, progress) ->
                 new ModLoaderInstaller.ModLoaderInstallResult(
                         loader.installedVersionId(),
                         new InstallationResult(1, 1, 0, 0, 10, List.of()));

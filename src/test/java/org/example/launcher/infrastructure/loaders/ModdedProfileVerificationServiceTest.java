@@ -3,7 +3,6 @@ package org.example.launcher.infrastructure.loaders;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.example.launcher.domain.model.ModLoaderType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,30 +10,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.example.launcher.domain.model.ModLoaderType;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.example.launcher.domain.model.ModLoaderType;
 
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.Sha1ChecksumVerifier;
 import org.example.launcher.domain.model.JavaResolutionResult;
 import org.example.launcher.domain.model.JavaRuntime;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.ModLoaderType;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
-import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
 import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
-import org.example.launcher.version.StandardVersionType;
-import org.example.launcher.version.VersionTypeRegistry;
-import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
@@ -50,15 +44,15 @@ class ModdedProfileVerificationServiceTest {
 
     private static final class StubVersionService extends MojangVersionService {
         StubVersionService() {
-            super("http://localhost/manifest", java.net.http.HttpClient.newHttpClient(),
-                    new com.google.gson.Gson(), new VersionTypeRegistry());
+            super("http://localhost/manifest");
         }
 
         @Override
-        public VersionManifest fetchVersions() {
-            return new VersionManifest("1.21.4", "1.21.4", List.of(
-                    new MinecraftVersion("1.21.4", StandardVersionType.RELEASE,
-                            "2024-12-03T10:00:00+00:00", "http://localhost/1.21.4.json")));
+        public java.util.List<MinecraftVersion> fetchVersions() {
+            return java.util.List.of(MinecraftVersion.of("1.21.4",
+                    org.example.launcher.domain.model.VersionType.RELEASE,
+                    "2024-12-03T10:00:00+00:00",
+                    "http://localhost/1.21.4.json"));
         }
     }
 
@@ -106,17 +100,16 @@ class ModdedProfileVerificationServiceTest {
     private static final class RecordingInstaller
             implements org.example.launcher.infrastructure.download.InstallationService {
         int installCalls;
-        MinecraftVersion installedVersion;
+        VersionMetadata installedVersion;
         GameDirectory installedGameDir;
 
         @Override
         public org.example.launcher.infrastructure.download.InstallationResult install(
-                MinecraftVersion version,
                 VersionMetadata metadata,
                 GameDirectory gameDir,
                 org.example.launcher.infrastructure.download.InstallationProgress progress) {
             installCalls++;
-            installedVersion = version;
+            installedVersion = metadata;
             installedGameDir = gameDir;
             return new org.example.launcher.infrastructure.download.InstallationResult(
                     0, 0, 0, 0, 0, List.of());
@@ -344,10 +337,10 @@ class ModdedProfileVerificationServiceTest {
         FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
-        ModLoaderInstaller fakeInstaller = (vanillaVersion, vanillaMetadata,
+        ModLoaderInstaller fakeInstaller = (vanillaMetadata,
                 loader, dir, progress) -> {
             installCalls.incrementAndGet();
-            assertEquals("1.21.4", vanillaVersion.id());
+            assertEquals("1.21.4", vanillaMetadata.id());
             assertEquals("0.16.9", loader.loaderVersion());
             assertTrue(loader.installerUrlOpt().isPresent(),
                     "installer URL resolved from the provider");
@@ -391,7 +384,7 @@ class ModdedProfileVerificationServiceTest {
         FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installerCalls = new AtomicInteger();
-        ModLoaderInstaller neverInstaller = (vanillaVersion, vanillaMetadata,
+        ModLoaderInstaller neverInstaller = (vanillaMetadata,
                 loader, dir, progress) -> {
             installerCalls.incrementAndGet();
             return null;
@@ -430,7 +423,7 @@ class ModdedProfileVerificationServiceTest {
         FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
-        ModLoaderInstaller fakeInstaller = (vanillaVersion, vanillaMetadata,
+        ModLoaderInstaller fakeInstaller = (vanillaMetadata,
                 loader, dir, progress) -> {
             installCalls.incrementAndGet();
             assertEquals("0.16.9", loader.loaderVersion());

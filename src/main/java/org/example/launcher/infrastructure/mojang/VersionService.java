@@ -1,23 +1,23 @@
 package org.example.launcher.infrastructure.mojang;
 
 import java.io.IOException;
+import java.util.List;
 
-import org.example.launcher.model.VersionManifest;
+import org.example.launcher.domain.model.MinecraftVersion;
 
 /**
- * Даёт доступ к каталогу версий Minecraft.
+ * Предоставляет каталог версий Minecraft.
  * <p>
- * Реализации вправе получать версии от Mojang, из локального кэша
- * или любого другого источника. Интерфейс отделяет UI от
- * конкретного поставщика данных.
+ * Это выборка первого уровня: список версий; детальные метаданные
+ * конкретной версии отдаёт {@link VersionMetadataService}.
  */
 public interface VersionService {
 
     /**
-     * Загружает полный манифест версий.
+     * Загружает полный каталог версий Minecraft от новых к старым.
      *
-     * @return не-{@code null} манифест со всеми известными версиями
-     * @throws IOException если манифест не удалось получить или разобрать
+     * @return версии каталога, никогда {@code null}
+     * @throws IOException если каталог не удалось получить
      */
-    VersionManifest fetchVersions() throws IOException;
+    List<MinecraftVersion> fetchVersions() throws IOException;
 }

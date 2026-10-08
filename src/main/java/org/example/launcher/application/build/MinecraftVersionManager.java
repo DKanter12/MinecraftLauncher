@@ -73,13 +73,13 @@ public class MinecraftVersionManager {
         VersionMetadata vanillaMetadata = metadataService.fetchMetadata(request.mcVersion());
         InstallationProgress active = progress == null ? InstallationProgress.NONE : progress;
         if (request.isVanilla()) {
-            installationService.install(request.mcVersion(), vanillaMetadata, storage, active);
+            installationService.install(vanillaMetadata, storage, active);
             return request.mcVersion().id();
         }
         var entry = modLoaderRegistry.get(request.type()).orElseThrow(
                 () -> new IOException(request.type().displayName() + " support is not registered"));
         var installResult = entry.installer().install(
-                request.mcVersion(), vanillaMetadata, request.loader(), storage, active);
+                vanillaMetadata, request.loader(), storage, active);
         if (installResult.fileResult() != null && installResult.fileResult().hasFailures()) {
             throw new IOException("Loader install failed: " + installResult.summary());
         }

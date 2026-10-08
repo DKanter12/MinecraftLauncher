@@ -6,7 +6,6 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
-import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 
@@ -28,9 +27,8 @@ public interface ModLoaderInstaller {
     /**
      * Устанавливает заданную версию мод-загрузчика.
      *
-     * @param vanillaVersion   ванильная запись манифеста целевой версии
-     *                         Minecraft
-     * @param vanillaMetadata  предзагруженные ванильные метаданные этой версии
+     * @param vanillaMetadata  предзагруженные ванильные метаданные целевой
+     *                         версии Minecraft
      * @param loader           устанавливаемая версия загрузчика
      * @param gameDir          раскладка игрового каталога
      * @param progress         колбэк прогресса
@@ -38,8 +36,7 @@ public interface ModLoaderInstaller {
      * @throws IOException при критических сбоях (сеть, ввод-вывод, ошибки
      *                     процесса установщика)
      */
-    ModLoaderInstallResult install(MinecraftVersion vanillaVersion,
-                                   VersionMetadata vanillaMetadata,
+    ModLoaderInstallResult install(VersionMetadata vanillaMetadata,
                                    ModLoaderVersion loader,
                                    GameDirectory gameDir,
                                    InstallationProgress progress) throws IOException;

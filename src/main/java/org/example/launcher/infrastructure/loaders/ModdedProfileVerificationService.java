@@ -16,7 +16,7 @@ import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.domain.model.JavaResolutionResult;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.VersionMetadata;
@@ -24,7 +24,6 @@ import org.example.launcher.infrastructure.java.JavaResolutionService;
 import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
-import org.example.launcher.version.ModdedVersionType;
 
 /**
  * Проверяет полноту и запускаемость установки игрового инстанса,
@@ -134,8 +133,9 @@ public class ModdedProfileVerificationService {
         if (vanillaVersion == null) {
             Path localJson = storage.versionMetadata(profile.minecraftVersion());
             if (Files.isRegularFile(localJson)) {
-                vanillaVersion = new MinecraftVersion(profile.minecraftVersion(),
-                        org.example.launcher.version.StandardVersionType.RELEASE, null, null);
+                vanillaVersion = MinecraftVersion.of(profile.minecraftVersion(),
+                        org.example.launcher.domain.model.VersionType.RELEASE,
+                        null, null);
                 offlineVanilla = true;
                 warnings.add("Offline mode: using cached version metadata for " + profile.minecraftVersion());
             } else {
@@ -366,7 +366,7 @@ public class ModdedProfileVerificationService {
             // Переустановить ванильную игру — skip-if-valid, поэтому целые
             // файлы не трогаются
             InstallationResult result = installationService.install(
-                    vanillaVersion, vanillaMetadata, storage, progress);
+                    vanillaMetadata, storage, progress);
             if (result.hasFailures()) {
                 throw new IOException("Vanilla repair incomplete: "
                         + result.failed() + " downloads failed");
@@ -396,11 +396,8 @@ public class ModdedProfileVerificationService {
                 // Повреждённый/неразрешимый JSON загрузчика → полная переустановка
             }
             if (merged != null) {
-                MinecraftVersion moddedVersion = new MinecraftVersion(
-                        profile.versionId(), ModdedVersionType.INSTANCE,
-                        null, null);
                 InstallationResult result = installationService.install(
-                        moddedVersion, merged, storage, progress);
+                        merged, storage, progress);
                 if (result.hasFailures()) {
                     throw new IOException(profile.loaderType().displayName()
                             + " repair incomplete: " + result.failed()
@@ -415,7 +412,7 @@ public class ModdedProfileVerificationService {
         // установщик загрузчика (Forge/NeoForge) и забирает каждую
         // зависимость — со skip-if-valid, поэтому целые файлы не
         // трогаются
-        return entry.installer().install(vanillaVersion, vanillaMetadata,
+        return entry.installer().install(vanillaMetadata,
                 resolveLoaderVersion(entry, profile), storage, progress);
     }
 
@@ -477,7 +474,7 @@ public class ModdedProfileVerificationService {
 
     private MinecraftVersion findManifestVersion(String minecraftVersion) {
         try {
-            return versionService.fetchVersions().versions().stream()
+            return versionService.fetchVersions().stream()
                     .filter(v -> v.id().equals(minecraftVersion))
                     .findFirst()
                     .orElse(null);

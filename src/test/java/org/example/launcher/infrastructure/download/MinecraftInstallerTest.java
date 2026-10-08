@@ -20,10 +20,10 @@ import org.example.launcher.domain.model.AssetIndexContent;
 import org.example.launcher.domain.model.AssetObject;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.Library;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.mojang.AssetIndexService;
-import org.example.launcher.version.StandardVersionType;
+import org.example.launcher.domain.model.VersionType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -178,8 +178,8 @@ class MinecraftInstallerTest {
     }
 
     private MinecraftVersion buildTestVersion() {
-        return new MinecraftVersion(
-                "1.21", StandardVersionType.RELEASE,
+        return MinecraftVersion.of(
+                "1.21", VersionType.RELEASE,
                 "2024-06-13T10:30:00+00:00",
                 "https://example.com/1.21.json");
     }
@@ -353,7 +353,7 @@ class MinecraftInstallerTest {
         TrackingProgress progress = new TrackingProgress();
 
         InstallationResult result = installer.install(
-                buildTestVersion(), buildTestMetadata(), gameDir, progress);
+                buildTestMetadata(), gameDir, progress);
 
         assertEquals(6, result.totalTasks());
         assertEquals(6, result.downloaded());
@@ -397,7 +397,7 @@ class MinecraftInstallerTest {
 
         TrackingProgress progress = new TrackingProgress();
         InstallationResult result = installer.install(
-                buildTestVersion(), meta, gameDir, progress);
+                meta, gameDir, progress);
 
         assertEquals(6, result.totalTasks());
         assertEquals(0, result.downloaded());
@@ -449,7 +449,7 @@ class MinecraftInstallerTest {
 
         TrackingProgress progress = new TrackingProgress();
         InstallationResult result = installer.install(
-                buildTestVersion(), meta, gameDir, progress);
+                meta, gameDir, progress);
 
         assertEquals(6, result.totalTasks());
         assertEquals(6, result.downloaded());
@@ -483,7 +483,7 @@ class MinecraftInstallerTest {
                 downloader, verifier, assetService, 3);
 
         InstallationResult result = installer.install(
-                buildTestVersion(), buildTestMetadata(), gameDir,
+                buildTestMetadata(), gameDir,
                 InstallationProgress.NONE);
 
         assertEquals(6, result.totalTasks());
@@ -549,7 +549,7 @@ class MinecraftInstallerTest {
                 downloader, strictVerifier, assetService, 3);
 
         InstallationResult result = installer.install(
-                buildTestVersion(), meta, gameDir, InstallationProgress.NONE);
+                meta, gameDir, InstallationProgress.NONE);
 
         assertEquals(6, result.totalTasks());
         assertEquals(6, result.downloaded());
@@ -589,7 +589,7 @@ class MinecraftInstallerTest {
                 downloader, alwaysReject, assetService, 3);
 
         InstallationResult result = installer.install(
-                buildTestVersion(), buildTestMetadata(), gameDir,
+                buildTestMetadata(), gameDir,
                 InstallationProgress.NONE);
 
         assertEquals(6, result.totalTasks());
@@ -644,7 +644,7 @@ class MinecraftInstallerTest {
                 partialDownloader, verifier, assetService, 2);
 
         InstallationResult result = partialInstaller.install(
-                buildTestVersion(), meta, gameDir, InstallationProgress.NONE);
+                meta, gameDir, InstallationProgress.NONE);
 
         assertEquals(6, result.totalTasks());
         assertEquals(1, result.skipped());
@@ -679,7 +679,7 @@ class MinecraftInstallerTest {
                 downloader, verifier, assetService);
 
         InstallationResult result = installer.install(
-                buildTestVersion(), meta, gameDir, InstallationProgress.NONE);
+                meta, gameDir, InstallationProgress.NONE);
 
         assertEquals(1, result.totalTasks());
         assertEquals(1, result.downloaded());
@@ -701,14 +701,14 @@ class MinecraftInstallerTest {
         VersionMetadata meta = buildTestMetadata();
 
         // First install — all files downloaded
-        installer.install(buildTestVersion(), meta, gameDir, InstallationProgress.NONE);
+        installer.install(meta, gameDir, InstallationProgress.NONE);
         int firstDownloadCount = downloader.downloadedUrls.size();
         assertEquals(5, firstDownloadCount); // client + 2 libs + 1 native + asset index
 
         // Second install of same version — all files should be skipped
         downloader.downloadedUrls.clear();
         InstallationResult result2 = installer.install(
-                buildTestVersion(), meta, gameDir, InstallationProgress.NONE);
+                meta, gameDir, InstallationProgress.NONE);
 
         assertEquals(5, result2.skipped());
         assertEquals(0, result2.downloaded());

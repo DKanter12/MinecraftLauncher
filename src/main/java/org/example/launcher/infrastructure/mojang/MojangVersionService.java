@@ -12,19 +12,18 @@ import java.util.List;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionManifest;
-import org.example.launcher.version.VersionType;
-import org.example.launcher.version.VersionTypeRegistry;
+import org.example.launcher.domain.model.MinecraftVersion;
+import org.example.launcher.domain.model.VersionType;
 
 /**
  * Реализация {@link VersionService} на официальном манифесте версий Mojang
  * ({@code version_manifest.json}).
  * <p>
- * URL манифеста, HTTP-клиент и реестр типов — всё инжектится,
- * что упрощает тестирование и настройку. Разбор JSON выделен в
- * {@link #parseManifest(String)}, чтобы его можно было юнит-тестировать
- * без доступа к сети.
+ * URL манифеста и HTTP-клиент инжектятся, что упрощает тестирование
+ * и настройку. Типы версий маппятся чистой функцией
+ * {@link VersionType#fromMojangId(String)} — реестр для этого не нужен.
+ * Разбор JSON выделен в {@link #parseManifest(String)}, чтобы его можно
+ * было юнит-тестировать без доступа к сети.
  */
 public class MojangVersionService implements VersionService {
 
@@ -34,33 +33,29 @@ public class MojangVersionService implements VersionService {
     private final String manifestUrl;
     private final HttpClient httpClient;
     private final Gson gson;
-    private final VersionTypeRegistry typeRegistry;
 
     public MojangVersionService() {
-        this(DEFAULT_MANIFEST_URL, new VersionTypeRegistry());
+        this(DEFAULT_MANIFEST_URL);
     }
 
-    public MojangVersionService(String manifestUrl, VersionTypeRegistry typeRegistry) {
+    public MojangVersionService(String manifestUrl) {
         this(manifestUrl,
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(15))
                         .build(),
-                new Gson(),
-                typeRegistry);
+                new Gson());
     }
 
     public MojangVersionService(String manifestUrl,
-                               HttpClient httpClient,
-                               Gson gson,
-                               VersionTypeRegistry typeRegistry) {
+                                HttpClient httpClient,
+                                Gson gson) {
         this.manifestUrl = manifestUrl;
         this.httpClient = httpClient;
         this.gson = gson;
-        this.typeRegistry = typeRegistry;
     }
 
     @Override
-    public VersionManifest fetchVersions() throws IOException {
+    public List<MinecraftVersion> fetchVersions() throws IOException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(manifestUrl))
                 .timeout(Duration.ofSeconds(30))
                 .GET()
@@ -80,10 +75,10 @@ public class MojangVersionService implements VersionService {
     }
 
     /**
-     * Разбирает сырую строку JSON манифеста в {@link VersionManifest}.
-     * Видимость на уровне пакета — для юнит-тестов.
+     * Разбирает сырую строку JSON манифеста в доменные версии от новых
+     * к старым. Видимость на уровне пакета — для юнит-тестов.
      */
-    VersionManifest parseManifest(String json) throws IOException {
+    List<MinecraftVersion> parseManifest(String json) throws IOException {
         ManifestDto dto;
         try {
             dto = gson.fromJson(json, ManifestDto.class);
@@ -96,13 +91,13 @@ public class MojangVersionService implements VersionService {
 
         List<MinecraftVersion> versions = new ArrayList<>(dto.versions.size());
         for (VersionDto v : dto.versions) {
-            VersionType type = typeRegistry.resolve(v.type);
-            versions.add(new MinecraftVersion(v.id, type, v.releaseTime, v.url));
+            if (v.id == null || v.id.isBlank()) {
+                continue;
+            }
+            versions.add(MinecraftVersion.of(v.id,
+                    VersionType.fromMojangId(v.type), v.releaseTime, v.url));
         }
-
-        String latestRelease = (dto.latest != null) ? dto.latest.release : null;
-        String latestSnapshot = (dto.latest != null) ? dto.latest.snapshot : null;
-        return new VersionManifest(latestRelease, latestSnapshot, versions);
+        return versions;
     }
 
     // ---- внутренние Gson-DTO, зеркалящие структуру манифеста Mojang ----

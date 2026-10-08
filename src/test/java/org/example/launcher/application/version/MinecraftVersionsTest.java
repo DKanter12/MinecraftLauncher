@@ -46,7 +46,7 @@ class MinecraftVersionsTest {
     }
 
     private static ModLoaderInstaller fakeInstaller() {
-        return (vanillaVersion, vanillaMetadata, loader, gameDir, progress) ->
+        return (vanillaMetadata, loader, gameDir, progress) ->
                 new ModLoaderInstaller.ModLoaderInstallResult(
                         loader.installedVersionId(), null);
     }

@@ -14,13 +14,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
-import org.example.launcher.version.ModLoaderFamilyType;
-import org.example.launcher.version.ModdedVersionType;
 
 /**
  * Обнаруживает локально установленные модовые версии (Fabric, Forge,
@@ -52,44 +51,15 @@ public class ModdedVersionService {
 
     /**
      * Перечисляет все модовые версии, установленные в заданном игровом каталоге.
-     * Версия считается модовой, когда её локальный JSON несёт поле
-     * {@code inheritsFrom} (профили загрузчиков) или совпадает с известным
-     * соглашением об id загрузчика.
+     * Правила те же, что у {@link #listInstalledDetailed(GameDirectory)}:
+     * нужен известный загрузчик, разборчивая версия и ванильная база
+     * из {@code inheritsFrom}.
      */
     public List<MinecraftVersion> listInstalled(GameDirectory gameDir)
             throws IOException {
         List<MinecraftVersion> result = new ArrayList<>();
-        Path versionsDir = gameDir.versionsDir();
-        if (!Files.isDirectory(versionsDir)) {
-            return result;
-        }
-
-        List<Path> dirs = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(versionsDir)) {
-            stream.forEach(dirs::add);
-        }
-
-        for (Path dir : dirs) {
-            if (!Files.isDirectory(dir)) continue;
-            String dirName = dir.getFileName().toString();
-            Path json = dir.resolve(dirName + ".json");
-            if (!Files.isRegularFile(json)) continue;
-
-            try {
-                JsonObject root = JsonParser.parseString(
-                                Files.readString(json, StandardCharsets.UTF_8))
-                        .getAsJsonObject();
-                boolean hasInherits = root.has("inheritsFrom")
-                        && root.get("inheritsFrom").isJsonPrimitive();
-                String id = root.has("id") && root.get("id").isJsonPrimitive()
-                        ? root.get("id").getAsString() : dirName;
-                if (hasInherits || loaderTypeOf(id).isPresent()) {
-                    result.add(new MinecraftVersion(id,
-                            ModdedVersionType.INSTANCE, null, null));
-                }
-            } catch (Exception ignored) {
-                // Повреждённый или посторонний JSON в versions/ — не модовая версия
-            }
+        for (InstalledModdedVersion installed : listInstalledDetailed(gameDir)) {
+            result.add(installed.version());
         }
         return result;
     }
@@ -139,7 +109,7 @@ public class ModdedVersionService {
         }
 
         try {
-            MinecraftVersion vanillaVersion = versionService.fetchVersions().versions()
+            MinecraftVersion vanillaVersion = versionService.fetchVersions()
                     .stream()
                     .filter(v -> v.id().equals(vanillaId))
                     .findFirst()
@@ -246,8 +216,8 @@ public class ModdedVersionService {
                 String loaderVersion = parseLoaderVersion(id, family, mcBase);
                 if (loaderVersion == null || loaderVersion.isBlank()) continue;
                 result.add(new InstalledModdedVersion(
-                        new MinecraftVersion(id,
-                                ModLoaderFamilyType.of(family), null, null),
+                        MinecraftVersion.of(id, VersionType.UNKNOWN, null,
+                                null, family, loaderVersion),
                         family, loaderVersion, mcBase));
             } catch (Exception ignored) {
                 // Повреждённый или посторонний JSON в versions/ — не модовая версия

@@ -25,7 +25,7 @@ import org.example.launcher.domain.model.AssetIndex;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.Library;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.http.HttpDefaults;
 import org.example.launcher.infrastructure.common.JsonStrings;

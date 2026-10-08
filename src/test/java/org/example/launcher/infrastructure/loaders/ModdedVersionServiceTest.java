@@ -11,21 +11,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import org.example.launcher.domain.model.ModLoaderType;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.example.launcher.domain.model.ModLoaderType;
 
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
-import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
+import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
-import org.example.launcher.version.VersionTypeRegistry;
-import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 
@@ -53,16 +49,15 @@ class ModdedVersionServiceTest {
     /** Manifest stub exposing only the vanilla 1.21.4 entry. */
     private static final class StubVersionService extends MojangVersionService {
         StubVersionService() {
-            super("http://localhost/manifest", java.net.http.HttpClient.newHttpClient(),
-                    new com.google.gson.Gson(), new VersionTypeRegistry());
+            super("http://localhost/manifest");
         }
 
         @Override
-        public VersionManifest fetchVersions() {
-            return new VersionManifest("1.21.4", "1.21.4", List.of(
-                    new MinecraftVersion("1.21.4",
-                            org.example.launcher.version.StandardVersionType.RELEASE,
-                            "2024-12-03T10:00:00+00:00", "http://localhost/1.21.4.json")));
+        public List<MinecraftVersion> fetchVersions() {
+            return List.of(MinecraftVersion.of("1.21.4",
+                    VersionType.RELEASE,
+                    "2024-12-03T10:00:00+00:00",
+                    "http://localhost/1.21.4.json"));
         }
     }
 
@@ -101,7 +96,8 @@ class ModdedVersionServiceTest {
         assertTrue(installed.stream().anyMatch(v ->
                 v.id().equals("neoforge-21.4.147")));
         assertTrue(installed.stream().allMatch(v ->
-                v.type() instanceof org.example.launcher.version.ModdedVersionType));
+                v.core() == ModLoaderType.FABRIC
+                        || v.core() == ModLoaderType.NEOFORGE));
     }
 
     @Test
@@ -197,9 +193,9 @@ class ModdedVersionServiceTest {
         assertEquals("21.4.147", neoforge.loaderVersion());
         assertEquals("1.21.4", neoforge.minecraftVersion());
 
-        // Loader-family version types for the unified browser filters
+        // Loader family comes through the core field for the browser filters
         assertTrue(detailed.stream().allMatch(iv ->
-                iv.version().type() instanceof org.example.launcher.version.ModLoaderFamilyType));
+                iv.version().core() == iv.loaderType()));
         // Round-trip: the parsed info reproduces the installed version id
         assertTrue(detailed.stream().allMatch(iv ->
                 iv.toModLoaderVersion().installedVersionId().equals(iv.version().id())));

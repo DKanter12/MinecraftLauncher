@@ -51,14 +51,11 @@ import org.example.launcher.application.java.JavaManager;
 import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
-import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.i18n.Lang;
 import org.example.launcher.presentation.MainView;
 import org.example.launcher.infrastructure.http.HttpDefaults;
-import org.example.launcher.version.ModLoaderFamilyType;
-import org.example.launcher.version.VersionTypeRegistry;
 
 /**
  * Точка входа JavaFX-приложения Minecraft Launcher.
@@ -81,15 +78,6 @@ public class LauncherApplication extends Application {
     @Override
     public void start(Stage stage) {
         Platform.setImplicitExit(false);
-
-        VersionTypeRegistry typeRegistry = new VersionTypeRegistry();
-        // Семейства загрузчиков как типы версий: установленные модовые версии
-        // показываются в общем каталоге версий со своими фильтрами
-        for (ModLoaderType loaderType : ModLoaderType.values()) {
-            if (loaderType != ModLoaderType.VANILLA) {
-                typeRegistry.register(ModLoaderFamilyType.of(loaderType));
-            }
-        }
 
         MojangVersionService mojangVersionService = new MojangVersionService();
         VersionService versionService = mojangVersionService;

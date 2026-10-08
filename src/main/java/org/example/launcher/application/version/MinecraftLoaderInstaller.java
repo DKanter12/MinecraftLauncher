@@ -73,21 +73,33 @@ public class MinecraftLoaderInstaller {
             throw new IllegalArgumentException(
                     "Loader version must be chosen by the user");
         }
-        org.example.launcher.model.MinecraftVersion base =
-                ManifestEntries.baseEntry(vanillaVersion, vanillaRepo);
+        MinecraftVersion base = vanillaVersion.metadataUrl() != null
+                && !vanillaVersion.metadataUrl().isBlank()
+                ? vanillaVersion
+                : vanillaEntry(vanillaVersion.id());
         ModLoaderVersion loader = resolveLoader(core,
                 vanillaVersion.id(), loaderVersion);
         var vanillaMetadata = metadataService.fetchMetadata(base);
         var entry = loaders.get(core)
                 .orElseThrow(() -> new IOException(
                         "Loader is not registered: " + core));
-        var result = entry.installer().install(base, vanillaMetadata,
+        var result = entry.installer().install(vanillaMetadata,
                 loader, storage, InstallationProgress.NONE);
         if (result.fileResult() != null && result.fileResult().hasFailures()) {
             throw new IOException(
                     "Loader install failed: " + result.summary());
         }
         return result.versionId();
+    }
+
+    private MinecraftVersion vanillaEntry(String minecraftVersion)
+            throws IOException {
+        List<MinecraftVersion> all = vanillaRepo.fetchVersions();
+        return vanillaRepo.findById(minecraftVersion, all)
+                .filter(v -> v.metadataUrl() != null
+                        && !v.metadataUrl().isBlank())
+                .orElseThrow(() -> new IOException(
+                        "Minecraft version not found: " + minecraftVersion));
     }
 
     private ModLoaderVersion resolveLoader(ModLoaderType core,

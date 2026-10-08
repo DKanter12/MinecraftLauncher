@@ -3,7 +3,7 @@ package org.example.launcher.application.build;
 import java.util.List;
 import java.util.Objects;
 
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModLoaderType;
 

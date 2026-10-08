@@ -18,11 +18,9 @@ import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.domain.model.JavaResolutionResult;
-import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.version.ModdedVersionType;
 
 /**
  * Реализация {@link ModLoaderInstaller} для загрузчиков, распространяемых как
@@ -67,8 +65,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
     }
 
     @Override
-    public ModLoaderInstallResult install(MinecraftVersion vanillaVersion,
-                                          VersionMetadata vanillaMetadata,
+    public ModLoaderInstallResult install(VersionMetadata vanillaMetadata,
                                           ModLoaderVersion loader,
                                           GameDirectory gameDir,
                                           InstallationProgress progress) throws IOException {
@@ -112,10 +109,8 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
         VersionMetadata merged = merger.merge(vanillaMetadata, loaderJson);
         String versionId = merged.id();
 
-        MinecraftVersion moddedVersion = new MinecraftVersion(
-                versionId, ModdedVersionType.INSTANCE, null, null);
         InstallationResult files = installationService.install(
-                moddedVersion, merged, gameDir, progress);
+                merged, gameDir, progress);
 
         if (files.hasFailures()) {
             throw new IOException(loader.loaderType().displayName()

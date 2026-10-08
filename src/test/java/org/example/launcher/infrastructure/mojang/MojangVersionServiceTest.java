@@ -1,20 +1,16 @@
 package org.example.launcher.infrastructure.mojang;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.Optional;
+import java.util.List;
 
-import org.example.launcher.model.MinecraftVersion;
-import org.example.launcher.model.VersionManifest;
-import org.example.launcher.version.StandardVersionType;
-import org.example.launcher.version.VersionTypeRegistry;
+import org.example.launcher.domain.model.MinecraftVersion;
+import org.example.launcher.domain.model.VersionType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.example.launcher.infrastructure.mojang.MojangVersionService;
 
 @DisplayName("MojangVersionService manifest parsing")
 class MojangVersionServiceTest {
@@ -52,69 +48,59 @@ class MojangVersionServiceTest {
             """;
 
     private MojangVersionService createService() {
-        return new MojangVersionService(
-                "http://localhost",
-                new VersionTypeRegistry());
+        return new MojangVersionService("http://localhost");
     }
 
     @Test
     @DisplayName("parses version count correctly")
     void parsesVersionCount() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
-        assertEquals(3, manifest.versions().size());
-    }
-
-    @Test
-    @DisplayName("parses latest release and snapshot ids")
-    void parsesLatestIds() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
-        assertEquals(Optional.of("1.21"), manifest.latestReleaseId());
-        assertEquals(Optional.of("1.21-snapshot1"), manifest.latestSnapshotId());
+        List<MinecraftVersion> versions = createService().parseManifest(SAMPLE_MANIFEST);
+        assertEquals(3, versions.size());
     }
 
     @Test
     @DisplayName("parses version id, type, metadata url and release time")
     void parsesVersionFields() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
+        List<MinecraftVersion> versions = createService().parseManifest(SAMPLE_MANIFEST);
 
-        MinecraftVersion v21 = manifest.versions().stream()
+        MinecraftVersion v21 = versions.stream()
                 .filter(v -> v.id().equals("1.21"))
                 .findFirst().orElseThrow();
-        assertEquals(StandardVersionType.RELEASE, v21.type());
+        assertEquals(VersionType.RELEASE, v21.type());
         assertEquals("https://launchermeta.mojang.com/v1/packages/aaa/1.21.json", v21.metadataUrl());
-        assertEquals("2024-06-13T10:30:00+00:00", v21.releaseTimeRaw());
+        assertEquals("https://launchermeta.mojang.com/v1/packages/aaa/1.21.json", v21.url());
         assertTrue(v21.releaseTime().isPresent());
         assertEquals(2024, v21.releaseTime().get().getYear());
+        assertTrue(v21.isVanilla());
     }
 
     @Test
     @DisplayName("maps snapshot type correctly")
     void mapsSnapshotType() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
-        MinecraftVersion snap = manifest.versions().stream()
+        List<MinecraftVersion> versions = createService().parseManifest(SAMPLE_MANIFEST);
+        MinecraftVersion snap = versions.stream()
                 .filter(v -> v.id().equals("1.21-snapshot1"))
                 .findFirst().orElseThrow();
-        assertEquals(StandardVersionType.SNAPSHOT, snap.type());
-        assertEquals("Snapshot", snap.type().displayName());
+        assertEquals(VersionType.SNAPSHOT, snap.type());
     }
 
     @Test
     @DisplayName("maps old_beta type correctly")
     void mapsOldBetaType() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
-        MinecraftVersion beta = manifest.versions().stream()
+        List<MinecraftVersion> versions = createService().parseManifest(SAMPLE_MANIFEST);
+        MinecraftVersion beta = versions.stream()
                 .filter(v -> v.id().equals("b1.7.3"))
                 .findFirst().orElseThrow();
-        assertEquals(StandardVersionType.OLD_BETA, beta.type());
+        assertEquals(VersionType.BETA, beta.type());
     }
 
     @Test
-    @DisplayName("formattedReleaseTime returns a human-readable date")
-    void formattedReleaseTime() throws IOException {
-        VersionManifest manifest = createService().parseManifest(SAMPLE_MANIFEST);
-        MinecraftVersion v21 = manifest.versions().get(0);
-        assertNotNull(v21.formattedReleaseTime());
-        assertTrue(v21.formattedReleaseTime().length() > 5);
+    @DisplayName("releaseDate returns a human-readable date")
+    void releaseDate() throws IOException {
+        List<MinecraftVersion> versions = createService().parseManifest(SAMPLE_MANIFEST);
+        MinecraftVersion v21 = versions.get(0);
+        assertTrue(v21.releaseDate().isPresent());
+        assertTrue(v21.releaseDate().get().length() > 5);
     }
 
     @Test
@@ -140,9 +126,8 @@ class MojangVersionServiceTest {
                   ]
                 }
                 """;
-        VersionManifest manifest = createService().parseManifest(json);
-        MinecraftVersion v = manifest.versions().get(0);
-        assertEquals(StandardVersionType.UNKNOWN, v.type());
+        List<MinecraftVersion> versions = createService().parseManifest(json);
+        MinecraftVersion v = versions.get(0);
+        assertEquals(VersionType.UNKNOWN, v.type());
     }
 }
-

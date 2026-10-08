@@ -47,7 +47,6 @@ class MinecraftLoaderInstallerTest {
 
         @Override
         public ModLoaderInstallResult install(
-                org.example.launcher.model.MinecraftVersion vanillaVersion,
                 VersionMetadata vanillaMetadata, ModLoaderVersion loader,
                 GameDirectory gameDir, InstallationProgress progress) {
             installedLoaderVersion = loader.loaderVersion();

@@ -57,10 +57,9 @@ import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.domain.model.GameProfile;
-import org.example.launcher.model.MinecraftVersion;
+import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
-import org.example.launcher.model.VersionManifest;
 import org.example.launcher.infrastructure.http.UrlFetcher;
 import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
@@ -88,9 +87,7 @@ import org.example.launcher.infrastructure.updater.AppVersion;
 import org.example.launcher.infrastructure.updater.LauncherUpdate;
 import org.example.launcher.infrastructure.updater.UpdateService;
 import org.example.launcher.i18n.Lang;
-import org.example.launcher.version.StandardVersionType;
-import org.example.launcher.version.VersionType;
-import org.example.launcher.version.VersionTypeRegistry;
+import org.example.launcher.domain.model.VersionType;
 
 /**
  * Строит главное окно лаунчера и управляет им.
@@ -1540,9 +1537,9 @@ public class MainView {
                 : Lang.tr("versions.cached.loading",
                         manifestVersions.size()));
 
-        Task<VersionManifest> task = new Task<>() {
+        Task<List<MinecraftVersion>> task = new Task<>() {
             @Override
-            protected VersionManifest call() throws Exception {
+            protected List<MinecraftVersion> call() throws Exception {
                 return versionService.fetchVersions();
             }
         };
@@ -1677,8 +1674,8 @@ public class MainView {
         }
     }
 
-    private void onVersionsLoaded(VersionManifest manifest) {
-        manifestVersions = manifest.versions();
+    private void onVersionsLoaded(List<MinecraftVersion> versions) {
+        manifestVersions = versions;
         versionsLoadFailed = false;
         footerVersionsCount = manifestVersions.size();
         footerOffline = false;
@@ -1742,13 +1739,8 @@ public class MainView {
                     // Пропускать битые или неванильные? Включаем и модовые для офлайн-видимости
                     String typeStr = obj.has("type") && obj.get("type").isJsonPrimitive()
                             ? obj.get("type").getAsString() : "release";
-                    VersionType type;
-                    try {
-                        type = new VersionTypeRegistry().resolve(typeStr);
-                    } catch (Exception e) {
-                        type = StandardVersionType.RELEASE;
-                    }
-                    cached.add(new MinecraftVersion(id, type, null, null));
+                    VersionType type = VersionType.fromMojangId(typeStr);
+                    cached.add(MinecraftVersion.of(id, type, null, null));
                 } catch (Exception ignored) {
                 }
             }
