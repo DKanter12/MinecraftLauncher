@@ -12,7 +12,7 @@ import com.google.gson.JsonSyntaxException;
  *   "version": "1.1.0",
  *   "notes": "Исправления ошибок и новая тема",
  *   "package": {
- *     "url": "https://github.com/DKanter12/LaunchBuildUseCase/releases/download/v1.1.0/launcher-win64.zip",
+ *     "url": "https://github.com/DKanter12/MinecraftLauncher/releases/download/v1.1.0/launcher-win64.zip",
  *     "sha256": "&lt;hex&gt;",
  *     "size": 123456
  *   }

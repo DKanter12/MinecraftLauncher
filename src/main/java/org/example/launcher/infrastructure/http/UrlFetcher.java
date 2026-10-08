@@ -19,7 +19,7 @@ import java.util.Map;
  */
 public class UrlFetcher {
 
-    private static final String USER_AGENT = "LaunchBuildUseCase/update";
+    private static final String USER_AGENT = "MinecraftLauncher/update";
 
     private static final int BUFFER_SIZE = 65536;
 

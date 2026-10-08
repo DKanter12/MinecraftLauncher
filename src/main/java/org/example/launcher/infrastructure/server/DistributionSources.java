@@ -25,11 +25,11 @@ public final class DistributionSources {
 
     /** Собственный репозиторий лаунчера. */
     public static final String LAUNCHER_REPO_URL =
-            "https://github.com/DKanter12/LaunchBuildUseCase.git";
+            "https://github.com/DKanter12/MinecraftLauncher.git";
 
     /** Манифест обновлений в ветке main {@link #LAUNCHER_REPO_URL}. */
     public static final String UPDATE_MANIFEST_URL =
-            "https://raw.githubusercontent.com/DKanter12/LaunchBuildUseCase/main/launcher-version.json";
+            "https://raw.githubusercontent.com/DKanter12/MinecraftLauncher/main/launcher-version.json";
 
     /** Общая папка Яндекс Диска со сборками администратора по умолчанию. */
     public static final String YANDEX_BUILDS_LINK_DEFAULT =

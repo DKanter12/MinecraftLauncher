@@ -21,15 +21,15 @@ import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 public class CreateBuildUseCase {
 
     private final MinecraftVersionManager versionManager;
-    private final FileSystemBuildRepository profileService;
+    private final FileSystemBuildRepository buildRepository;
     private final GameDirectory storage;
 
     public CreateBuildUseCase(
             MinecraftVersionManager versionManager,
-            FileSystemBuildRepository profileService,
+            FileSystemBuildRepository buildRepository,
             GameDirectory storage) {
         this.versionManager = Objects.requireNonNull(versionManager);
-        this.profileService = Objects.requireNonNull(profileService);
+        this.buildRepository = Objects.requireNonNull(buildRepository);
         this.storage = Objects.requireNonNull(storage);
     }
 
@@ -46,7 +46,7 @@ public class CreateBuildUseCase {
         if (wanted.isEmpty()) {
             return true;
         }
-        for (ModdedProfile existing : profileService.loadProfiles()) {
+        for (ModdedProfile existing : buildRepository.loadProfiles()) {
             boolean sameName = existing.name().trim().equalsIgnoreCase(wanted);
             boolean sameVersion = existing.versionId().equals(versionId);
             if (sameName && sameVersion) {
@@ -95,7 +95,7 @@ public class CreateBuildUseCase {
     public ModdedProfile createBuildDirectory(BuildRequest request, String versionId)
             throws IOException {
         Build build = request.build();
-        return profileService.createProfile(
+        return buildRepository.createProfile(
                 build.core(),
                 build.isVanilla() ? "" : build.coreVersion(),
                 build.minecraftVersion(),

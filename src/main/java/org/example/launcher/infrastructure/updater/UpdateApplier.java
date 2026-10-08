@@ -98,7 +98,7 @@ public final class UpdateApplier {
     private static Optional<List<String>> restartCommand(Path appHome) {
         Path bin = appHome.resolve("bin");
         if (Files.isDirectory(bin)) {
-            Path preferred = bin.resolve("LaunchBuildUseCase.bat");
+            Path preferred = bin.resolve("MinecraftLauncher.bat");
             if (Files.isRegularFile(preferred)) {
                 return Optional.of(List.of(preferred.toString()));
             }
