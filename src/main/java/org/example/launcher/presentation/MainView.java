@@ -189,7 +189,6 @@ public class MainView {
     // переиспользования (см. org.example.launcher.distribution).
     private ServerAuthService serverAuthService;
     private ServerSession serverSession;
-    private Button serverButton;
 
     // Состояние запуска инстанса
 
@@ -268,7 +267,6 @@ public class MainView {
                 // файл токена уже удалён — нормально
             }
             serverSession = null;
-            updateServerButtonText();
         }
     }
 
@@ -423,14 +421,8 @@ public class MainView {
         addAccountButton.setOnAction(e -> onAddAccount());
         addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
 
-        serverButton = new Button(Lang.tr("server.button"));
-        serverButton.getStyleClass().add("browse-java-button");
-        serverButton.setStyle("-fx-font-size: 11px;");
-        serverButton.setOnAction(e -> onServerLogin());
-        updateServerButtonText();
-
         HBox accountBox = new HBox(8, avatarView, accountCombo,
-                addAccountButton, serverButton);
+                addAccountButton);
         accountBox.setAlignment(Pos.CENTER);
         accountBox.getStyleClass().add("account-pill");
 
@@ -1359,7 +1351,6 @@ public class MainView {
         accountCombo.setPromptText(Lang.tr("account.none"));
         addAccountButton.setText(Lang.tr("account.add"));
         addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
-        updateServerButtonText();
         rebuildInstanceFilterChips();
         updateFooterVersion();
         refreshAccounts();
@@ -1491,7 +1482,6 @@ public class MainView {
                 (Stage) root.getScene().getWindow(), serverAuthService, serverSession);
         boolean changed = result != serverSession;
         serverSession = result;
-        updateServerButtonText();
         if (changed) {
             statusLabel.setText(serverSession == null
                     ? Lang.tr("server.signedout.status")
@@ -1504,19 +1494,6 @@ public class MainView {
         }
         refreshProfilesView();
         refreshSettingsView();
-    }
-
-    private void updateServerButtonText() {
-        if (serverButton == null) {
-            return;
-        }
-        serverButton.setText(serverSession == null
-                ? Lang.tr("server.button")
-                : serverSession.isAdmin()
-                        ? Lang.tr("server.button.admin",
-                                serverSession.accountName())
-                        : Lang.tr("server.button.session",
-                                serverSession.accountName()));
     }
 
     // ------------------------------------------------------------------

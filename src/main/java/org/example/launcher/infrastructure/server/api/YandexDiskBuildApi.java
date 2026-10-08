@@ -253,7 +253,10 @@ public class YandexDiskBuildApi implements LauncherServerApi {
         if (!hasMods && !hasConfigs) {
             return null; // не папка сборки
         }
-        return readManifest(session, folder.path(), folder.name(),
+        // Манифест ищем по уже вычисленному логическому пути, а не по
+        // пути из ответа API: у публичных папок он относительный
+        // и ненадёжный, а folderLogical всегда корректен.
+        return readManifest(session, folderLogical, folder.name(),
                 modifiedVersion(folder.modified()));
     }
 
