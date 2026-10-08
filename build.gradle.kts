@@ -23,7 +23,7 @@ dependencies {
 }
 
 application {
-    mainClass = "org.example.launcher.ui.LauncherApp"
+    mainClass = "org.example.launcher.app.LauncherApplication"
 }
 
 tasks.test {

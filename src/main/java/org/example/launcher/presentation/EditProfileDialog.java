@@ -1,4 +1,4 @@
-package org.example.launcher.ui;
+package org.example.launcher.presentation;
 
 import java.util.List;
 

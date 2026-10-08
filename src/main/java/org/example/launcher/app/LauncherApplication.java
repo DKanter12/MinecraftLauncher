@@ -1,4 +1,4 @@
-package org.example.launcher.ui;
+package org.example.launcher.app;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -41,6 +41,7 @@ import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.i18n.Lang;
+import org.example.launcher.presentation.MainView;
 import org.example.launcher.infrastructure.http.HttpDefaults;
 import org.example.launcher.version.ModLoaderFamilyType;
 import org.example.launcher.version.VersionTypeRegistry;
@@ -61,7 +62,7 @@ import org.example.launcher.version.VersionTypeRegistry;
  * <li>{@link ProfileService} — управляет профилями игроков</li>
  * </ul>
  */ 
-public class LauncherApp extends Application {
+public class LauncherApplication extends Application {
 
     @Override
     public void start(Stage stage) {
@@ -127,8 +128,8 @@ public class LauncherApp extends Application {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 mojangVersionService, mojangMetadataService, merger);
 
-        // Игровые инстансы (ванильные + модовые, у каждого свой каталог)
-        FileSystemBuildRepository FileSystemBuildRepository =
+        // Игровые сборки (ванильные + модовые, у каждой свой каталог)
+        FileSystemBuildRepository buildRepository =
                 new FileSystemBuildRepository(defaultGameDir);
         ModdedProfileVerificationService profileVerificationService =
                 new ModdedProfileVerificationService(
@@ -140,8 +141,8 @@ public class LauncherApp extends Application {
         // [isVersionDownloaded -> downloadVersion -> createBuildDirectory]
         MinecraftVersionManager versionManager = new MinecraftVersionManager(
                 metadataService, installationService, modLoaderRegistry, defaultGameDir);
-        CreateBuildUseCase CreateBuildUseCase = new CreateBuildUseCase(
-                versionManager, FileSystemBuildRepository, defaultGameDir);
+        CreateBuildUseCase createBuild = new CreateBuildUseCase(
+                versionManager, buildRepository, defaultGameDir);
         AccountManager accountManager = new AccountManager(profileService);
 
         MainView view = new MainView(
@@ -149,7 +150,7 @@ public class LauncherApp extends Application {
                 launchService, javaResolutionService, javaRuntimeInstaller,
                 profileService, preferences, elyAuthService, skinService,
                 modLoaderRegistry, moddedVersionService,
-                FileSystemBuildRepository, profileVerificationService, CreateBuildUseCase,
+                buildRepository, profileVerificationService, createBuild,
                 accountManager);
 
         Scene scene = new Scene(view.getView(), 1180, 680);

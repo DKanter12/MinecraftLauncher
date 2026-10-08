@@ -1,4 +1,4 @@
-package org.example.launcher.ui;
+package org.example.launcher.presentation;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -135,9 +135,9 @@ public class MainView {
     private final ElyAuthService elyAuthService;
     private final SkinService skinService;
     private final ModLoaderRegistry modLoaderRegistry;
-    private final FileSystemBuildRepository FileSystemBuildRepository;
+    private final FileSystemBuildRepository buildRepository;
     private final ModdedProfileVerificationService profileVerificationService;
-    private final CreateBuildUseCase CreateBuildUseCase;
+    private final CreateBuildUseCase createBuildUseCase;
     private final AccountManager accountManager;
 
     private BorderPane root;
@@ -225,9 +225,9 @@ public class MainView {
                     SkinService skinService,
                     ModLoaderRegistry modLoaderRegistry,
                     ModdedVersionService moddedVersionService,
-                    FileSystemBuildRepository FileSystemBuildRepository,
+                    FileSystemBuildRepository buildRepository,
                     ModdedProfileVerificationService profileVerificationService,
-                    CreateBuildUseCase CreateBuildUseCase,
+                    CreateBuildUseCase createBuildUseCase,
                     AccountManager accountManager) {
         this.versionService = versionService;
         this.metadataService = metadataService;
@@ -240,9 +240,9 @@ public class MainView {
         this.elyAuthService = elyAuthService;
         this.skinService = skinService;
         this.modLoaderRegistry = modLoaderRegistry;
-        this.FileSystemBuildRepository = FileSystemBuildRepository;
+        this.buildRepository = buildRepository;
         this.profileVerificationService = profileVerificationService;
-        this.CreateBuildUseCase = CreateBuildUseCase;
+        this.createBuildUseCase = createBuildUseCase;
         this.accountManager = accountManager;
         serverSession = null;
         applyDistributionSettings();
@@ -828,7 +828,7 @@ public class MainView {
                 : "MC " + profile.minecraftVersion() + "  ·  "
                         + profile.loaderType().displayName() + " "
                         + profile.loaderVersion()));
-        Path dir = FileSystemBuildRepository.resolveGameDir(profile);
+        Path dir = buildRepository.resolveGameDir(profile);
         details.getChildren().add(detailLine(Lang.tr("card.gamedir",
                 shortGameDir(dir))));
         details.getChildren().add(detailLine(Lang.tr("card.memory",
@@ -920,7 +920,7 @@ public class MainView {
     /** Считает jar-моды; отрицательное — когда не читается. */
     private int modsCount(ModdedProfile profile) {
         try {
-            Path mods = FileSystemBuildRepository.resolveGameDir(profile)
+            Path mods = buildRepository.resolveGameDir(profile)
                     .resolve("mods");
             if (!Files.isDirectory(mods)) {
                 return profile.isVanilla() ? -1 : 0;
@@ -2017,7 +2017,7 @@ public class MainView {
         String versionId = request.versionId();
 
         try {
-            if (!CreateBuildUseCase.isBuildAvailable(versionId, request.effectiveName())) {
+            if (!createBuildUseCase.isBuildAvailable(versionId, request.effectiveName())) {
                 statusLabel.setText(Lang.tr("instance.create.failed",
                         "Build already exists: " + request.effectiveName() + " " + versionId));
                 ErrorDialog.show((Stage) root.getScene().getWindow(),
@@ -2050,7 +2050,7 @@ public class MainView {
                 // Весь пайплайн — в CreateBuildUseCase:
                 // isVersionDownloaded -> downloadVersion + повторная проверка
                 // -> createBuildDirectory + populateBuildDirectories
-                return CreateBuildUseCase.createBuild(request, progressDialog);
+                return createBuildUseCase.createBuild(request, progressDialog);
             }
         };
         task.setOnSucceeded(e -> {
@@ -2086,7 +2086,7 @@ public class MainView {
      */
     private void refreshModdedProfiles(String selectId) {
         try {
-            moddedProfiles = FileSystemBuildRepository.loadProfiles();
+            moddedProfiles = buildRepository.loadProfiles();
             if (selectId != null) {
                 selectedInstanceId = selectId;
             } else if (selectedInstance() == null) {
@@ -2107,7 +2107,7 @@ public class MainView {
     private void onOpenProfileFolder(ModdedProfile profile) {
         if (profile == null) return;
         try {
-            Path dir = FileSystemBuildRepository.resolveGameDir(profile);
+            Path dir = buildRepository.resolveGameDir(profile);
             FileSystemBuildRepository.ensureProfileFolders(dir);
             java.awt.Desktop.getDesktop().open(dir.toFile());
             statusLabel.setText(Lang.tr("folder.opened", dir));
@@ -2135,7 +2135,7 @@ public class MainView {
         try {
             // Переименование также переименовывает папку (моды/сохранения/сборки
             // переезжают вместе), поэтому далее выбираем по новому id
-            Optional<ModdedProfile> updated = FileSystemBuildRepository.updateProfile(
+            Optional<ModdedProfile> updated = buildRepository.updateProfile(
                     profile.id(), result.extraJvmArgs(), result.name(),
                     result.memoryMb());
             if (updated.isPresent()) {
@@ -2170,7 +2170,7 @@ public class MainView {
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    var keptDir = FileSystemBuildRepository.deleteProfile(profile.id());
+                    var keptDir = buildRepository.deleteProfile(profile.id());
                     refreshModdedProfiles(null);
                     statusLabel.setText(Lang.tr("instance.delete.done",
                             keptDir.map(d -> Lang.tr("instance.delete.kept", d))
@@ -2399,7 +2399,7 @@ public class MainView {
             LaunchResult result = launchTask.getValue();
             if (result.isSuccess()) {
                 try {
-                    FileSystemBuildRepository.touchLastPlayed(profile.id());
+                    buildRepository.touchLastPlayed(profile.id());
                 } catch (IOException ignored) {
                     // Некритично
                 }
