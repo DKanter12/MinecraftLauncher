@@ -33,8 +33,8 @@ import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
 import org.example.launcher.service.ModdedProfileService;
 import org.example.launcher.service.AccountManager;
-import org.example.launcher.build.BuildCreator;
-import org.example.launcher.build.MinecraftVersionManager;
+import org.example.launcher.application.build.CreateBuildUseCase;
+import org.example.launcher.application.build.MinecraftVersionManager;
 import org.example.launcher.service.modloader.ModLoaderMetadataMerger;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
@@ -140,7 +140,7 @@ public class LauncherApp extends Application {
         // [isVersionDownloaded -> downloadVersion -> createBuildDirectory]
         MinecraftVersionManager versionManager = new MinecraftVersionManager(
                 metadataService, installationService, modLoaderRegistry, defaultGameDir);
-        BuildCreator buildCreator = new BuildCreator(
+        CreateBuildUseCase CreateBuildUseCase = new CreateBuildUseCase(
                 versionManager, moddedProfileService, defaultGameDir);
         AccountManager accountManager = new AccountManager(profileService);
 
@@ -149,7 +149,7 @@ public class LauncherApp extends Application {
                 launchService, javaResolutionService, javaRuntimeInstaller,
                 profileService, preferences, elyAuthService, skinService,
                 modLoaderRegistry, moddedVersionService,
-                moddedProfileService, profileVerificationService, buildCreator,
+                moddedProfileService, profileVerificationService, CreateBuildUseCase,
                 accountManager);
 
         Scene scene = new Scene(view.getView(), 1180, 680);

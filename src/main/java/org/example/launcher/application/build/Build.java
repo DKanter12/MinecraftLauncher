@@ -1,4 +1,4 @@
-package org.example.launcher.build;
+package org.example.launcher.application.build;
 
 import java.util.Objects;
 

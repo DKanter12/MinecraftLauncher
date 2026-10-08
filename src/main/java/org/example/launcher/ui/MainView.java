@@ -81,9 +81,9 @@ import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
-import org.example.launcher.build.Build;
-import org.example.launcher.build.BuildCreator;
-import org.example.launcher.build.BuildRequest;
+import org.example.launcher.application.build.Build;
+import org.example.launcher.application.build.CreateBuildUseCase;
+import org.example.launcher.application.build.BuildRequest;
 import org.example.launcher.service.AccountManager;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
@@ -137,7 +137,7 @@ public class MainView {
     private final ModLoaderRegistry modLoaderRegistry;
     private final ModdedProfileService moddedProfileService;
     private final ModdedProfileVerificationService profileVerificationService;
-    private final BuildCreator buildCreator;
+    private final CreateBuildUseCase CreateBuildUseCase;
     private final AccountManager accountManager;
 
     private BorderPane root;
@@ -227,7 +227,7 @@ public class MainView {
                     ModdedVersionService moddedVersionService,
                     ModdedProfileService moddedProfileService,
                     ModdedProfileVerificationService profileVerificationService,
-                    BuildCreator buildCreator,
+                    CreateBuildUseCase CreateBuildUseCase,
                     AccountManager accountManager) {
         this.versionService = versionService;
         this.metadataService = metadataService;
@@ -242,7 +242,7 @@ public class MainView {
         this.modLoaderRegistry = modLoaderRegistry;
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
-        this.buildCreator = buildCreator;
+        this.CreateBuildUseCase = CreateBuildUseCase;
         this.accountManager = accountManager;
         serverSession = null;
         applyDistributionSettings();
@@ -2017,7 +2017,7 @@ public class MainView {
         String versionId = request.versionId();
 
         try {
-            if (!buildCreator.isBuildAvailable(versionId, request.effectiveName())) {
+            if (!CreateBuildUseCase.isBuildAvailable(versionId, request.effectiveName())) {
                 statusLabel.setText(Lang.tr("instance.create.failed",
                         "Build already exists: " + request.effectiveName() + " " + versionId));
                 ErrorDialog.show((Stage) root.getScene().getWindow(),
@@ -2047,10 +2047,10 @@ public class MainView {
         Task<ModdedProfile> task = new Task<>() {
             @Override
             protected ModdedProfile call() throws Exception {
-                // Весь пайплайн — в BuildCreator:
+                // Весь пайплайн — в CreateBuildUseCase:
                 // isVersionDownloaded -> downloadVersion + повторная проверка
                 // -> createBuildDirectory + populateBuildDirectories
-                return buildCreator.createBuild(request, progressDialog);
+                return CreateBuildUseCase.createBuild(request, progressDialog);
             }
         };
         task.setOnSucceeded(e -> {

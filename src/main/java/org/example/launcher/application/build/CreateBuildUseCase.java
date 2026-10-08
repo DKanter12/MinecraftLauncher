@@ -1,4 +1,4 @@
-package org.example.launcher.build;
+package org.example.launcher.application.build;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -18,13 +18,13 @@ import org.example.launcher.service.ModdedProfileService;
  * {@link MinecraftVersionManager}, папки/реестр — {@link ModdedProfileService},
  * отображение остаётся в {@code MainView}.
  */
-public class BuildCreator {
+public class CreateBuildUseCase {
 
     private final MinecraftVersionManager versionManager;
     private final ModdedProfileService profileService;
     private final GameDirectory storage;
 
-    public BuildCreator(
+    public CreateBuildUseCase(
             MinecraftVersionManager versionManager,
             ModdedProfileService profileService,
             GameDirectory storage) {
