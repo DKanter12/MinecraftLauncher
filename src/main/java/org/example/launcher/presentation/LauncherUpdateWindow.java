@@ -69,7 +69,7 @@ public class LauncherUpdateWindow extends Stage {
         notesArea.setEditable(false);
         notesArea.setWrapText(true);
         notesArea.setPrefRowCount(5);
-        notesArea.getStyleClass().add("profile-jvm-args");
+        notesArea.getStyleClass().add("error-text");
         VBox.setVgrow(notesArea, Priority.ALWAYS);
 
         statusLabel.getStyleClass().add("quick-select-label");

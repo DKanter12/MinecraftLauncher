@@ -678,21 +678,6 @@
     -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 10, 0, 0, 0);
 }
 
-.profile-jvm-args {
-    -fx-control-inner-background: #0B0F15;
-    -fx-text-fill: #F1F5F9;
-    -fx-font-family: Consolas;
-    -fx-font-size: 12px;
-    -fx-background-radius: 10;
-    -fx-border-color: #26303D;
-    -fx-border-radius: 10;
-    -fx-border-width: 1;
-}
-
-.profile-jvm-args:focused {
-    -fx-border-color: #4842B0;
-}
-
 /* ===================== Lists ===================== */
 
 .profile-list {

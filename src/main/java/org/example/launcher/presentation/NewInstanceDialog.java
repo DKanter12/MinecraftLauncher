@@ -14,7 +14,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -28,7 +27,6 @@ import javafx.stage.StageStyle;
 
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
-import org.example.launcher.infrastructure.common.JvmArgs;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.version.StandardVersionType;
@@ -57,18 +55,16 @@ public class NewInstanceDialog extends Stage {
     /**
      * Параметры созданного инстанса.
      *
-     * @param type         ванилла или семейство модового загрузчика
-     * @param mcVersion    целевая версия Minecraft
-     * @param loader       выбранная версия загрузчика ({@code null}
-     *                     для ваниллы)
-     * @param extraJvmArgs дополнительные параметры запуска JVM
-     * @param name         отображаемое имя инстанса (пустое означает
-     *                     автоматическое имя «Загрузчик МК»)
+     * @param type      ванилла или семейство модового загрузчика
+     * @param mcVersion целевая версия Minecraft
+     * @param loader    выбранная версия загрузчика ({@code null}
+     *                  для ваниллы)
+     * @param name      отображаемое имя инстанса (пустое означает
+     *                  автоматическое имя «Загрузчик МК»)
      */
     public record Result(ModLoaderType type,
                          MinecraftVersion mcVersion,
                          ModLoaderVersion loader,
-                         List<String> extraJvmArgs,
                          String name) {
     }
 
@@ -83,7 +79,6 @@ public class NewInstanceDialog extends Stage {
     private final HBox categoryChips = new HBox(6);
     private final ListView<MinecraftVersion> versionList = new ListView<>();
     private final ComboBox<ModLoaderVersion> loaderCombo = new ComboBox<>();
-    private final TextArea jvmArgsArea = new TextArea();
     private final TextField nameField = new TextField();
     private final ProgressIndicator loaderProgress = new ProgressIndicator();
     private final Label loaderStatusLabel = new Label();
@@ -242,15 +237,6 @@ public class NewInstanceDialog extends Stage {
         loaderBox = new VBox(4, loaderVersionTitle, loaderCombo,
                 loaderStatusRow);
 
-        // -- JVM-аргументы --
-        Label jvmLabel = new Label(Lang.tr("new.jvm"));
-        jvmLabel.getStyleClass().add("section-title");
-        jvmArgsArea.setPromptText("-Xmx4G");
-        jvmArgsArea.setPrefRowCount(3);
-        jvmArgsArea.setPrefColumnCount(30);
-        jvmArgsArea.setWrapText(false);
-        jvmArgsArea.getStyleClass().add("profile-jvm-args");
-
         // -- Кнопки --
         createButton.getStyleClass().add("install-close-button");
         createButton.setDefaultButton(true);
@@ -262,7 +248,6 @@ public class NewInstanceDialog extends Stage {
                     effectiveVersion(),
                     type == ModLoaderType.VANILLA ? null
                             : loaderCombo.getValue(),
-                    parseJvmArgs(jvmArgsArea.getText()),
                     nameField.getText().trim());
             close();
         });
@@ -286,7 +271,6 @@ public class NewInstanceDialog extends Stage {
                 categoryBox,
                 versionListBox,
                 loaderBox,
-                jvmLabel, jvmArgsArea,
                 buttons);
         content.setPadding(new Insets(18));
         content.setPrefWidth(440);
@@ -502,10 +486,6 @@ public class NewInstanceDialog extends Stage {
                                           boolean visible) {
         node.setVisible(visible);
         node.setManaged(visible);
-    }
-
-    private static List<String> parseJvmArgs(String text) {
-        return JvmArgs.parse(text);
     }
 
     /**

@@ -1,21 +1,17 @@
 package org.example.launcher.presentation;
 
-import java.util.List;
 
-import org.example.launcher.infrastructure.common.JvmArgs;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -35,12 +31,10 @@ import org.example.launcher.i18n.Lang;
 public class EditProfileDialog extends Stage {
 
     /**
-     * Отредактированные значения. JVM-аргументы задаются списком отдельных
-     * аргументов в порядке запуска; лимит памяти — в мегабайтах
+     * Отредактированные значения. Лимит памяти — в мегабайтах
      * ({@code 0} означает автоматический).
      */
-    public record Result(String name, List<String> extraJvmArgs,
-                         int memoryMb) {
+    public record Result(String name, int memoryMb) {
     }
 
     private Result result;
@@ -49,7 +43,6 @@ public class EditProfileDialog extends Stage {
     private final TextField memoryField = new TextField();
     private final FlowPane memoryChips = new FlowPane();
     private final ToggleGroup memoryGroup = new ToggleGroup();
-    private final TextArea jvmArgsArea = new TextArea();
     private final Label errorLabel = new Label();
     private final Button saveButton = new Button(Lang.tr("button.save"));
 
@@ -90,15 +83,6 @@ public class EditProfileDialog extends Stage {
         memoryField.getStyleClass().add("search-field");
         memoryField.setMaxWidth(Double.MAX_VALUE);
 
-        Label jvmLabel = new Label(Lang.tr("edit.jvm"));
-        jvmLabel.getStyleClass().add("section-title");
-        jvmArgsArea.setText(String.join("\n", profile.extraJvmArgs()));
-        jvmArgsArea.setPromptText("-XX:+UseG1GC");
-        jvmArgsArea.setPrefRowCount(4);
-        jvmArgsArea.setPrefColumnCount(34);
-        jvmArgsArea.setWrapText(false);
-        jvmArgsArea.getStyleClass().add("profile-jvm-args");
-
         errorLabel.getStyleClass().add("account-error");
         errorLabel.setWrapText(true);
 
@@ -113,7 +97,6 @@ public class EditProfileDialog extends Stage {
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> {
             result = new Result(nameField.getText().trim(),
-                    parseJvmArgs(jvmArgsArea.getText()),
                     parseMemory(memoryField.getText()));
             close();
         });
@@ -130,7 +113,7 @@ public class EditProfileDialog extends Stage {
         VBox content = new VBox(6,
                 infoLabel, nameLabel, nameField,
                 memoryLabel, memoryChips, memoryField,
-                jvmLabel, jvmArgsArea, errorLabel,
+                errorLabel,
                 buttons);
         content.setPadding(new Insets(18));
         content.setPrefWidth(440);
@@ -211,14 +194,6 @@ public class EditProfileDialog extends Stage {
         } catch (NumberFormatException e) {
             return -1;
         }
-    }
-
-    /**
-     * Разбивает содержимое текстового поля на отдельные JVM-аргументы: один
-     * аргумент на непустую строку, с обрезкой пробелов.
-     */
-    private static List<String> parseJvmArgs(String text) {
-        return JvmArgs.parse(text);
     }
 
     /**

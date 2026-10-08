@@ -1967,7 +1967,7 @@ public class MainView {
                 build,
                 result.mcVersion(),
                 result.type() == ModLoaderType.VANILLA ? null : result.loader(),
-                result.extraJvmArgs());
+                List.of());
         String versionId = request.versionId();
 
         try {
@@ -2090,7 +2090,7 @@ public class MainView {
             // Переименование также переименовывает папку (моды/сохранения/сборки
             // переезжают вместе), поэтому далее выбираем по новому id
             Optional<ModdedProfile> updated = buildRepository.updateProfile(
-                    profile.id(), result.extraJvmArgs(), result.name(),
+                    profile.id(), profile.extraJvmArgs(), result.name(),
                     result.memoryMb());
             if (updated.isPresent()) {
                 refreshModdedProfiles(updated.get().id());
@@ -2098,9 +2098,7 @@ public class MainView {
                         updated.get().name(),
                         FileSystemBuildRepository.formatMemory(
                                 updated.get().memoryMb()),
-                        result.extraJvmArgs().isEmpty() ? ""
-                                : Lang.tr("instance.updated.jvm",
-                                        result.extraJvmArgs().size())));
+                        ""));
             }
         } catch (IOException e) {
             UiErrors.fail(statusLabel,
