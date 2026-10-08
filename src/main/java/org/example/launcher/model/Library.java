@@ -1,6 +1,5 @@
 package org.example.launcher.model;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -39,10 +38,6 @@ public final class Library {
         return Optional.ofNullable(artifact);
     }
 
-    public Map<String, DownloadInfo> classifiers() {
-        return Collections.unmodifiableMap(classifiers);
-    }
-
     /**
      * Возвращает загрузку нативного классификатора для заданного имени ОС
      * (например, {@code "windows"}, {@code "linux"}, {@code "osx"}) либо
@@ -56,9 +51,5 @@ public final class Library {
 
     public boolean hasNatives() {
         return !natives.isEmpty();
-    }
-
-    public Map<String, String> natives() {
-        return Collections.unmodifiableMap(natives);
     }
 }

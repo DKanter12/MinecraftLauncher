@@ -81,8 +81,10 @@ import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.VersionService;
 import org.example.launcher.service.modloader.ModLoaderRegistry;
 import org.example.launcher.service.modloader.ModLoaderType;
+import org.example.launcher.build.Build;
 import org.example.launcher.build.BuildCreator;
 import org.example.launcher.build.BuildRequest;
+import org.example.launcher.service.AccountManager;
 import org.example.launcher.service.modloader.ModdedProfileVerificationService;
 import org.example.launcher.service.modloader.ModdedVersionService;
 import org.example.launcher.update.AppVersion;
@@ -136,6 +138,7 @@ public class MainView {
     private final ModdedProfileService moddedProfileService;
     private final ModdedProfileVerificationService profileVerificationService;
     private final BuildCreator buildCreator;
+    private final AccountManager accountManager;
 
     private BorderPane root;
     private Label statusLabel;
@@ -224,7 +227,8 @@ public class MainView {
                     ModdedVersionService moddedVersionService,
                     ModdedProfileService moddedProfileService,
                     ModdedProfileVerificationService profileVerificationService,
-                    BuildCreator buildCreator) {
+                    BuildCreator buildCreator,
+                    AccountManager accountManager) {
         this.versionService = versionService;
         this.metadataService = metadataService;
         this.installationService = installationService;
@@ -239,6 +243,7 @@ public class MainView {
         this.moddedProfileService = moddedProfileService;
         this.profileVerificationService = profileVerificationService;
         this.buildCreator = buildCreator;
+        this.accountManager = accountManager;
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -1102,7 +1107,7 @@ public class MainView {
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    profileService.deleteProfile(account.name());
+                    accountManager.delete(account.name());
                     if (selectedProfile != null
                             && selectedProfile.equals(account)) {
                         selectedProfile = null;
@@ -1445,7 +1450,7 @@ public class MainView {
     /** Ручная проверка обновлений из настроек. */
     private void onCheckUpdatesNow() {
         updateStatusLabel.setText(Lang.tr("settings.checking"));
-        Thread thread = new Thread(() -> {
+        FxTasks.run("update-check-manual", () -> {
             UpdateService.CheckResult result = checkForUpdates();
             Platform.runLater(() -> {
                 updateStatusLabel.setText(result.detail());
@@ -1460,9 +1465,7 @@ public class MainView {
                 }
                 refreshSettingsView();
             });
-        }, "update-check-manual");
-        thread.setDaemon(true);
-        thread.start();
+        });
     }
 
     /** Сохраняет ссылку на репозиторий сборок (приходит отдельно). */
@@ -1583,9 +1586,7 @@ public class MainView {
         };
         task.setOnSucceeded(e -> onVersionsLoaded(task.getValue()));
         task.setOnFailed(e -> onLoadFailed(task.getException()));
-        var thread = new Thread(task, "version-fetch");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("version-fetch", task);
 
         checkForUpdatesOnStartup();
     }
@@ -1596,7 +1597,7 @@ public class MainView {
      * открывается, когда обновление доступно или подготовлено.
      */
     private void checkForUpdatesOnStartup() {
-        Thread thread = new Thread(() -> {
+        FxTasks.run("update-check", () -> {
             try {
                 UpdateService.CheckResult result = checkForUpdates();
                 Platform.runLater(() -> {
@@ -1619,9 +1620,7 @@ public class MainView {
             } catch (RuntimeException ignored) {
                 // проверки обновлений не должны ломать старт
             }
-        }, "update-check");
-        thread.setDaemon(true);
-        thread.start();
+        });
     }
 
     private void startElyByRefreshTimer() {
@@ -1841,7 +1840,7 @@ public class MainView {
 
     private void refreshAccounts() {
         try {
-            var profiles = profileService.loadProfiles();
+            var profiles = accountManager.load();
             suppressSelectionListener = true;
             try {
                 accountCombo.getItems().setAll(profiles);
@@ -1853,26 +1852,9 @@ public class MainView {
                     savedName = preferences.getLastSelectedAccount().orElse(null);
                 }
 
-                GameProfile toSelect = null;
-                if (selectedUuid != null) {
-                    for (GameProfile p : profiles) {
-                        if (p.uuid().isPresent() && p.uuid().get().equals(selectedUuid)) {
-                            toSelect = p;
-                            break;
-                        }
-                    }
-                }
-                if (toSelect == null && savedName != null) {
-                    for (GameProfile p : profiles) {
-                        if (p.name().equals(savedName)) {
-                            toSelect = p;
-                            break;
-                        }
-                    }
-                }
-                if (toSelect == null && !profiles.isEmpty()) {
-                    toSelect = profiles.get(0);
-                }
+                var toSelect = accountManager
+                        .resolveSelection(profiles, selectedUuid, savedName)
+                        .orElse(null);
 
                 if (toSelect != null) {
                     accountCombo.getSelectionModel().clearSelection();
@@ -1906,18 +1888,21 @@ public class MainView {
         if (name == null || name.isBlank()) return;
         Stage launcherStage = (Stage) root.getScene().getWindow();
         try {
-            profileService.addOfflineProfile(name);
+            accountManager.createOffline(name);
             refreshAccounts();
             refreshProfilesView();
             for (GameProfile p : accountCombo.getItems()) {
-                if (p.name().equals(name)) {
+                if (p.name().equals(name.trim())) {
                     accountCombo.getSelectionModel().select(p);
                     selectedProfile = p;
-                    saveLastSelectedAccount(name);
+                    saveLastSelectedAccount(p.name());
                     break;
                 }
             }
-            statusLabel.setText(Lang.tr("account.created", name));
+            statusLabel.setText(Lang.tr("account.created", name.trim()));
+        } catch (IllegalArgumentException e) {
+            ErrorDialog.show(launcherStage, Lang.tr("account.error.title"),
+                    e.getMessage());
         } catch (IOException e) {
             ErrorDialog.show(launcherStage, Lang.tr("account.error.title"),
                     Lang.tr("account.create.failed", e.getMessage()));
@@ -1938,12 +1923,7 @@ public class MainView {
         authTask.setOnSucceeded(e -> {
             GameProfile profile = authTask.getValue();
             try {
-                var profiles = new ArrayList<>(profileService.loadProfiles());
-                profiles.removeIf(p -> (profile.uuid().isPresent() && p.uuid().isPresent()
-                        && p.uuid().get().equals(profile.uuid().get()))
-                        || p.name().equals(profile.name()));
-                profiles.add(profile);
-                profileService.saveProfiles(profiles);
+                accountManager.saveAuthenticated(profile);
             } catch (IOException ex) {
                 // Некритично
             }
@@ -1968,13 +1948,12 @@ public class MainView {
         });
         authTask.setOnFailed(e -> {
             String msg = authTask.getException().getMessage();
-            statusLabel.setText(Lang.tr("ely.failed", msg));
             if (addAccountButton != null) addAccountButton.setDisable(false);
-            ErrorDialog.show(launcherStage, Lang.tr("ely.failed.title"), msg);
+            UiErrors.fail(statusLabel, launcherStage,
+                    Lang.tr("ely.failed", msg),
+                    Lang.tr("ely.failed.title"), msg);
         });
-        var thread = new Thread(authTask, "ely-auth");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("ely-auth", authTask);
     }
 
     // ------------------------------------------------------------------
@@ -2025,12 +2004,16 @@ public class MainView {
      */
     private void createInstance(NewInstanceDialog.Result result,
                                 boolean playWhenReady) {
-        BuildRequest request = new BuildRequest(
+        Build build = new Build(
+                result.name(),
+                result.mcVersion().id(),
                 result.type(),
+                result.type() == ModLoaderType.VANILLA ? "" : result.loader().loaderVersion());
+        BuildRequest request = new BuildRequest(
+                build,
                 result.mcVersion(),
-                result.loader(),
-                result.extraJvmArgs(),
-                result.name());
+                result.type() == ModLoaderType.VANILLA ? null : result.loader(),
+                result.extraJvmArgs());
         String versionId = request.versionId();
 
         try {
@@ -2085,14 +2068,11 @@ public class MainView {
         task.setOnFailed(e -> {
             Throwable cause = task.getException();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
-            statusLabel.setText(
-                    Lang.tr("instance.create.failed", cause.getMessage()));
-            ErrorDialog.show(owner, Lang.tr("instance.create.failed.title"),
-                    cause.getClass().getSimpleName() + ": " + cause.getMessage());
+            UiErrors.fail(statusLabel, owner,
+                    Lang.tr("instance.create.failed", cause.getMessage()),
+                    Lang.tr("instance.create.failed.title"), cause);
         });
-        var thread = new Thread(task, "instance-create");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("instance-create", task);
     }
 
     // ------------------------------------------------------------------
@@ -2132,10 +2112,10 @@ public class MainView {
             java.awt.Desktop.getDesktop().open(dir.toFile());
             statusLabel.setText(Lang.tr("folder.opened", dir));
         } catch (Exception ex) {
-            statusLabel.setText(Lang.tr("folder.open.failed", ex.getMessage()));
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    Lang.tr("error.folder.title"),
-                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            UiErrors.fail(statusLabel,
+                    (Stage) root.getScene().getWindow(),
+                    Lang.tr("folder.open.failed", ex.getMessage()),
+                    Lang.tr("error.folder.title"), ex);
         }
     }
 
@@ -2169,11 +2149,10 @@ public class MainView {
                                         result.extraJvmArgs().size())));
             }
         } catch (IOException e) {
-            statusLabel.setText(
-                    Lang.tr("instance.update.failed", e.getMessage()));
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
-                    Lang.tr("error.update.title"),
-                    e.getClass().getSimpleName() + ": " + e.getMessage());
+            UiErrors.fail(statusLabel,
+                    (Stage) root.getScene().getWindow(),
+                    Lang.tr("instance.update.failed", e.getMessage()),
+                    Lang.tr("error.update.title"), e);
         }
     }
 
@@ -2241,9 +2220,7 @@ public class MainView {
                     verifyProfileAndLaunch(profile, refreshTask.getValue(), storage));
             refreshTask.setOnFailed(e ->
                     verifyProfileAndLaunch(profile, account, storage));
-            var thread = new Thread(refreshTask, "ely-refresh");
-            thread.setDaemon(true);
-            thread.start();
+            FxTasks.run("ely-refresh", refreshTask);
         } else {
             verifyProfileAndLaunch(profile, account, storage);
         }
@@ -2277,16 +2254,14 @@ public class MainView {
         });
         verifyTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            statusLabel.setText(Lang.tr("launch.verify.error",
-                    verifyTask.getException().getMessage()));
-            ErrorDialog.show((Stage) root.getScene().getWindow(),
+            UiErrors.fail(statusLabel,
+                    (Stage) root.getScene().getWindow(),
+                    Lang.tr("launch.verify.error",
+                            verifyTask.getException().getMessage()),
                     Lang.tr("launch.verify.title"),
-                    verifyTask.getException().getClass().getSimpleName() + ": "
-                            + verifyTask.getException().getMessage());
+                    verifyTask.getException());
         });
-        var thread = new Thread(verifyTask, "instance-verify");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("instance-verify", verifyTask);
     }
 
     /**
@@ -2360,20 +2335,18 @@ public class MainView {
             refreshLaunchButtons();
             Throwable cause = repairTask.getException();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
-            statusLabel.setText(
-                    Lang.tr("launch.repair.failed", cause.getMessage()));
             StringBuilder msg = new StringBuilder();
             msg.append(Lang.tr("launch.repair.failed.text",
                     cause.getClass().getSimpleName(), cause.getMessage()));
             for (String error : original.errors()) {
                 msg.append(" - ").append(error).append('\n');
             }
-            ErrorDialog.show(owner, Lang.tr("launch.repair.failed.title",
-                    profile.name()), msg.toString());
+            UiErrors.fail(statusLabel, owner,
+                    Lang.tr("launch.repair.failed", cause.getMessage()),
+                    Lang.tr("launch.repair.failed.title", profile.name()),
+                    msg.toString());
         });
-        var thread = new Thread(repairTask, "instance-repair");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("instance-repair", repairTask);
     }
 
     /**
@@ -2384,8 +2357,6 @@ public class MainView {
             ModdedProfile profile,
             ModdedProfileVerificationService.VerificationReport report) {
         refreshLaunchButtons();
-        statusLabel.setText(
-                Lang.tr("launch.notlaunchable", report.errors().get(0)));
 
         StringBuilder msg = new StringBuilder(
                 Lang.tr("launch.cannot"));
@@ -2398,7 +2369,9 @@ public class MainView {
                 msg.append(" - ").append(warning).append('\n');
             }
         }
-        ErrorDialog.show((Stage) root.getScene().getWindow(),
+        UiErrors.fail(statusLabel,
+                (Stage) root.getScene().getWindow(),
+                Lang.tr("launch.notlaunchable", report.errors().get(0)),
                 Lang.tr("launch.verify.failed.title", profile.name()),
                 msg.toString());
     }
@@ -2446,27 +2419,22 @@ public class MainView {
             } else {
                 refreshLaunchButtons();
                 String msg = Lang.tr("launch.launch.failed", result.message());
-                statusLabel.setText(msg);
                 Stage launcherStage = (Stage) root.getScene().getWindow();
-                ErrorDialog.show(launcherStage,
+                UiErrors.fail(statusLabel, launcherStage, msg,
                         Lang.tr("launch.launch.failed.title"),
                         result.status() + ": " + result.message());
             }
         });
         launchTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            String msg = Lang.tr("launch.launch.error",
-                    launchTask.getException().getMessage());
-            statusLabel.setText(msg);
             Stage launcherStage = (Stage) root.getScene().getWindow();
-            ErrorDialog.show(launcherStage,
+            UiErrors.fail(statusLabel, launcherStage,
+                    Lang.tr("launch.launch.error",
+                            launchTask.getException().getMessage()),
                     Lang.tr("launch.launch.error.title"),
-                    launchTask.getException().getClass().getSimpleName() + ": "
-                            + launchTask.getException().getMessage());
+                    launchTask.getException());
         });
-        var thread = new Thread(launchTask, "profile-launch");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("profile-launch", launchTask);
     }
 
     // ------------------------------------------------------------------
@@ -2505,46 +2473,31 @@ public class MainView {
         });
         installTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            String msg = Lang.tr("launch.java.failed",
-                    installTask.getException().getMessage());
-            statusLabel.setText(msg);
             Stage launcherStage = (Stage) root.getScene().getWindow();
-            ErrorDialog.show(launcherStage, Lang.tr("launch.java.failed.title"),
+            UiErrors.fail(statusLabel, launcherStage,
+                    Lang.tr("launch.java.failed",
+                            installTask.getException().getMessage()),
+                    Lang.tr("launch.java.failed.title"),
                     installTask.getException().getClass().getSimpleName() + ": "
                             + installTask.getException().getMessage()
                             + Lang.tr("launch.java.manual"));
         });
-        var thread = new Thread(installTask, "java-install");
-        thread.setDaemon(true);
-        thread.start();
+        FxTasks.run("java-install", installTask);
     }
 
     private GameProfile getOrCreateProfile() {
-        if (selectedProfile != null) {
-            return selectedProfile;
-        }
         try {
-            var profiles = profileService.loadProfiles();
-            if (!profiles.isEmpty()) {
-                selectedProfile = profiles.get(0);
-                return selectedProfile;
-            }
+            selectedProfile = accountManager.getOrCreateDefault(selectedProfile);
         } catch (IOException e) {
-            // Проваливаемся к созданию умолчания
+            // Проваливаемся к профилю в памяти
+            selectedProfile = GameProfile.offline("Player");
         }
-        GameProfile defaultProfile = GameProfile.offline("Player");
-        try {
-            profileService.addOfflineProfile("Player");
-        } catch (IOException e) {
-            // Некритично — продолжаем с профилем в памяти
-        }
-        selectedProfile = defaultProfile;
-        return defaultProfile;
+        return selectedProfile;
     }
 
     private void monitorProcess(MinecraftProcess process, String versionId,
                                  Stage launcherStage) {
-        Thread monitor = new Thread(() -> {
+        FxTasks.run("mc-monitor", () -> {
             try {
                 int exitCode = process.waitFor();
                 Platform.runLater(() -> {
@@ -2576,9 +2529,7 @@ public class MainView {
                     refreshLaunchButtons();
                 });
             }
-        }, "mc-monitor");
-        monitor.setDaemon(true);
-        monitor.start();
+        });
     }
 
     // ------------------------------------------------------------------

@@ -34,12 +34,4 @@ public enum BuildFileCategory {
     public String folder() {
         return folder;
     }
-
-    /**
-     * @return true, если файлы этой категории копируются в живые папки
-     * инстанса при применении сборки.
-     */
-    public boolean isAppliedToInstance() {
-        return this == MODS || this == CONFIGS;
-    }
 }

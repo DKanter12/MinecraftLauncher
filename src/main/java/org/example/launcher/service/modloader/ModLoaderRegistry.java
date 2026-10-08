@@ -46,11 +46,6 @@ public final class ModLoaderRegistry {
         return Optional.ofNullable(entries.get(type));
     }
 
-    /** Все зарегистрированные типы загрузчиков. */
-    public List<ModLoaderType> registeredTypes() {
-        return new ArrayList<>(entries.keySet());
-    }
-
     /** Все зарегистрированные привязки. */
     public List<Entry> all() {
         return new ArrayList<>(entries.values());

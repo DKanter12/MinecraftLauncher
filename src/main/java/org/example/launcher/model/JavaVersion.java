@@ -1,7 +1,5 @@
 package org.example.launcher.model;
 
-import java.util.Optional;
-
 /**
  * Требования к среде Java для версии Minecraft.
  */
@@ -21,10 +19,6 @@ public final class JavaVersion {
      */
     public String component() {
         return component;
-    }
-
-    public Optional<String> componentOpt() {
-        return Optional.ofNullable(component);
     }
 
     /**

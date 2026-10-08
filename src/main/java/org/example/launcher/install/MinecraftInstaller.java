@@ -19,6 +19,8 @@ import org.example.launcher.service.AssetIndexService;
 import org.example.launcher.service.MojangAssetIndexService;
 import org.example.launcher.util.LibraryPaths;
 import org.example.launcher.util.OsDetector;
+import org.example.launcher.domain.port.RetryPolicy;
+import org.example.launcher.infrastructure.download.FixedRetryPolicy;
 
 /**
  * Реализация {@link InstallationService} для Minecraft.
@@ -57,22 +59,31 @@ public class MinecraftInstaller implements InstallationService {
     private final FileDownloader fileDownloader;
     private final ChecksumVerifier checksumVerifier;
     private final AssetIndexService assetIndexService;
-    private final int maxRetries;
+    private final RetryPolicy retryPolicy;
 
     public MinecraftInstaller(FileDownloader fileDownloader,
                               ChecksumVerifier checksumVerifier,
                               AssetIndexService assetIndexService) {
-        this(fileDownloader, checksumVerifier, assetIndexService, 3);
+        this(fileDownloader, checksumVerifier, assetIndexService,
+                new FixedRetryPolicy());
     }
 
     public MinecraftInstaller(FileDownloader fileDownloader,
                               ChecksumVerifier checksumVerifier,
                               AssetIndexService assetIndexService,
                               int maxRetries) {
+        this(fileDownloader, checksumVerifier, assetIndexService,
+                new FixedRetryPolicy(maxRetries));
+    }
+
+    public MinecraftInstaller(FileDownloader fileDownloader,
+                              ChecksumVerifier checksumVerifier,
+                              AssetIndexService assetIndexService,
+                              RetryPolicy retryPolicy) {
         this.fileDownloader = Objects.requireNonNull(fileDownloader, "fileDownloader");
         this.checksumVerifier = Objects.requireNonNull(checksumVerifier, "checksumVerifier");
         this.assetIndexService = Objects.requireNonNull(assetIndexService, "assetIndexService");
-        this.maxRetries = Math.max(1, maxRetries);
+        this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy");
     }
 
     // ------------------------------------------------------------------
@@ -129,7 +140,8 @@ public class MinecraftInstaller implements InstallationService {
      *   <li>Если файл есть, но хэш не совпал → удалить повреждённый файл.</li>
      *   <li>Загрузить файл.</li>
      *   <li>Проверить SHA-1 загруженного файла.</li>
-     *   <li>При несовпадении хэша → удалить и повторить (до {@link #maxRetries}).</li>
+     *   <li>При несовпадении хэша → удалить и повторить
+     *       (число попыток задаёт {@link RetryPolicy}).</li>
      *   <li>Если все попытки исчерпаны → ОШИБКА.</li>
      * </ol>
      */
@@ -148,18 +160,19 @@ public class MinecraftInstaller implements InstallationService {
             }
         }
 
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        int maxAttempts = retryPolicy.maxAttempts();
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 long bytes = fileDownloader.download(task.url(), localPath);
 
                 if (expectedSha1.isPresent()) {
                     if (!checksumVerifier.verify(localPath, expectedSha1.get())) {
                         deleteFile(localPath);
-                        if (attempt < maxRetries) {
+                        if (attempt < maxAttempts) {
                             continue;
                         }
                         return DownloadResult.failed(task,
-                                "SHA-1 mismatch after " + maxRetries
+                                "SHA-1 mismatch after " + maxAttempts
                                         + " attempts: expected " + expectedSha1.get()
                                         + " for " + task.name(),
                                 attempt);
@@ -170,14 +183,14 @@ public class MinecraftInstaller implements InstallationService {
 
             } catch (IOException e) {
                 deleteFile(localPath);
-                if (attempt < maxRetries) {
+                if (attempt < maxAttempts) {
                     continue;
                 }
                 return DownloadResult.failed(task, e.getMessage(), attempt);
             }
         }
 
-        return DownloadResult.failed(task, "Exhausted all retries", maxRetries);
+        return DownloadResult.failed(task, "Exhausted all retries", maxAttempts);
     }
 
     // ------------------------------------------------------------------

@@ -89,17 +89,19 @@ public class BuildCreator {
 
     /**
      * Создаёт директорию под сборку и регистрирует её
-     * (имя каталога выводится из имени + делается уникальным внутри сервиса).
+     * (имя каталога выводится из названия сборки + делается уникальным
+     * внутри группы версии; см. {@link Build}).
      */
     public ModdedProfile createBuildDirectory(BuildRequest request, String versionId)
             throws IOException {
+        Build build = request.build();
         return profileService.createProfile(
-                request.type(),
-                request.isVanilla() ? "" : request.loader().loaderVersion(),
-                request.mcVersion().id(),
+                build.core(),
+                build.isVanilla() ? "" : build.coreVersion(),
+                build.minecraftVersion(),
                 versionId,
                 request.extraJvmArgs(),
-                request.effectiveName(),
+                build.effectiveName(),
                 0);
     }
 

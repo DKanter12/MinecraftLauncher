@@ -8,35 +8,53 @@ import org.example.launcher.model.ModLoaderVersion;
 import org.example.launcher.service.modloader.ModLoaderType;
 
 /**
- * Данные интерфейса для создания сборки.
- * Формируется из {@code NewInstanceDialog.Result} сразу после
- * нажатия кнопки создания, дальше UI в создании не участвует.
+ * Конверт для выполнения создания сборки: сама {@link Build} (кто она)
+ * плюс всё нужное для скачивания (откуда брать файлы).
+ * Несогласованные данные отбрасываются сразу в конструкторе,
+ * а не в глубине пайплайна.
  *
- * @param type         ванилла или семейство загрузчика
- * @param mcVersion    целевая версия Minecraft
- * @param loader       выбранная версия загрузчика ({@code null} для ваниллы)
+ * @param build        сборка: название, версия цифрами, ядро, версия ядра
+ * @param mcVersion    запись манифеста (несёт {@code metadataUrl} для скачивания)
+ * @param loader       объект версии загрузчика для установщика
+ *                     ({@code null} для ваниллы)
  * @param extraJvmArgs доп. JVM-арги
- * @param buildName    имя сборки (может быть пустым — подставится авто)
  */
 public record BuildRequest(
-        ModLoaderType type,
+        Build build,
         MinecraftVersion mcVersion,
         ModLoaderVersion loader,
-        List<String> extraJvmArgs,
-        String buildName) {
+        List<String> extraJvmArgs) {
 
     public BuildRequest {
-        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(build, "build");
         Objects.requireNonNull(mcVersion, "mcVersion");
         extraJvmArgs = extraJvmArgs == null ? List.of() : List.copyOf(extraJvmArgs);
-        buildName = buildName == null ? "" : buildName;
-        if (type != ModLoaderType.VANILLA && loader == null) {
-            throw new IllegalArgumentException("Modded build requires loader version");
+        if (!mcVersion.id().equals(build.minecraftVersion())) {
+            throw new IllegalArgumentException("Manifest entry " + mcVersion.id()
+                    + " does not match build MC " + build.minecraftVersion());
+        }
+        if (build.isVanilla()) {
+            if (loader != null) {
+                throw new IllegalArgumentException("Vanilla build must not carry a loader");
+            }
+        } else {
+            Objects.requireNonNull(loader, "loader");
+            if (loader.loaderType() != build.core()
+                    || !loader.loaderVersion().equals(build.coreVersion())
+                    || !loader.minecraftVersion().equals(build.minecraftVersion())) {
+                throw new IllegalArgumentException("Loader does not match build core");
+            }
         }
     }
 
+    /** Ядро сборки (делегат к {@link Build#core()}). */
+    public ModLoaderType type() {
+        return build.core();
+    }
+
+    /** Ванильная ли сборка. */
     public boolean isVanilla() {
-        return type == ModLoaderType.VANILLA;
+        return build.isVanilla();
     }
 
     /** Id версии, которая должна лежать в {@code versions/}. */
@@ -44,8 +62,8 @@ public record BuildRequest(
         return isVanilla() ? mcVersion.id() : loader.installedVersionId();
     }
 
-    /** Имя для отображения (пустое означает авто «Loader MC»). */
+    /** Обрезанное название сборки (пустое означает авто-имя). */
     public String effectiveName() {
-        return buildName == null ? "" : buildName.trim();
+        return build.effectiveName();
     }
 }

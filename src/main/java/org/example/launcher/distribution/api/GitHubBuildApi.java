@@ -140,8 +140,7 @@ public class GitHubBuildApi implements LauncherServerApi {
 
     private Map<String, String> headers(ServerSession session) {
         Map<String, String> headers = new HashMap<>();
-        if (session != null && session.token() != null
-                && !session.token().isBlank()
+        if (session != null && !session.isAnonymous()
                 && baseUrl.startsWith("http")) {
             headers.put("Authorization", "Bearer " + session.token());
         }

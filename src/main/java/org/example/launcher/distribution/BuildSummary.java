@@ -53,11 +53,6 @@ public record BuildSummary(
                 + " " + minecraftVersion;
     }
 
-    /** @return true, если эта запись описывает ту же сборку (тот же id), что и {@code other}. */
-    public boolean sameBuild(BuildSummary other) {
-        return other != null && id.equals(other.id());
-    }
-
     /** @return отображаемая форма для диалогов. */
     @Override
     public String toString() {

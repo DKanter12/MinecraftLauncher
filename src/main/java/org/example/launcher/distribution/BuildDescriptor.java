@@ -40,11 +40,6 @@ public record BuildDescriptor(
         return summary.version();
     }
 
-    /** @return true, если этот манифест описывает тот же id сборки, что и {@code other}. */
-    public boolean sameBuild(BuildDescriptor other) {
-        return other != null && id().equals(other.id());
-    }
-
     /** @return отображаемая форма для диалогов. */
     @Override
     public String toString() {

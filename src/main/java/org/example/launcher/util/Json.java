@@ -40,15 +40,4 @@ public final class Json {
         String value = getStringOrNull(obj, key);
         return value != null ? value : fallback;
     }
-
-    /**
-     * @throws IllegalArgumentException если ключ отсутствует или пуст.
-     */
-    public static String getRequiredString(JsonObject obj, String key) {
-        String value = getStringOrNull(obj, key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing required JSON string: " + key);
-        }
-        return value;
-    }
 }

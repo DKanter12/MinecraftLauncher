@@ -188,11 +188,6 @@ public class UpdateService {
         }
     }
 
-    /** Отбрасывает подготовленное обновление. */
-    public void clearStaged() throws IOException {
-        deleteTree(storageRoot.resolve(UPDATES_DIR));
-    }
-
     /**
      * Отбрасывает все подготовленные обновления, кроме указанного каталога
      * подготовки (плюс сам скрипт обновляльщика).

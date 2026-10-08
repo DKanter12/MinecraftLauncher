@@ -7,25 +7,19 @@ package org.example.launcher.util;
 public final class OsDetector {
 
     public enum Os {
-        WINDOWS("windows", "win"),
-        LINUX("linux", "linux"),
-        OSX("osx", "mac"),
-        UNKNOWN("unknown", "unknown");
+        WINDOWS("windows"),
+        LINUX("linux"),
+        OSX("osx"),
+        UNKNOWN("unknown");
 
         private final String mojangName;
-        private final String shortName;
 
-        Os(String mojangName, String shortName) {
+        Os(String mojangName) {
             this.mojangName = mojangName;
-            this.shortName = shortName;
         }
 
         public String mojangName() {
             return mojangName;
-        }
-
-        public String shortName() {
-            return shortName;
         }
     }
 
