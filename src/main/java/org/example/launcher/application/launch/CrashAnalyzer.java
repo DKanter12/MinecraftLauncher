@@ -33,6 +33,14 @@ public final class CrashAnalyzer {
      * @param stderr   вывод stderr (может быть пустым)
      */
     public static CrashReport analyze(int exitCode, String stdout, String stderr) {
+        return analyze(exitCode, stdout, stderr, "");
+    }
+
+    /**
+     * Разбирает падение с путём полного лога для кнопки «Открыть лог».
+     */
+    public static CrashReport analyze(int exitCode, String stdout,
+                                      String stderr, String fullLog) {
         String err = stderr == null ? "" : stderr;
         String out = stdout == null ? "" : stdout;
         String log = err.isBlank() ? out : err;
@@ -41,12 +49,12 @@ public final class CrashAnalyzer {
         if (containsAny(lower, WRONG_JAVA_FRAGMENTS)) {
             return report(CrashCategory.WRONG_JAVA, exitCode, log,
                     Lang.tr("launch.crash.reason.java", excerpt(log)),
-                    Lang.tr("launch.crash.suggest.java"));
+                    Lang.tr("launch.crash.suggest.java"), fullLog);
         }
         if (containsAny(lower, OUT_OF_MEMORY_FRAGMENTS)) {
             return report(CrashCategory.OUT_OF_MEMORY, exitCode, log,
                     Lang.tr("launch.crash.reason.memory"),
-                    Lang.tr("launch.crash.suggest.memory"));
+                    Lang.tr("launch.crash.suggest.memory"), fullLog);
         }
         Optional<LoaderMismatchDetector.MismatchEvidence> mismatch =
                 LoaderMismatchDetector.detect(log);
@@ -54,10 +62,10 @@ public final class CrashAnalyzer {
             return report(CrashCategory.WRONG_LOADER, exitCode, log,
                     Lang.tr("launch.crash.reason.loader",
                             mismatch.get().fragment()),
-                    Lang.tr("launch.crash.suggest.loader"));
+                    Lang.tr("launch.crash.suggest.loader"), fullLog);
         }
         return report(CrashCategory.UNKNOWN, exitCode, log,
-                Lang.tr("launch.crash.reason.unknown"), null);
+                Lang.tr("launch.crash.reason.unknown"), null, fullLog);
     }
 
     /**
@@ -71,8 +79,15 @@ public final class CrashAnalyzer {
 
     private static CrashReport report(CrashCategory category, int exitCode,
                                       String log, String reason, String suggestion) {
+        return report(category, exitCode, log, reason, suggestion, "");
+    }
+
+    private static CrashReport report(CrashCategory category, int exitCode,
+                                      String log, String reason,
+                                      String suggestion, String fullLog) {
         return new CrashReport(category, exitCode, reason,
-                Optional.ofNullable(suggestion), tail(log, LOG_TAIL_LINES));
+                Optional.ofNullable(suggestion), tail(log, LOG_TAIL_LINES),
+                fullLog == null ? "" : fullLog);
     }
 
     private static boolean containsAny(String text, List<String> fragments) {

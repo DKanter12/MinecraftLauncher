@@ -29,8 +29,7 @@ import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.application.launch.LaunchCommandBuilder;
-import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
 import org.example.launcher.version.StandardVersionType;
@@ -193,9 +192,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
-                new LaunchCommandBuilder(), javaService,
-                new Sha1ChecksumVerifier());
+        FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
         ModLoaderRegistry registry = new ModLoaderRegistry();
         return new ModdedProfileVerificationService(moddedVersionService,
                 versionService, metadataService, registry, launcher,
@@ -344,9 +341,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
-                new LaunchCommandBuilder(), ALWAYS_JAVA,
-                new Sha1ChecksumVerifier());
+        FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
         ModLoaderInstaller fakeInstaller = (vanillaVersion, vanillaMetadata,
@@ -393,9 +388,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
-                new LaunchCommandBuilder(), ALWAYS_JAVA,
-                new Sha1ChecksumVerifier());
+        FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installerCalls = new AtomicInteger();
         ModLoaderInstaller neverInstaller = (vanillaVersion, vanillaMetadata,
@@ -434,9 +427,7 @@ class ModdedProfileVerificationServiceTest {
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 versionService, metadataService,
                 new ModLoaderMetadataMerger(metadataService));
-        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
-                new LaunchCommandBuilder(), ALWAYS_JAVA,
-                new Sha1ChecksumVerifier());
+        FileIntegrityChecker launcher = new FileIntegrityChecker(new Sha1ChecksumVerifier());
 
         AtomicInteger installCalls = new AtomicInteger();
         ModLoaderInstaller fakeInstaller = (vanillaVersion, vanillaMetadata,

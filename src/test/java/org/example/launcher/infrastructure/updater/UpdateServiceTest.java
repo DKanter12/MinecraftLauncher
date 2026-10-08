@@ -90,7 +90,8 @@ class UpdateServiceTest {
         entries.put("lib/app.jar", "jar-bytes");
         entries.put("version.txt", "old");
         Path zip = writeZip(entries);
-        writeManifest("9.9.9", zip.toUri().toString(), sha256(zip));
+        writeManifest("9.9.9", zip.toUri().toString(), sha256(zip),
+                Files.size(zip));
         LauncherUpdate update = service.check().update();
 
         Path downloaded = service.download(update, null);
@@ -100,7 +101,7 @@ class UpdateServiceTest {
                 Files.readString(stageDir.resolve("lib/app.jar")));
         assertFalse(Files.exists(downloaded),
                 "package temp file is cleaned after staging");
-        Optional<UpdateService.PendingUpdate> staged = service.stagedUpdate();
+        Optional<LauncherUpdateManager.PendingUpdate> staged = service.stagedUpdate();
         assertTrue(staged.isPresent());
         assertEquals("9.9.9", staged.get().version());
         assertEquals(stageDir, staged.get().stageDir());
@@ -111,7 +112,8 @@ class UpdateServiceTest {
         Map<String, String> entries = new LinkedHashMap<>();
         entries.put("lib/app.jar", "jar-bytes");
         Path zip = writeZip(entries);
-        writeManifest("9.9.9", zip.toUri().toString(), "0".repeat(64));
+        writeManifest("9.9.9", zip.toUri().toString(), "0".repeat(64),
+                Files.size(zip));
         LauncherUpdate update = service.check().update();
 
         assertThrows(IOException.class, () -> service.download(update, null));
@@ -122,7 +124,8 @@ class UpdateServiceTest {
         Map<String, String> entries = new LinkedHashMap<>();
         entries.put("../evil.txt", "evil");
         Path zip = writeZip(entries);
-        writeManifest("9.9.9", zip.toUri().toString(), sha256(zip));
+        writeManifest("9.9.9", zip.toUri().toString(), sha256(zip),
+                Files.size(zip));
         LauncherUpdate update = service.check().update();
         Path downloaded = service.download(update, null);
 
@@ -149,10 +152,15 @@ class UpdateServiceTest {
 
     private void writeManifest(String version, String packageUrl, String sha)
             throws IOException {
+        writeManifest(version, packageUrl, sha, 1);
+    }
+
+    private void writeManifest(String version, String packageUrl, String sha,
+                               long size) throws IOException {
         String json = "{\"version\": \"" + version + "\","
                 + "\"notes\": \"notes\","
                 + "\"package\": {\"url\": \"" + packageUrl + "\","
-                + "\"sha256\": \"" + sha + "\", \"size\": 1}}";
+                + "\"sha256\": \"" + sha + "\", \"size\": " + size + "}}";
         Files.writeString(manifestFile, json);
     }
 

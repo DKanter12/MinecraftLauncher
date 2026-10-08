@@ -14,8 +14,8 @@ import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService.VerificationReport;
 
-@DisplayName("LaunchManager decisions")
-class LaunchManagerTest {
+@DisplayName("BuildLaunchManager decisions")
+class BuildLaunchManagerTest {
 
     private static VersionMetadata meta(int javaMajor) {
         return new VersionMetadata("1.21.4", "release",
@@ -37,7 +37,7 @@ class LaunchManagerTest {
                 List.of("No suitable Java runtime (need 8)"), meta(8));
 
         assertEquals(LaunchDecision.INSTALL_JAVA8,
-                LaunchManager.decide(report, false, false));
+                BuildLaunchManager.decide(report, false, false));
     }
 
     @Test
@@ -47,7 +47,7 @@ class LaunchManagerTest {
                 List.of("No suitable Java runtime (need 8)"), meta(8));
 
         assertEquals(LaunchDecision.REPAIR,
-                LaunchManager.decide(report, false, true));
+                BuildLaunchManager.decide(report, false, true));
     }
 
     @Test
@@ -58,7 +58,7 @@ class LaunchManagerTest {
                 meta(8));
 
         assertEquals(LaunchDecision.REPAIR,
-                LaunchManager.decide(report, false, false));
+                BuildLaunchManager.decide(report, false, false));
     }
 
     @Test
@@ -68,7 +68,7 @@ class LaunchManagerTest {
                 List.of("No suitable Java runtime (need 17)"), meta(17));
 
         assertEquals(LaunchDecision.REPAIR,
-                LaunchManager.decide(report, false, false));
+                BuildLaunchManager.decide(report, false, false));
     }
 
     @Test
@@ -77,7 +77,7 @@ class LaunchManagerTest {
         var report = report(false, List.of("version json missing"), null);
 
         assertEquals(LaunchDecision.FAIL,
-                LaunchManager.decide(report, false, false));
+                BuildLaunchManager.decide(report, false, false));
     }
 
     @Test
@@ -87,15 +87,15 @@ class LaunchManagerTest {
                 meta(17));
 
         assertEquals(LaunchDecision.FAIL,
-                LaunchManager.decide(report, true, false));
+                BuildLaunchManager.decide(report, true, false));
     }
 
     @Test
     @DisplayName("needsJava8 matches legacy rule")
     void java8Rule() {
-        assertTrue(LaunchManager.needsJava8(meta(8)));
-        assertFalse(LaunchManager.needsJava8(meta(17)));
-        assertTrue(LaunchManager.needsJava8(new VersionMetadata("old", "release",
+        assertTrue(BuildLaunchManager.needsJava8(meta(8)));
+        assertFalse(BuildLaunchManager.needsJava8(meta(17)));
+        assertTrue(BuildLaunchManager.needsJava8(new VersionMetadata("old", "release",
                 "Main", null, null, null, null,
                 List.of(), List.of(), List.of(), null)));
     }

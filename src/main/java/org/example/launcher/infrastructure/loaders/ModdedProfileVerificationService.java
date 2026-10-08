@@ -21,7 +21,7 @@ import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
 import org.example.launcher.version.ModdedVersionType;
@@ -80,7 +80,7 @@ public class ModdedProfileVerificationService {
     private final MojangVersionService versionService;
     private final MojangVersionMetadataService metadataService;
     private final ModLoaderRegistry registry;
-    private final LaunchBuildUseCase launcher;
+    private final FileIntegrityChecker integrityChecker;
     private final JavaResolutionService javaResolutionService;
     private final InstallationService installationService;
 
@@ -88,14 +88,14 @@ public class ModdedProfileVerificationService {
                                             MojangVersionService versionService,
                                             MojangVersionMetadataService metadataService,
                                             ModLoaderRegistry registry,
-                                            LaunchBuildUseCase launcher,
+                                            FileIntegrityChecker integrityChecker,
                                             JavaResolutionService javaResolutionService,
                                             InstallationService installationService) {
         this.moddedVersionService = moddedVersionService;
         this.versionService = versionService;
         this.metadataService = metadataService;
         this.registry = registry;
-        this.launcher = launcher;
+        this.integrityChecker = integrityChecker;
         this.javaResolutionService = javaResolutionService;
         this.installationService = installationService;
     }
@@ -175,7 +175,7 @@ public class ModdedProfileVerificationService {
         // asset-индекс — с проверкой SHA-1, где известен). Отсутствующий файл
         // означает неполную установку; починка докачивает
         // только недостающее.
-        List<String> fileProblems = launcher.verifyFiles(metadata, storage);
+        List<String> fileProblems = integrityChecker.verifyFiles(metadata, storage);
         for (String problem : fileProblems) {
             errors.add("Missing or corrupt dependency: " + problem);
         }
@@ -283,7 +283,7 @@ public class ModdedProfileVerificationService {
 
         // 4. Зависимости на месте и целы (клиентский JAR, библиотеки,
         //    asset-индекс — с проверкой SHA-1, где известен)
-        List<String> fileProblems = launcher.verifyFiles(merged, storage);
+        List<String> fileProblems = integrityChecker.verifyFiles(merged, storage);
         for (String problem : fileProblems) {
             errors.add("Missing or corrupt dependency: " + problem);
         }

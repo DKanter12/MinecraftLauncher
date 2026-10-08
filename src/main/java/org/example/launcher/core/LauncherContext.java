@@ -8,7 +8,7 @@ import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
-import org.example.launcher.application.launch.LaunchManager;
+import org.example.launcher.application.launch.BuildLaunchManager;
 import org.example.launcher.infrastructure.mojang.VersionService;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.infrastructure.skins.SkinService;
@@ -31,7 +31,7 @@ public final class LauncherContext {
     private final FileSystemBuildRepository buildRepository;
     private final CreateBuildUseCase createBuildUseCase;
     private final AccountManager accountManager;
-    private final LaunchManager launchManager;
+    private final BuildLaunchManager buildLaunchManager;
 
     @SuppressWarnings("checkstyle:ParameterNumber")
     public LauncherContext(
@@ -46,7 +46,7 @@ public final class LauncherContext {
             FileSystemBuildRepository buildRepository,
             CreateBuildUseCase createBuildUseCase,
             AccountManager accountManager,
-            LaunchManager launchManager) {
+            BuildLaunchManager buildLaunchManager) {
         this.versionService = versionService;
         this.javaResolutionService = javaResolutionService;
         this.javaManager = javaManager;
@@ -58,7 +58,7 @@ public final class LauncherContext {
         this.buildRepository = buildRepository;
         this.createBuildUseCase = createBuildUseCase;
         this.accountManager = accountManager;
-        this.launchManager = launchManager;
+        this.buildLaunchManager = buildLaunchManager;
     }
 
     public VersionService versionService() {
@@ -105,7 +105,7 @@ public final class LauncherContext {
         return accountManager;
     }
 
-    public LaunchManager launchManager() {
-        return launchManager;
+    public BuildLaunchManager buildLaunchManager() {
+        return buildLaunchManager;
     }
 }

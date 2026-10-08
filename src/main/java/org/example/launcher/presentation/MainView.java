@@ -57,14 +57,10 @@ import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.domain.model.GameProfile;
-import org.example.launcher.domain.model.JavaRuntime;
-import org.example.launcher.domain.model.LaunchResult;
-import org.example.launcher.domain.model.MinecraftProcess;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.model.VersionManifest;
-import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.http.UrlFetcher;
 import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
@@ -82,10 +78,11 @@ import org.example.launcher.application.build.BuildRequest;
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.ModScanner;
 import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.launch.BuildLaunchListener;
+import org.example.launcher.application.launch.BuildLaunchManager;
 import org.example.launcher.application.launch.CrashReport;
-import org.example.launcher.application.launch.LaunchManager;
+import org.example.launcher.application.launch.LaunchStage;
 import org.example.launcher.core.LauncherContext;
-import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.infrastructure.updater.AppVersion;
 import org.example.launcher.infrastructure.updater.LauncherUpdate;
@@ -135,7 +132,7 @@ public class MainView {
     private final FileSystemBuildRepository buildRepository;
     private final CreateBuildUseCase createBuildUseCase;
     private final AccountManager accountManager;
-    private final LaunchManager launchManager;
+    private final BuildLaunchManager buildLaunchManager;
 
     private BorderPane root;
     private Label statusLabel;
@@ -197,7 +194,6 @@ public class MainView {
     private Button serverButton;
 
     // Состояние запуска инстанса
-    private boolean javaDownloadAttempted = false;
 
     // Аккаунт
     private ComboBox<GameProfile> accountCombo;
@@ -222,7 +218,7 @@ public class MainView {
         this.buildRepository = context.buildRepository();
         this.createBuildUseCase = context.createBuildUseCase();
         this.accountManager = context.accountManager();
-        this.launchManager = context.launchManager();
+        this.buildLaunchManager = context.buildLaunchManager();
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -1424,7 +1420,7 @@ public class MainView {
                         || result.status() == UpdateService.Status.STAGED) {
                     UpdateService service = updateService();
                     if (service != null) {
-                        UpdateDialog.show(
+                        LauncherUpdateWindow.show(
                                 (Stage) root.getScene().getWindow(), service,
                                 result);
                     }
@@ -1572,7 +1568,7 @@ public class MainView {
                             statusLabel.setText(result.detail());
                             UpdateService service = updateService();
                             if (service != null) {
-                                UpdateDialog.show((Stage) root.getScene()
+                                LauncherUpdateWindow.show((Stage) root.getScene()
                                         .getWindow(), service, result);
                             }
                         }
@@ -2141,12 +2137,12 @@ public class MainView {
         });
     }
 
-    // --- Запуск инстанса (проверка → починка при нужде → запуск) ---
+    // --- Запуск сборки одним вызовом: BuildLaunchManager владеет
+    // проверкой, починкой, Java, командой, процессом и разбором выхода.
+    // Здесь только поток, статусы и диалоги.
 
     /**
-     * Общая точка запуска для всех кнопок «Играть» на карточках:
-     * определение аккаунта, обновление Ely.by и далее цепочка
-     * проверка → починка-при-необходимости → запуск.
+     * Общая точка запуска для всех кнопок «Играть» на карточках.
      */
     private void startInstanceLaunch(ModdedProfile profile) {
         // Только одна игра за раз на окно лаунчера — повторная
@@ -2162,263 +2158,100 @@ public class MainView {
         // Попытка запуска сразу блокирует все кнопки «Играть»
         // (до обновления по терминальному колбэку)
         versionPlayInFlight = true;
-        javaDownloadAttempted = false;
         setLaunchStatus(profile.id(), Lang.tr("launch.verifying"));
         statusLabel.setText(Lang.tr("launch.verify.status", profile.name()));
-
         if (account.isElyBy()) {
             statusLabel.setText(Lang.tr("ely.refreshing"));
-            Task<GameProfile> refreshTask = new Task<>() {
-                @Override
-                protected GameProfile call() throws Exception {
-                    return launchManager.resolveAccount(account);
-                }
-            };
-            refreshTask.setOnSucceeded(e ->
-                    verifyProfileAndLaunch(profile, refreshTask.getValue(), storage));
-            refreshTask.setOnFailed(e ->
-                    verifyProfileAndLaunch(profile, account, storage));
-            FxTasks.run("ely-refresh", refreshTask);
-        } else {
-            verifyProfileAndLaunch(profile, account, storage);
         }
-    }
-
-    /**
-     * Проверяет установку профиля; при проблемах пытается автоматически
-     * починить (докачивая только отсутствующие или битые файлы)
-     * и перепроверяет перед запуском. Непочиняемые проблемы
-     * показываются с причинами.
-     */
-    private void verifyProfileAndLaunch(ModdedProfile profile,
-                                        GameProfile account,
-                                        GameDirectory storage) {
-        Task<ModdedProfileVerificationService.VerificationReport> verifyTask = new Task<>() {
-            @Override
-            protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
-                return launchManager.verify(profile, storage);
-            }
-        };
-        verifyTask.setOnSucceeded(e -> {
-            ModdedProfileVerificationService.VerificationReport report =
-                    verifyTask.getValue();
-            if (report.ok()) {
-                doLaunchProfile(profile, account, report.metadata().orElseThrow(),
-                        storage);
-            } else {
-                handleInstanceVerificationFailure(profile, account, storage,
-                        report, false);
-            }
-        });
-        verifyTask.setOnFailed(e -> {
-            refreshLaunchButtons();
-            UiErrors.fail(statusLabel,
-                    (Stage) root.getScene().getWindow(),
-                    Lang.tr("launch.verify.error",
-                            verifyTask.getException().getMessage()),
-                    Lang.tr("launch.verify.title"),
-                    verifyTask.getException());
-        });
-        FxTasks.run("instance-verify", verifyTask);
-    }
-
-    /**
-     * Направляет неуспешную проверку по нужному пути восстановления:
-     * автоматическое скачивание Java 8 для legacy-версий, которым не хватает
-     * только рантайма, однократная автопочинка (докачка отсутствующих или
-     * битых файлов) либо диагностический отчёт с причинами.
-     *
-     * @param repairAttempted выполнялась ли уже починка для этой
-     *                        попытки запуска (защита от циклов починки)
-     */
-    private void handleInstanceVerificationFailure(
-            ModdedProfile profile,
-            GameProfile account,
-            GameDirectory storage,
-            ModdedProfileVerificationService.VerificationReport report,
-            boolean repairAttempted) {
-        switch (launchManager.decide(report, repairAttempted,
-                javaDownloadAttempted)) {
-            case INSTALL_JAVA8 -> {
-                javaDownloadAttempted = true;
-                downloadAndInstallJava8ForInstance(profile, account, storage,
-                        report.metadata().orElseThrow());
-            }
-            // Автопочинка: переустановка ваниллы/загрузчика — целые файлы
-            // пропускаются, скачиваются только отсутствующие/битые — затем
-            // повторная проверка
-            case REPAIR -> repairProfileAndLaunch(profile, account, storage,
-                    report);
-            case FAIL -> showProfileVerificationErrors(profile, report);
-        }
-    }
-
-    private void repairProfileAndLaunch(ModdedProfile profile,
-                                        GameProfile account,
-                                        GameDirectory storage,
-                                        ModdedProfileVerificationService.VerificationReport original) {
-        statusLabel.setText(
-                Lang.tr("launch.repair.status", profile.name()));
-        setLaunchStatus(profile.id(), Lang.tr("launch.repairing"));
 
         Stage owner = (Stage) root.getScene().getWindow();
-        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
-        progressDialog.setTitle(Lang.tr("install.repair.title", profile.name()));
-        progressDialog.show();
+        InstallProgressDialog repairDialog = new InstallProgressDialog(owner);
+        repairDialog.setTitle(Lang.tr("install.repair.title", profile.name()));
 
-        Task<ModdedProfileVerificationService.VerificationReport> repairTask = new Task<>() {
+        Task<Void> launchTask = new Task<>() {
             @Override
-            protected ModdedProfileVerificationService.VerificationReport call() throws Exception {
-                return launchManager.repairAndReverify(profile, storage,
-                        progressDialog);
+            protected Void call() throws Exception {
+                buildLaunchManager.launch(profile, account, storage,
+                        repairDialog, new BuildLaunchListener() {
+                            @Override
+                            public void onStage(LaunchStage stage) {
+                                Platform.runLater(() -> onLaunchStage(
+                                        profile, repairDialog, stage));
+                            }
+
+                            @Override
+                            public void onFinished() {
+                                Platform.runLater(() -> {
+                                    refreshLaunchButtons();
+                                    statusLabel.setText(Lang.tr(
+                                            "launch.exited",
+                                            profile.versionId()));
+                                });
+                            }
+
+                            @Override
+                            public void onCrashed(CrashReport report) {
+                                Platform.runLater(() -> {
+                                    refreshLaunchButtons();
+                                    CrashWindow.show(owner, report);
+                                });
+                            }
+
+                            @Override
+                            public void onFailed(String error) {
+                                Platform.runLater(() -> {
+                                    refreshLaunchButtons();
+                                    UiErrors.fail(statusLabel, owner, error,
+                                            Lang.tr("launch.launch.failed.title"),
+                                            error);
+                                });
+                            }
+                        });
+                return null;
             }
         };
-        repairTask.setOnSucceeded(e -> {
-            ModdedProfileVerificationService.VerificationReport report =
-                    repairTask.getValue();
-            if (report.ok()) {
-                doLaunchProfile(profile, account, report.metadata().orElseThrow(),
-                        storage);
-            } else {
-                handleInstanceVerificationFailure(profile, account, storage,
-                        report, true);
-            }
-        });
-        repairTask.setOnFailed(e -> {
-            refreshLaunchButtons();
-            Throwable cause = repairTask.getException();
-            progressDialog.onComplete(new InstallationResult(0, 0, 0, 1, 0, List.of()));
-            StringBuilder msg = new StringBuilder();
-            msg.append(Lang.tr("launch.repair.failed.text",
-                    cause.getClass().getSimpleName(), cause.getMessage()));
-            for (String error : original.errors()) {
-                msg.append(" - ").append(error).append('\n');
-            }
-            UiErrors.fail(statusLabel, owner,
-                    Lang.tr("launch.repair.failed", cause.getMessage()),
-                    Lang.tr("launch.repair.failed.title", profile.name()),
-                    msg.toString());
-        });
-        FxTasks.run("instance-repair", repairTask);
-    }
-
-    /**
-     * Сообщает о проблемах проверки с причинами и вновь включает
-     * управление инстансом.
-     */
-    private void showProfileVerificationErrors(
-            ModdedProfile profile,
-            ModdedProfileVerificationService.VerificationReport report) {
-        refreshLaunchButtons();
-
-        UiErrors.fail(statusLabel,
-                (Stage) root.getScene().getWindow(),
-                Lang.tr("launch.notlaunchable", report.errors().get(0)),
-                Lang.tr("launch.verify.failed.title", profile.name()),
-                LaunchManager.verificationErrorText(report));
-    }
-
-    private void doLaunchProfile(ModdedProfile profile,
-                                 GameProfile account,
-                                 VersionMetadata metadata,
-                                 GameDirectory storage) {
-        statusLabel.setText(Lang.tr("launch.starting", profile.name()));
-        setLaunchStatus(profile.id(), Lang.tr("launch.launching"));
-
-        Task<LaunchResult> launchTask = new Task<>() {
-            @Override
-            protected LaunchResult call() throws Exception {
-                return launchManager.launch(profile, account, metadata,
-                        storage);
-            }
-        };
-        launchTask.setOnSucceeded(e -> {
-            LaunchResult result = launchTask.getValue();
-            if (result.isSuccess()) {
-                try {
-                    launchManager.markPlayed(profile.id());
-                } catch (IOException ignored) {
-                    // Некритично
-                }
-                statusLabel.setText(Lang.tr("launch.running",
-                        profile.versionId(), profile.name()));
-                Stage launcherStage = (Stage) root.getScene().getWindow();
-                launcherStage.hide();
-                monitorProcess(result.process().orElseThrow(),
-                        profile.versionId(), launcherStage);
-            } else if (result.status() == LaunchResult.Status.FILE_CHECK_FAILED) {
-                // Редкая гонка (файлы исчезли между проверкой и запуском)
-                ModdedProfileVerificationService.VerificationReport report =
-                        new ModdedProfileVerificationService.VerificationReport(
-                                false, List.of(result.message()), List.of(),
-                                Optional.of(metadata));
-                repairProfileAndLaunch(profile, account, storage, report);
-            } else {
-                refreshLaunchButtons();
-                String msg = Lang.tr("launch.launch.failed", result.message());
-                Stage launcherStage = (Stage) root.getScene().getWindow();
-                UiErrors.fail(statusLabel, launcherStage, msg,
-                        Lang.tr("launch.launch.failed.title"),
-                        result.status() + ": " + result.message());
-            }
-        });
         launchTask.setOnFailed(e -> {
             refreshLaunchButtons();
-            Stage launcherStage = (Stage) root.getScene().getWindow();
-            UiErrors.fail(statusLabel, launcherStage,
-                    Lang.tr("launch.launch.error",
-                            launchTask.getException().getMessage()),
-                    Lang.tr("launch.launch.error.title"),
-                    launchTask.getException());
+            Throwable cause = launchTask.getException();
+            UiErrors.fail(statusLabel, owner,
+                    Lang.tr("launch.launch.error", cause.getMessage()),
+                    Lang.tr("launch.launch.error.title"), cause);
         });
-        FxTasks.run("profile-launch", launchTask);
+        FxTasks.run("build-launch", launchTask);
     }
 
-    // ------------------------------------------------------------------
-    //  Автозагрузка Java 8 (legacy-инстансы)
-    // ------------------------------------------------------------------
-
-    /**
-     * Скачивает и устанавливает управляемую JRE 8 для legacy-инстанса,
-     * единственная проблема которого — отсутствующий рантайм, затем перепроверяет
-     * и запускает.
-     */
-    private void downloadAndInstallJava8ForInstance(ModdedProfile profile,
-                                                    GameProfile account,
-                                                    GameDirectory storage,
-                                                    VersionMetadata meta) {
-        statusLabel.setText(
-                Lang.tr("launch.java.needed", profile.name()));
-        setLaunchStatus(profile.id(), Lang.tr("launch.installing"));
-
-        Task<JavaRuntime> installTask = new Task<>() {
-            @Override
-            protected JavaRuntime call() throws Exception {
-                Path targetDir = storage.javaRuntimeDir("jre-legacy");
-                return javaManager.ensureInstalled(8, targetDir);
+    /** Строка статуса и диалог починки по стадии запуска. */
+    private void onLaunchStage(ModdedProfile profile,
+                               InstallProgressDialog repairDialog,
+                               LaunchStage stage) {
+        switch (stage) {
+            case CHECKING -> {
+                setLaunchStatus(profile.id(), Lang.tr("launch.verifying"));
+                statusLabel.setText(
+                        Lang.tr("launch.verify.status", profile.name()));
             }
-        };
-        installTask.setOnSucceeded(e -> {
-            JavaRuntime rt = installTask.getValue();
-            statusLabel.setText(
-                    Lang.tr("launch.java.installed", profile.name()));
-
-            javaManager.adoptManaged(rt);
-            verifyProfileAndLaunch(profile, account, storage);
-        });
-        installTask.setOnFailed(e -> {
-            refreshLaunchButtons();
-            Stage launcherStage = (Stage) root.getScene().getWindow();
-            UiErrors.fail(statusLabel, launcherStage,
-                    Lang.tr("launch.java.failed",
-                            installTask.getException().getMessage()),
-                    Lang.tr("launch.java.failed.title"),
-                    installTask.getException().getClass().getSimpleName() + ": "
-                            + installTask.getException().getMessage()
-                            + Lang.tr("launch.java.manual"));
-        });
-        FxTasks.run("java-install", installTask);
+            case REPAIRING -> {
+                setLaunchStatus(profile.id(), Lang.tr("launch.repairing"));
+                statusLabel.setText(
+                        Lang.tr("launch.repair.status", profile.name()));
+                repairDialog.show();
+            }
+            case INSTALLING_JAVA -> {
+                setLaunchStatus(profile.id(), Lang.tr("launch.installing"));
+                statusLabel.setText(
+                        Lang.tr("launch.java.needed", profile.name()));
+            }
+            case STARTING -> {
+                setLaunchStatus(profile.id(), Lang.tr("launch.launching"));
+                statusLabel.setText(
+                        Lang.tr("launch.starting", profile.name()));
+            }
+            case RUNNING ->
+                statusLabel.setText(Lang.tr("launch.running",
+                        profile.versionId(), profile.name()));
+        }
     }
+
 
     private GameProfile getOrCreateProfile() {
         try {
@@ -2428,44 +2261,6 @@ public class MainView {
             selectedProfile = GameProfile.offline("Player");
         }
         return selectedProfile;
-    }
-
-    private void monitorProcess(MinecraftProcess process, String versionId,
-                                 Stage launcherStage) {
-        FxTasks.run("mc-monitor", () -> {
-            try {
-                int exitCode = process.waitFor();
-                Platform.runLater(() -> {
-                    launcherStage.show();
-                    if (exitCode == 0) {
-                        statusLabel.setText(
-                                Lang.tr("launch.exited", versionId));
-                    } else {
-                        statusLabel.setText(Lang.tr("launch.crashed",
-                                versionId, exitCode));
-                        CrashReport report = launchManager.analyzeCrash(
-                                process, exitCode);
-                        if (!report.logTail().isBlank()) {
-                            String text = Lang.tr("launch.crash.code", exitCode)
-                                    + report.reason() + "\n\n"
-                                    + report.logTail();
-                            if (report.suggestion().isPresent()) {
-                                text += "\n\n" + report.suggestion().get();
-                            }
-                            ErrorDialog.show(launcherStage,
-                                    Lang.tr("launch.crash.title"), text);
-                        }
-                    }
-                    refreshLaunchButtons();
-                });
-            } catch (InterruptedException e) {
-                Platform.runLater(() -> {
-                    launcherStage.show();
-                    statusLabel.setText(Lang.tr("launch.monitor"));
-                    refreshLaunchButtons();
-                });
-            }
-        });
     }
 
     // ------------------------------------------------------------------

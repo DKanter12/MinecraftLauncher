@@ -7,6 +7,7 @@ import javafx.stage.Stage;
 
 import org.example.launcher.infrastructure.download.ChecksumVerifier;
 import org.example.launcher.infrastructure.download.FileDownloader;
+import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.HttpFileDownloader;
 import org.example.launcher.infrastructure.download.InstallationService;
@@ -20,9 +21,20 @@ import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
 import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
+import org.example.launcher.application.launch.BuildIntegrityChecker;
+import org.example.launcher.application.launch.BuildLaunchListener;
+import org.example.launcher.application.launch.BuildLaunchManager;
+import org.example.launcher.application.launch.BuildRepairManager;
+import org.example.launcher.application.launch.ElyByAuthenticator;
+import org.example.launcher.application.launch.GameAuthenticationProvider;
+import org.example.launcher.application.launch.GameExitHandler;
+import org.example.launcher.application.launch.GameLaunchCommandBuilder;
+import org.example.launcher.application.launch.GameProcessManager;
+import org.example.launcher.application.launch.GameProcessMonitor;
+import org.example.launcher.application.launch.JavaRuntimeManager;
 import org.example.launcher.application.launch.LaunchCommandBuilder;
-import org.example.launcher.application.launch.LaunchService;
-import org.example.launcher.application.launch.LaunchBuildUseCase;
+import org.example.launcher.application.launch.LaunchStage;
+import org.example.launcher.application.launch.LauncherWindowManager;
 import org.example.launcher.infrastructure.mojang.MojangAssetIndexService;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
@@ -36,7 +48,6 @@ import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.MinecraftVersionManager;
 import org.example.launcher.application.java.JavaManager;
-import org.example.launcher.application.launch.LaunchManager;
 import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
@@ -106,11 +117,8 @@ public class LauncherApplication extends Application {
         LaunchCommandBuilder argumentBuilder =
                 new LaunchCommandBuilder(authlibInjectorManager);
 
-        LaunchBuildUseCase launcher = new LaunchBuildUseCase(
-                argumentBuilder,
-                javaResolutionService,
-                checksumVerifier);
-        LaunchService launchService = launcher;
+        FileIntegrityChecker integrityChecker =
+                new FileIntegrityChecker(checksumVerifier);
         ProfileService profileService = new ProfileService(
                 GameDirectory.defaultDirectory().profilesFile());
 
@@ -138,7 +146,8 @@ public class LauncherApplication extends Application {
                 new ModdedProfileVerificationService(
                         moddedVersionService, mojangVersionService,
                         mojangMetadataService, modLoaderRegistry,
-                        launcher, javaResolutionService, installationService);
+                        integrityChecker, javaResolutionService,
+                        installationService);
 
         // Создание сборок по схеме UI: isBuildAvailable -> createBuild
         // [isVersionDownloaded -> downloadVersion -> createBuildDirectory]
@@ -149,9 +158,42 @@ public class LauncherApplication extends Application {
         AccountManager accountManager = new AccountManager(profileService);
         JavaManager javaManager = new JavaManager(
                 javaResolutionService, javaRuntimeInstaller);
-        LaunchManager launchManager = new LaunchManager(
-                profileVerificationService, launchService, javaManager,
-                buildRepository, elyAuthService);
+        ElyByAuthenticator elyAuthenticator =
+                new ElyByAuthenticator(elyAuthService);
+        JavaRuntimeManager javaRuntimeManager = new JavaRuntimeManager(
+                javaManager);
+        GameAuthenticationProvider authProvider =
+                new GameAuthenticationProvider(elyAuthService);
+        GameLaunchCommandBuilder commandBuilder = new GameLaunchCommandBuilder(
+                javaRuntimeManager, authProvider, argumentBuilder,
+                buildRepository);
+        BuildIntegrityChecker buildIntegrity =
+                new BuildIntegrityChecker(profileVerificationService);
+        BuildRepairManager repair =
+                new BuildRepairManager(profileVerificationService);
+        GameProcessManager processes = new GameProcessManager();
+        GameProcessMonitor monitor = new GameProcessMonitor();
+        GameExitHandler exitHandler = new GameExitHandler();
+        LauncherWindowManager windows = new LauncherWindowManager() {
+            @Override
+            public void hide() {
+                Platform.runLater(stage::hide);
+            }
+
+            @Override
+            public void show() {
+                Platform.runLater(stage::show);
+            }
+
+            @Override
+            public void minimize() {
+                Platform.runLater(() -> stage.setIconified(true));
+            }
+        };
+        BuildLaunchManager buildLaunchManager = new BuildLaunchManager(
+                buildIntegrity,
+                repair, elyAuthenticator, javaManager, commandBuilder,
+                processes, monitor, exitHandler, windows, buildRepository);
 
         LauncherContext context = new LauncherContext(
                 versionService,
@@ -159,7 +201,7 @@ public class LauncherApplication extends Application {
                 javaManager, profileService, preferences, elyAuthService,
                 skinService, modLoaderRegistry,
                 buildRepository, createBuild,
-                accountManager, launchManager);
+                accountManager, buildLaunchManager);
 
         MainView view = new MainView(context);
 

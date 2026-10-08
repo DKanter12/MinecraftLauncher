@@ -19,8 +19,9 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 import org.example.launcher.infrastructure.updater.AppVersion;
+import org.example.launcher.infrastructure.updater.LauncherRestartManager;
 import org.example.launcher.infrastructure.updater.LauncherUpdate;
-import org.example.launcher.infrastructure.updater.UpdateApplier;
+import org.example.launcher.infrastructure.updater.LauncherUpdateManager;
 import org.example.launcher.infrastructure.updater.UpdateService;
 import org.example.launcher.i18n.Lang;
 
@@ -33,7 +34,7 @@ import org.example.launcher.i18n.Lang;
  * приложения не распознана (запуск из dev), вместо этого показываются
  * подготовленные файлы для ручного копирования.
  */
-public class UpdateDialog extends Stage {
+public class LauncherUpdateWindow extends Stage {
 
     private final UpdateService service;
     private UpdateService.CheckResult result;
@@ -42,7 +43,7 @@ public class UpdateDialog extends Stage {
     private final Button primaryButton = new Button();
     private final Button laterButton = new Button(Lang.tr("button.later"));
 
-    public UpdateDialog(Stage owner, UpdateService service,
+    public LauncherUpdateWindow(Stage owner, UpdateService service,
                         UpdateService.CheckResult result) {
         this.service = service;
         this.result = result;
@@ -160,23 +161,22 @@ public class UpdateDialog extends Stage {
 
     private void onRestartApply() {
         LauncherUpdate update = result.update();
-        Optional<UpdateService.PendingUpdate> staged = service.stagedUpdate();
+        Optional<LauncherUpdateManager.PendingUpdate> staged =
+                service.stagedUpdate();
         if (update == null || staged.isEmpty()) {
             statusLabel.setText(Lang.tr("update.nothing"));
             return;
         }
-        Optional<UpdateApplier.ApplyPlan> plan =
-                UpdateApplier.plan(staged.get().stageDir(), update.version());
-        if (plan.isEmpty()) {
-            statusLabel.setText(Lang.tr("update.manual",
-                    staged.get().stageDir()));
-            primaryButton.setDisable(true);
-            return;
-        }
         try {
-            Path updater = UpdateApplier.writeUpdater(service, plan.get());
-            UpdateApplier.launchAndExit(updater,
-                    ProcessHandle.current().pid());
+            Optional<Path> updater = new LauncherRestartManager()
+                    .restartWithUpdate(service, staged.get().stageDir(),
+                            update.version(), ProcessHandle.current().pid());
+            if (updater.isEmpty()) {
+                statusLabel.setText(Lang.tr("update.manual",
+                        staged.get().stageDir()));
+                primaryButton.setDisable(true);
+                return;
+            }
             Platform.exit();
         } catch (IOException | RuntimeException e) {
             statusLabel.setText(Lang.tr("update.startfailed",
@@ -205,6 +205,6 @@ public class UpdateDialog extends Stage {
                 && result.status() != UpdateService.Status.STAGED) {
             return;
         }
-        new UpdateDialog(owner, service, result).showAndWait();
+        new LauncherUpdateWindow(owner, service, result).showAndWait();
     }
 }
