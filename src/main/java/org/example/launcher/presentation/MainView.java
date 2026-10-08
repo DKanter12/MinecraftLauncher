@@ -56,7 +56,6 @@ import org.example.launcher.infrastructure.server.api.LauncherServerApi;
 import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
-import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.JavaVersion;
@@ -71,13 +70,11 @@ import org.example.launcher.infrastructure.http.UrlFetcher;
 import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.application.launch.LaunchService;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
 import org.example.launcher.infrastructure.skins.SkinService;
-import org.example.launcher.infrastructure.mojang.VersionMetadataService;
 import org.example.launcher.infrastructure.mojang.VersionService;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
@@ -85,6 +82,11 @@ import org.example.launcher.application.build.Build;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.BuildRequest;
 import org.example.launcher.application.account.AccountManager;
+import org.example.launcher.application.build.ModScanner;
+import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.launch.CrashAnalyzer;
+import org.example.launcher.application.launch.CrashReport;
+import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
 import org.example.launcher.infrastructure.loaders.ModdedVersionService;
 import org.example.launcher.infrastructure.updater.AppVersion;
@@ -125,11 +127,9 @@ public class MainView {
     private static final String APP_VERSION = AppVersion.BUILT_IN;
 
     private final VersionService versionService;
-    private final VersionMetadataService metadataService;
-    private final InstallationService installationService;
     private final LaunchService launchService;
     private final JavaResolutionService javaResolutionService;
-    private final JavaRuntimeInstaller javaRuntimeInstaller;
+    private final JavaManager javaManager;
     private final ProfileService profileService;
     private final FileSettingsRepository preferences;
     private final ElyAuthService elyAuthService;
@@ -213,37 +213,20 @@ public class MainView {
     /** Версии манифеста Mojang — питают диалог создания. */
     private List<MinecraftVersion> manifestVersions = List.of();
 
-    public MainView(VersionService versionService,
-                    VersionMetadataService metadataService,
-                    InstallationService installationService,
-                    LaunchService launchService,
-                    JavaResolutionService javaResolutionService,
-                    JavaRuntimeInstaller javaRuntimeInstaller,
-                     ProfileService profileService,
-                     FileSettingsRepository preferences,
-                    ElyAuthService elyAuthService,
-                    SkinService skinService,
-                    ModLoaderRegistry modLoaderRegistry,
-                    ModdedVersionService moddedVersionService,
-                    FileSystemBuildRepository buildRepository,
-                    ModdedProfileVerificationService profileVerificationService,
-                    CreateBuildUseCase createBuildUseCase,
-                    AccountManager accountManager) {
-        this.versionService = versionService;
-        this.metadataService = metadataService;
-        this.installationService = installationService;
-        this.launchService = launchService;
-        this.javaResolutionService = javaResolutionService;
-        this.javaRuntimeInstaller = javaRuntimeInstaller;
-        this.profileService = profileService;
-        this.preferences = preferences;
-        this.elyAuthService = elyAuthService;
-        this.skinService = skinService;
-        this.modLoaderRegistry = modLoaderRegistry;
-        this.buildRepository = buildRepository;
-        this.profileVerificationService = profileVerificationService;
-        this.createBuildUseCase = createBuildUseCase;
-        this.accountManager = accountManager;
+    public MainView(LauncherContext context) {
+        this.versionService = context.versionService();
+        this.launchService = context.launchService();
+        this.javaResolutionService = context.javaResolutionService();
+        this.javaManager = context.javaManager();
+        this.profileService = context.profileService();
+        this.preferences = context.preferences();
+        this.elyAuthService = context.elyAuthService();
+        this.skinService = context.skinService();
+        this.modLoaderRegistry = context.modLoaderRegistry();
+        this.buildRepository = context.buildRepository();
+        this.profileVerificationService = context.profileVerificationService();
+        this.createBuildUseCase = context.createBuildUseCase();
+        this.accountManager = context.accountManager();
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -917,23 +900,10 @@ public class MainView {
                 .orElseGet(() -> Lang.tr("card.never"));
     }
 
-    /** Считает jar-моды; отрицательное — когда не читается. */
+    /** Считает jar-моды через {@link ModScanner}. */
     private int modsCount(ModdedProfile profile) {
-        try {
-            Path mods = buildRepository.resolveGameDir(profile)
-                    .resolve("mods");
-            if (!Files.isDirectory(mods)) {
-                return profile.isVanilla() ? -1 : 0;
-            }
-            try (var stream = Files.list(mods)) {
-                return (int) stream
-                        .filter(f -> f.getFileName().toString()
-                                .endsWith(".jar"))
-                        .count();
-            }
-        } catch (IOException e) {
-            return -1;
-        }
+        return ModScanner.countMods(
+                buildRepository.resolveGameDir(profile), profile.isVanilla());
     }
 
     private static String shortGameDir(Path dir) {
@@ -2458,7 +2428,7 @@ public class MainView {
             @Override
             protected JavaRuntime call() throws Exception {
                 Path targetDir = storage.javaRuntimeDir("jre-legacy");
-                return javaRuntimeInstaller.install(8, targetDir);
+                return javaManager.ensureInstalled(8, targetDir);
             }
         };
         installTask.setOnSucceeded(e -> {
@@ -2466,9 +2436,7 @@ public class MainView {
             statusLabel.setText(
                     Lang.tr("launch.java.installed", profile.name()));
 
-            if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
-                svc.setCustomJavaPath(rt.javaExecutable());
-            }
+            javaManager.adoptManaged(rt);
             verifyProfileAndLaunch(profile, account, storage);
         });
         installTask.setOnFailed(e -> {
@@ -2508,16 +2476,17 @@ public class MainView {
                     } else {
                         statusLabel.setText(Lang.tr("launch.crashed",
                                 versionId, exitCode));
-                        String err = process.stderr();
-                        if (err.isBlank()) {
-                            err = process.stdout();
-                        }
-                        if (!err.isBlank()) {
+                        CrashReport report = CrashAnalyzer.analyze(
+                                exitCode, process.stdout(), process.stderr());
+                        if (!report.logTail().isBlank()) {
+                            String text = Lang.tr("launch.crash.code", exitCode)
+                                    + report.reason() + "\n\n"
+                                    + report.logTail();
+                            if (report.suggestion().isPresent()) {
+                                text += "\n\n" + report.suggestion().get();
+                            }
                             ErrorDialog.show(launcherStage,
-                                    Lang.tr("launch.crash.title"),
-                                    Lang.tr("launch.crash.code", exitCode)
-                                            + err.lines().limit(30)
-                                                    .reduce("", (a, b) -> a + b + "\n"));
+                                    Lang.tr("launch.crash.title"), text);
                         }
                     }
                     refreshLaunchButtons();

@@ -1,7 +1,7 @@
 package org.example.launcher.domain;
 
 /** Ошибки скачивания файлов и проверки целостности. */
-public class DownloadException extends LauncherException {
+public class  DownloadException extends LauncherException {
 
     public DownloadException(String message) {
         super(ErrorCode.DOWNLOAD_FAILED, message);

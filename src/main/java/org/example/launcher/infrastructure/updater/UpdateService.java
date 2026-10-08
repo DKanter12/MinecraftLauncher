@@ -7,8 +7,6 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -113,7 +111,7 @@ public class UpdateService {
         try {
             fetcher.download(update.packageUrl(), tmp, DOWNLOAD_TIMEOUT,
                     progress);
-            verifySha256(tmp, update.sha256());
+            UpdateVerifier.verifySha256(tmp, update.sha256());
             return tmp;
         } catch (IOException | RuntimeException e) {
             Files.deleteIfExists(tmp);
@@ -206,30 +204,6 @@ public class UpdateService {
                 }
                 deleteTree(child);
             }
-        }
-    }
-
-    private void verifySha256(Path file, String expected) throws IOException {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream in = Files.newInputStream(file)) {
-                byte[] buffer = new byte[65536];
-                int read;
-                while ((read = in.read(buffer)) != -1) {
-                    digest.update(buffer, 0, read);
-                }
-            }
-            StringBuilder hex = new StringBuilder();
-            for (byte b : digest.digest()) {
-                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-                hex.append(Character.forDigit(b & 0xF, 16));
-            }
-            if (!hex.toString().equalsIgnoreCase(expected)) {
-                throw new IOException(
-                        "Update package checksum mismatch — download again");
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new IOException("SHA-256 is not available", e);
         }
     }
 

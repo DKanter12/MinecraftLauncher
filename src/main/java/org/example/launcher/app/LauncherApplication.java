@@ -35,6 +35,8 @@ import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.MinecraftVersionManager;
+import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.core.LauncherContext;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
@@ -144,14 +146,18 @@ public class LauncherApplication extends Application {
         CreateBuildUseCase createBuild = new CreateBuildUseCase(
                 versionManager, buildRepository, defaultGameDir);
         AccountManager accountManager = new AccountManager(profileService);
+        JavaManager javaManager = new JavaManager(
+                javaResolutionService, javaRuntimeInstaller);
 
-        MainView view = new MainView(
-                versionService, metadataService, installationService,
-                launchService, javaResolutionService, javaRuntimeInstaller,
-                profileService, preferences, elyAuthService, skinService,
-                modLoaderRegistry, moddedVersionService,
+        LauncherContext context = new LauncherContext(
+                versionService,
+                launchService, javaResolutionService,
+                javaManager, profileService, preferences, elyAuthService,
+                skinService, modLoaderRegistry,
                 buildRepository, profileVerificationService, createBuild,
                 accountManager);
+
+        MainView view = new MainView(context);
 
         Scene scene = new Scene(view.getView(), 1180, 680);
         var css = getClass().getResource("/styles.css");
