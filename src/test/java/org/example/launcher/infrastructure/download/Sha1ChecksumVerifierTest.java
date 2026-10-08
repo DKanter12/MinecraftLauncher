@@ -1,4 +1,4 @@
-package org.example.launcher.install;
+package org.example.launcher.infrastructure.download;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

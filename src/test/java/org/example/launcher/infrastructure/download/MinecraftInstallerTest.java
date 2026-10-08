@@ -1,4 +1,6 @@
-package org.example.launcher.install;
+package org.example.launcher.infrastructure.download;
+
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

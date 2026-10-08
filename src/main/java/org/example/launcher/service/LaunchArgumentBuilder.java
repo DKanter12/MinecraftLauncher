@@ -3,7 +3,7 @@ package org.example.launcher.service;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.LaunchArguments;

@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 
 /**
  * Управляет JAR-файлом authlib-injector — javaagent, который патчит

@@ -9,9 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.example.launcher.install.ChecksumVerifier;
-import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.Sha1ChecksumVerifier;
+import org.example.launcher.infrastructure.download.ChecksumVerifier;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.download.Sha1ChecksumVerifier;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaResolutionResult;
 import org.example.launcher.domain.model.JavaRuntime;

@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Objects;
 
-import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.InstallationProgress;
-import org.example.launcher.install.InstallationService;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.service.VersionMetadataService;
 import org.example.launcher.service.modloader.ModLoaderRegistry;

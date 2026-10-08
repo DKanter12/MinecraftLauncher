@@ -20,7 +20,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.AssetIndex;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.JavaVersion;

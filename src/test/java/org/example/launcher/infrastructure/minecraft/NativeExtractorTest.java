@@ -1,4 +1,4 @@
-package org.example.launcher.install;
+package org.example.launcher.infrastructure.minecraft;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +12,7 @@ import java.util.zip.ZipEntry;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.Library;
 import org.example.launcher.domain.model.VersionMetadata;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

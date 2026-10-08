@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.example.launcher.install.FileDownloader;
+import org.example.launcher.infrastructure.download.FileDownloader;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.util.OsDetector;
 

@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.example.launcher.domain.model.ModLoaderType;
 
-import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.InstallationProgress;
-import org.example.launcher.install.Sha1ChecksumVerifier;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.Sha1ChecksumVerifier;
 import org.example.launcher.domain.model.JavaResolutionResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.model.MinecraftVersion;
@@ -98,21 +98,21 @@ class ModdedProfileVerificationServiceTest {
 
     /** Records installation calls (vanilla repair path). */
     private static final class RecordingInstaller
-            implements org.example.launcher.install.InstallationService {
+            implements org.example.launcher.infrastructure.download.InstallationService {
         int installCalls;
         MinecraftVersion installedVersion;
         GameDirectory installedGameDir;
 
         @Override
-        public org.example.launcher.install.InstallationResult install(
+        public org.example.launcher.infrastructure.download.InstallationResult install(
                 MinecraftVersion version,
                 VersionMetadata metadata,
                 GameDirectory gameDir,
-                org.example.launcher.install.InstallationProgress progress) {
+                org.example.launcher.infrastructure.download.InstallationProgress progress) {
             installCalls++;
             installedVersion = version;
             installedGameDir = gameDir;
-            return new org.example.launcher.install.InstallationResult(
+            return new org.example.launcher.infrastructure.download.InstallationResult(
                     0, 0, 0, 0, 0, List.of());
         }
     }

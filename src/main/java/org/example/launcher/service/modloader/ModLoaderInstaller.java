@@ -2,10 +2,10 @@ package org.example.launcher.service.modloader;
 
 import java.io.IOException;
 
-import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.InstallationProgress;
-import org.example.launcher.install.InstallationResult;
-import org.example.launcher.install.InstallationService;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.InstallationResult;
+import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;

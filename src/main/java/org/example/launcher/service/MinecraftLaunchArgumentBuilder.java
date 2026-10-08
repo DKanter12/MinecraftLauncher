@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.domain.model.DownloadInfo;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaRuntime;

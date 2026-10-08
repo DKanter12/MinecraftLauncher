@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.example.launcher.domain.model.ModLoaderType;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.model.VersionManifest;
 import org.example.launcher.domain.model.VersionMetadata;

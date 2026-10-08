@@ -1,4 +1,6 @@
-package org.example.launcher.install;
+package org.example.launcher.infrastructure.download;
+
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 
 import java.io.IOException;
 import java.nio.file.Files;

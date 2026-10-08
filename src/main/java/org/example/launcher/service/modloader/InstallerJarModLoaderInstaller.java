@@ -12,11 +12,11 @@ import java.util.concurrent.TimeUnit;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.example.launcher.install.FileDownloader;
-import org.example.launcher.install.GameDirectory;
-import org.example.launcher.install.InstallationProgress;
-import org.example.launcher.install.InstallationResult;
-import org.example.launcher.install.InstallationService;
+import org.example.launcher.infrastructure.download.FileDownloader;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.InstallationResult;
+import org.example.launcher.infrastructure.download.InstallationService;
 import org.example.launcher.domain.model.JavaResolutionResult;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;

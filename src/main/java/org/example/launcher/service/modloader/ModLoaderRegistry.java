@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.example.launcher.domain.model.ModLoaderType;
 
-import org.example.launcher.install.FileDownloader;
-import org.example.launcher.install.InstallationService;
+import org.example.launcher.infrastructure.download.FileDownloader;
+import org.example.launcher.infrastructure.download.InstallationService;
 
 /**
  * Центральный реестр и точка расширения для поддерживаемых мод-загрузчиков.

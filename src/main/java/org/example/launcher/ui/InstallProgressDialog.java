@@ -14,10 +14,10 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import org.example.launcher.install.DownloadResult;
-import org.example.launcher.install.DownloadTask;
-import org.example.launcher.install.InstallationProgress;
-import org.example.launcher.install.InstallationResult;
+import org.example.launcher.infrastructure.download.DownloadResult;
+import org.example.launcher.infrastructure.download.DownloadTask;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.i18n.Lang;
 
 /**

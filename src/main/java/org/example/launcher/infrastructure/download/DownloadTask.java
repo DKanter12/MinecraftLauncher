@@ -1,4 +1,4 @@
-package org.example.launcher.install;
+package org.example.launcher.infrastructure.download;
 
 import java.nio.file.Path;
 import java.util.Objects;

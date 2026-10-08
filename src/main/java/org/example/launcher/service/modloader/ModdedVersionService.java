@@ -13,7 +13,7 @@ import org.example.launcher.domain.model.ModLoaderType;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.example.launcher.install.GameDirectory;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;
