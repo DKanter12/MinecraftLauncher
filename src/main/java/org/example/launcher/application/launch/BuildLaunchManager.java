@@ -15,6 +15,7 @@ import org.example.launcher.i18n.Lang;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.minecraft.NativeExtractor;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService.VerificationReport;
 
 /**
@@ -191,6 +192,13 @@ public class BuildLaunchManager {
         }
 
         listener.onStage(LaunchStage.STARTING);
+        try {
+            NativeExtractor.extractNatives(metadata, storage);
+        } catch (IOException e) {
+            listener.onFailed("Failed to extract native libraries: "
+                    + e.getMessage());
+            return;
+        }
         LaunchSettings settings = new LaunchSettings(profile.memoryMb(),
                 profile.extraJvmArgs());
         GameLaunchCommand command;

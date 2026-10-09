@@ -17,7 +17,6 @@ import org.example.launcher.application.launch.JavaRuntimeManager;
 import org.example.launcher.application.launch.LaunchCommandBuilder;
 import org.example.launcher.application.launch.LauncherWindowManager;
 import org.example.launcher.core.LauncherContext;
-import org.example.launcher.application.version.MinecraftVersions;
 import org.example.launcher.infrastructure.download.ChecksumVerifier;
 import org.example.launcher.infrastructure.download.FileDownloader;
 import org.example.launcher.infrastructure.download.FileIntegrityChecker;

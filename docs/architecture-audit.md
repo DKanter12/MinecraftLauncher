@@ -178,7 +178,7 @@ zip-slip невозможен — распаковка без пользоват
 | C4 | `JavaRuntimeManager.isCompatible` | Не вызывается в проде, правило продублировано в резолвере | Мёртвый код с тестами | Вызвать из `GameLaunchCommandBuilder` как защиту или удалить + перенести тесты | `GameLaunchCommandBuilder` | Перенести 5 ассертов |
 | C5 | `FileSystemBuildRepository` (~600 строк) | CRUD + JSON + sanitize + память + JVM-арги | Много причин для изменений | Выделить имена/память при касании, не сейчас | `MainView`, тесты профилей | Существующие |
 | C6 | `ModdedProfileVerificationService` (~500 строк, 7 deps) | Проверка + починка + Java + отчёты | Сложно тестировать целиком | Делить только по подтверждённым швам (файлы vs метаданные) | Тесты верификации | Существующие |
-| C7 | `RemoteBuildService`, `ModpackProvisioner`, `LoaderMismatchDetector`, `LoaderFallbackPolicy`, `AdminLauncherServerApi` | 0 вызовов из `src/main` | Мёртвый прод-код | ✅ РЕШЕНО: удалены `RemoteBuildService`, `ModpackProvisioner`, `LoaderFallbackPolicy`, `AdminLauncherServerApi` (+ `CrashAnalyzer.suggestOlderLoader`, тесты-драйверы переписаны на прямые вызовы API). `LoaderMismatchDetector` оставлен — вызывается из `CrashAnalyzer`. `OfflineLauncherServerApi` переведён прямо на `LauncherServerApi` | Тесты distribution | Заменить/удалить синхронно |
+| C7 | `RemoteBuildService`, `ModpackProvisioner`, `LoaderMismatchDetector`, `LoaderFallbackPolicy`, `AdminLauncherServerApi` | 0 вызовов из `src/main` | Мёртвый прод-код | ✅ РЕШЕНО (коммит `1b648fc`): удалены `RemoteBuildService`, `ModpackProvisioner`, `LoaderFallbackPolicy`, `AdminLauncherServerApi` (+ `CrashAnalyzer.suggestOlderLoader`, тесты-драйверы переписаны на прямые вызовы API). `LoaderMismatchDetector` оставлен — вызывается из `CrashAnalyzer`. `OfflineLauncherServerApi` переведён прямо на `LauncherServerApi` | Тесты distribution | Заменить/удалить синхронно |
 | C8 | `DownloadVerifier` vs `UpdateVerifier` | Два SHA-компонента обновлений | Неясно, какой использовать | Один компонент (§12), тесты слить | `UpdateService`, 2 тест-файла | Слить, не удалять кейсы |
 | C9 | `MainView` (~2500 строк) | Вся логика интерфейса в одном файле | Любое изменение risky | Поэтапное выделение видов (§10), без смены визуала | Все диалоги | Ручная проверка сценариев |
 
@@ -210,3 +210,20 @@ zip-slip невозможен — распаковка без пользоват
 `LaunchManager.decide`, `UpdateVerifier`, `FxTasks/UiErrors`, удаление
 `StubJavaRuntimeInstaller`, `clearStaged()`, `sameBuild`, JVM-полей из диалогов,
 `Json→JsonStrings`, восстановление затёртых URL/UA/bat-имени.
+
+## 4. Sweep неиспользуемого 2026-10-09
+
+Проверен каждый класс src/main на вызовы вне собственного файла (точный подсчёт, не эвристика).
+
+Удалено как мёртвое (0 вызовов в проде, дубли живого кода):
+- infrastructure/server/BuildVersions + тест (осиротел после удаления RemoteBuildService; сравнение версий покрывает AppVersion);
+- ersion/ целиком (VersionTypeRegistry — чипы диалога идут напрямую по domain VersionType);
+- pplication/version/ целиком (6 классов) — дублировал рабочий слой (MojangVersionService, MinecraftVersionManager);
+- MojangMinecraftVersionRepository, CachedMinecraftVersionRepository, domain/port/MinecraftVersionRepository — тот же дубль;
+- ReleaseNotesProvider — однострочная обёртка без вызовов;
+- тесты всех удалённых классов (кроме пристроенных кейсов, перенесённых в живые тесты).
+
+Встроено вместо удаления (функциональная дыра, а не мёртвый код):
+- NativeExtractor.extractNatives никто не вызывал — нативы никогда не распаковывались, хотя -Djava.library.path на них ссылается. Вызов добавлен в BuildLaunchManager на стадии STARTING, ошибка ведёт в onFailed.
+
+Оставлено с обоснованием: LoaderMismatchDetector (зовёт CrashAnalyzer), исключения (JavaException бросается), FakeLauncherServerApi (нужен живому ServerAuthServiceTest).

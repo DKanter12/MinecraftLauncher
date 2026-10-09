@@ -1,6 +1,5 @@
 package org.example.launcher.infrastructure.updater;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,12 +28,5 @@ class LauncherVersionCheckerTest {
     void same() {
         assertFalse(new LauncherVersionChecker().isUpdateAvailable(
                 version(AppVersion.current())));
-    }
-
-    @Test
-    @DisplayName("release notes come from the version")
-    void notes() {
-        assertEquals("notes", new ReleaseNotesProvider()
-                .getReleaseNotes(version("9.9.9")));
     }
 }
