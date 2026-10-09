@@ -84,21 +84,4 @@ class CrashAnalyzerTest {
         assertEquals(30, tail.lines().count());
         assertTrue(tail.startsWith("line-20"));
     }
-
-    @Test
-    @DisplayName("suggestOlderLoader steps one version back")
-    void fallbackSuggestion() {
-        var versions = List.of(
-                new ModLoaderVersion(ModLoaderType.FABRIC, "0.16.9", "1.21.4",
-                        true, null),
-                new ModLoaderVersion(ModLoaderType.FABRIC, "0.15.0", "1.21.4",
-                        false, null));
-
-        Optional<ModLoaderVersion> next =
-                CrashAnalyzer.suggestOlderLoader(versions, "0.16.9");
-
-        assertTrue(next.isPresent());
-        assertEquals("0.15.0", next.get().loaderVersion());
-        assertTrue(CrashAnalyzer.suggestOlderLoader(versions, "0.15.0").isEmpty());
-    }
 }

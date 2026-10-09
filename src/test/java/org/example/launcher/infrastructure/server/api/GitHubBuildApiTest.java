@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildFileEntry;
 import org.example.launcher.infrastructure.server.BuildSummary;
 import org.example.launcher.infrastructure.server.DistributionSources;
-import org.example.launcher.infrastructure.server.RemoteBuildService;
 import org.example.launcher.infrastructure.server.ServerSession;
 import org.example.launcher.infrastructure.server.UserRole;
 import org.example.launcher.infrastructure.http.UrlFetcher;
@@ -106,15 +106,18 @@ class GitHubBuildApiTest {
     }
 
     @Test
-    void remoteServiceInstallsFromGit() throws IOException {
-        RemoteBuildService builds =
-                new RemoteBuildService(api);
+    void fetchBuildDownloadsFiles() throws IOException {
         Path gameDir = tempDir.resolve("game");
 
-        BuildDescriptor installed = builds.install(session,
-                api.listBuilds(session).get(0), gameDir);
+        BuildDescriptor descriptor = api.fetchBuild(session, "survival");
+        assertEquals("1.1.0", descriptor.version());
+        for (BuildFileEntry file : descriptor.files()) {
+            Path target = gameDir.resolve("builds").resolve("survival")
+                    .resolve(file.category().folder())
+                    .resolve(file.relativePath());
+            api.downloadFile(session, descriptor, file, target);
+        }
 
-        assertEquals("1.1.0", installed.version());
         assertEquals("mod-bytes", Files.readString(gameDir
                 .resolve("builds").resolve("survival").resolve("mods")
                 .resolve("a.jar")));

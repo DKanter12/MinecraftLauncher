@@ -3,9 +3,7 @@ package org.example.launcher.application.launch;
 import java.util.List;
 import java.util.Optional;
 
-import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.i18n.Lang;
-import org.example.launcher.infrastructure.server.LoaderFallbackPolicy;
 import org.example.launcher.infrastructure.server.LoaderMismatchDetector;
 
 /**
@@ -66,15 +64,6 @@ public final class CrashAnalyzer {
         }
         return report(CrashCategory.UNKNOWN, exitCode, log,
                 Lang.tr("launch.crash.reason.unknown"), null, fullLog);
-    }
-
-    /**
-     * Подбирает следующую более старую версию загрузчика после
-     * падения из-за несоответствия. Пусто, если пробовать больше нечего.
-     */
-    public static Optional<ModLoaderVersion> suggestOlderLoader(
-            List<ModLoaderVersion> newestFirst, String failedLoaderVersion) {
-        return LoaderFallbackPolicy.nextOlder(newestFirst, failedLoaderVersion);
     }
 
     private static CrashReport report(CrashCategory category, int exitCode,

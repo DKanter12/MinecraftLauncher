@@ -8,7 +8,7 @@ package org.example.launcher.infrastructure.server;
  *       собственного инстанса через диалог «Сохранить сборку».</li>
  *   <li>{@code SERVER} — сборка, опубликованная администратором,
  *       скачанная через сервер лаунчера и установленная с
- *       манифестом build.json (см. {@link RemoteBuildService}).</li>
+ *       манифестом build.json серверной сборки.</li>
  * </ul>
  *
  * Оба вида лежат рядом в одной папке {@code builds} инстанса,

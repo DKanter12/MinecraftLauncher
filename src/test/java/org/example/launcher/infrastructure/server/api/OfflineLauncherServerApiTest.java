@@ -35,15 +35,5 @@ class OfflineLauncherServerApiTest {
         assertThrows(IOException.class, () -> api.fetchBuild(session, "any"));
         assertThrows(IOException.class, () -> api.downloadFile(session, null, null, null));
     }
-
-    @Test
-    void adminFunctionsFailEvenForAdminSession() {
-        assertThrows(IOException.class, () -> api.createBuild(session, null));
-        assertThrows(IOException.class, () -> api.uploadBuildFile(session, "b", "1", null, "f", null));
-        assertThrows(IOException.class, () -> api.publishBuild(session, "b", "1"));
-        assertThrows(IOException.class, () -> api.hideBuild(session, "b"));
-        assertThrows(IOException.class, () -> api.deleteBuild(session, "b"));
-        assertThrows(IOException.class, () -> api.listUsers(session));
-    }
 }
 

@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.example.launcher.infrastructure.server.BuildDescriptor;
-import org.example.launcher.infrastructure.server.BuildFileCategory;
 import org.example.launcher.infrastructure.server.BuildFileEntry;
 import org.example.launcher.infrastructure.server.BuildSummary;
 import org.example.launcher.infrastructure.server.ServerSession;
@@ -16,16 +15,13 @@ import org.example.launcher.infrastructure.server.ServerSession;
  * архитектуры распространения. Локальные сборки,
  * установка и запуск продолжают работать без изменений.
  *
- * <p>Вход и все административные функции завершаются понятной
- * ошибкой вместо молчаливого бездействия; каталог сборок
- * просто пуст.</p>
+ * <p>Вход завершается понятной ошибкой вместо молчаливого бездействия;
+ * каталог сборок просто пуст.</p>
  */
-public class OfflineLauncherServerApi implements AdminLauncherServerApi {
+public class OfflineLauncherServerApi implements LauncherServerApi {
 
     private static final String NOT_CONFIGURED =
             "Launcher server is not configured — the launcher runs in local mode";
-    private static final String ADMIN_UNAVAILABLE =
-            "Administrator functions require a configured launcher server";
 
     @Override
     public ServerSession login(String login, String password) throws IOException {
@@ -48,36 +44,5 @@ public class OfflineLauncherServerApi implements AdminLauncherServerApi {
     @Override
     public void downloadFile(ServerSession session, BuildDescriptor build, BuildFileEntry file, Path target) throws IOException {
         throw new IOException(NOT_CONFIGURED);
-    }
-
-    @Override
-    public BuildSummary createBuild(ServerSession session, BuildSummary draft) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
-    }
-
-    @Override
-    public void uploadBuildFile(ServerSession session, String buildId, String version,
-                                BuildFileCategory category, String relativePath, Path file) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
-    }
-
-    @Override
-    public void publishBuild(ServerSession session, String buildId, String version) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
-    }
-
-    @Override
-    public void hideBuild(ServerSession session, String buildId) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
-    }
-
-    @Override
-    public void deleteBuild(ServerSession session, String buildId) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
-    }
-
-    @Override
-    public List<String> listUsers(ServerSession session) throws IOException {
-        throw new IOException(ADMIN_UNAVAILABLE);
     }
 }

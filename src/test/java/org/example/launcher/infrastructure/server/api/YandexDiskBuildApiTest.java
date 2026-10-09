@@ -22,9 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.example.launcher.infrastructure.server.BuildDescriptor;
+import org.example.launcher.infrastructure.server.BuildFileCategory;
+import org.example.launcher.infrastructure.server.BuildFileEntry;
 import org.example.launcher.infrastructure.server.BuildSummary;
 import org.example.launcher.infrastructure.server.DistributionSources;
-import org.example.launcher.infrastructure.server.RemoteBuildService;
 import org.example.launcher.infrastructure.server.ServerSession;
 import org.example.launcher.infrastructure.http.UrlFetcher;
 import org.example.launcher.infrastructure.http.UrlFetcher;
@@ -128,34 +129,29 @@ class YandexDiskBuildApiTest {
     }
 
     @Test
-    void installViaRemoteService() throws IOException {
-        RemoteBuildService builds = new RemoteBuildService(api);
+    void fetchBuildDownloadsFiles() throws IOException {
         Path gameDir = tempDir.resolve("game");
+        BuildDescriptor descriptor = api.fetchBuild(session, "Survival");
 
-        BuildDescriptor installed = builds.install(session,
-                api.listBuilds(session).stream()
-                        .filter(b -> b.id().equals("Survival")).findFirst()
-                        .orElseThrow(),
-                gameDir);
+        assertEquals("2.0.0", descriptor.version());
+        for (BuildFileEntry file : descriptor.files()) {
+            // RESOURCES-записи уже несут полный путь, остальные лежат
+            // в папке своей категории
+            Path target = file.category() == BuildFileCategory.RESOURCES
+                    ? gameDir.resolve("builds").resolve("Survival")
+                            .resolve(file.relativePath())
+                    : gameDir.resolve("builds").resolve("Survival")
+                            .resolve(file.category().folder())
+                            .resolve(file.relativePath());
+            api.downloadFile(session, descriptor, file, target);
+        }
 
-        assertEquals("2.0.0", installed.version());
         assertEquals("mod-bytes", Files.readString(gameDir
                 .resolve("builds").resolve("Survival").resolve("mods")
                 .resolve("a.jar")));
-    }
-
-    @Test
-    void newBuildsListsMissingOnes() throws IOException {
-        RemoteBuildService builds = new RemoteBuildService(api);
-        Path gameDir = tempDir.resolve("game");
-        builds.install(session, api.listBuilds(session).stream()
-                .filter(b -> b.id().equals("Survival")).findFirst()
-                .orElseThrow(), gameDir);
-
-        List<BuildSummary> fresh = builds.newBuilds(session, gameDir);
-
-        assertEquals(List.of("Old"),
-                fresh.stream().map(BuildSummary::id).toList());
+        assertEquals("cfg-bytes", Files.readString(gameDir
+                .resolve("builds").resolve("Survival").resolve("config")
+                .resolve("x.toml")));
     }
 
     @Test
