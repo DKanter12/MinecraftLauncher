@@ -7,8 +7,8 @@ import java.util.Optional;
 /**
  * Представляет среду Java, обнаруженную в локальной системе.
  * <p>
- * Экземпляры создаются реализациями {@code JavaDetector} и
- * используются службой {@code JavaResolutionService} для выбора подходящей
+ * Экземпляры создаются реализациями {@code JavaScanner} и
+ * используются службой {@code JavaFinder} для выбора подходящей
  * среды запуска указанной версии Minecraft.
  */
 public final class JavaRuntime {

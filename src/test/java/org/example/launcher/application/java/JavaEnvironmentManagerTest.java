@@ -10,49 +10,49 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.java.JavaFinder;
+import org.example.launcher.infrastructure.java.JavaInstaller;
 
-@DisplayName("JavaManager")
-class JavaManagerTest {
+@DisplayName("JavaEnvironmentManager")
+class JavaEnvironmentManagerTest {
 
     private static JavaRuntime runtime() {
         return new JavaRuntime(Path.of("/java/bin/java"), 17,
                 JavaRuntime.Source.CUSTOM);
     }
 
-    private static JavaResolutionService foundService() {
-        return new JavaResolutionService() {
+    private static JavaFinder foundService() {
+        return new JavaFinder() {
             @Override
-            public JavaResolutionResult resolve(VersionMetadata metadata) {
-                return JavaResolutionResult.found(runtime());
+            public JavaFindResult find(VersionMetadata metadata) {
+                return JavaFindResult.found(runtime());
             }
 
             @Override
-            public JavaResolutionResult resolve(int requiredMajor) {
-                return JavaResolutionResult.found(runtime());
-            }
-        };
-    }
-
-    private static JavaResolutionService missingService() {
-        return new JavaResolutionService() {
-            @Override
-            public JavaResolutionResult resolve(VersionMetadata metadata) {
-                return JavaResolutionResult.notFound("stub");
-            }
-
-            @Override
-            public JavaResolutionResult resolve(int requiredMajor) {
-                return JavaResolutionResult.notFound("stub");
+            public JavaFindResult find(int requiredMajor) {
+                return JavaFindResult.found(runtime());
             }
         };
     }
 
-    private static final class RecordingInstaller implements JavaRuntimeInstaller {
+    private static JavaFinder missingService() {
+        return new JavaFinder() {
+            @Override
+            public JavaFindResult find(VersionMetadata metadata) {
+                return JavaFindResult.notFound("stub");
+            }
+
+            @Override
+            public JavaFindResult find(int requiredMajor) {
+                return JavaFindResult.notFound("stub");
+            }
+        };
+    }
+
+    private static final class RecordingInstaller implements JavaInstaller {
         int calls;
 
         @Override
@@ -72,7 +72,7 @@ class JavaManagerTest {
     @DisplayName("ensureInstalled returns existing runtime without installing")
     void returnsExisting(@TempDir Path dir) throws Exception {
         var installer = new RecordingInstaller();
-        var manager = new JavaManager(foundService(), installer);
+        var manager = new JavaEnvironmentManager(foundService(), installer);
 
         assertEquals(runtime().javaExecutable(),
                 manager.ensureInstalled(17, dir).javaExecutable());
@@ -83,7 +83,7 @@ class JavaManagerTest {
     @DisplayName("ensureInstalled installs when nothing found")
     void installsWhenMissing(@TempDir Path dir) throws Exception {
         var installer = new RecordingInstaller();
-        var manager = new JavaManager(missingService(), installer);
+        var manager = new JavaEnvironmentManager(missingService(), installer);
 
         JavaRuntime installed = manager.ensureInstalled(8, dir);
 
@@ -94,16 +94,16 @@ class JavaManagerTest {
     @Test
     @DisplayName("adoptManaged is a no-op for foreign resolution services")
     void adoptForeignNoOp() {
-        var manager = new JavaManager(missingService(), new RecordingInstaller());
+        var manager = new JavaEnvironmentManager(missingService(), new RecordingInstaller());
 
         manager.adoptManaged(runtime());
     }
 
     @Test
-    @DisplayName("resolve delegates to the resolution service")
-    void delegatesResolve() {
-        var manager = new JavaManager(foundService(), new RecordingInstaller());
+    @DisplayName("find delegates to the finder service")
+    void delegatesFind() {
+        var manager = new JavaEnvironmentManager(foundService(), new RecordingInstaller());
 
-        assertTrue(manager.resolve(null).isPresent());
+        assertTrue(manager.find(null).isPresent());
     }
 }

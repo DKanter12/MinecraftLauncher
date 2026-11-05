@@ -10,9 +10,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.domain.model.GameProfile;
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.domain.model.ModdedProfile;
@@ -20,8 +20,8 @@ import org.example.launcher.domain.model.VersionMetadata;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.java.JavaFinder;
+import org.example.launcher.infrastructure.java.JavaInstaller;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 
 @DisplayName("GameLaunchCommandBuilder")
@@ -48,22 +48,22 @@ class GameLaunchCommandBuilderTest {
             }
             """;
 
-    private static JavaResolutionService foundService(JavaRuntime rt) {
-        return new JavaResolutionService() {
+    private static JavaFinder foundService(JavaRuntime rt) {
+        return new JavaFinder() {
             @Override
-            public JavaResolutionResult resolve(VersionMetadata meta) {
-                return JavaResolutionResult.found(rt);
+            public JavaFindResult find(VersionMetadata meta) {
+                return JavaFindResult.found(rt);
             }
 
             @Override
-            public JavaResolutionResult resolve(int requiredMajor) {
-                return JavaResolutionResult.found(rt);
+            public JavaFindResult find(int requiredMajor) {
+                return JavaFindResult.found(rt);
             }
         };
     }
 
-    private static JavaRuntimeInstaller failingInstaller() {
-        return new JavaRuntimeInstaller() {
+    private static JavaInstaller failingInstaller() {
+        return new JavaInstaller() {
             @Override
             public JavaRuntime install(String component, Path targetDir) {
                 throw new UnsupportedOperationException("stub");
@@ -88,7 +88,7 @@ class GameLaunchCommandBuilderTest {
         var runtime = new JavaRuntime(Path.of("/java/bin/java"), 21,
                 JavaRuntime.Source.JAVA_HOME);
         var builder = new GameLaunchCommandBuilder(
-                new JavaRuntimeManager(new JavaManager(
+                new JavaRuntimeManager(new JavaEnvironmentManager(
                         foundService(runtime), failingInstaller())),
                 new GameAuthenticationProvider(new ElyAuthService()),
                 new LaunchCommandBuilder(),
@@ -120,7 +120,7 @@ class GameLaunchCommandBuilderTest {
         var runtime = new JavaRuntime(Path.of("/java/bin/java"), 21,
                 JavaRuntime.Source.JAVA_HOME);
         var builder = new GameLaunchCommandBuilder(
-                new JavaRuntimeManager(new JavaManager(
+                new JavaRuntimeManager(new JavaEnvironmentManager(
                         foundService(runtime), failingInstaller())),
                 new GameAuthenticationProvider(new ElyAuthService()),
                 new LaunchCommandBuilder(),

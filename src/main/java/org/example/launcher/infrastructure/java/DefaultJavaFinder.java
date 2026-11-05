@@ -5,15 +5,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.VersionMetadata;
 
 /**
- * Реализация {@link JavaResolutionService} по умолчанию.
+ * Реализация {@link JavaFinder} по умолчанию.
  * <p>
- * Делегирует поиск рантаймов {@link JavaDetector} и выбирает
+ * Делегирует поиск рантаймов {@link JavaScanner} и выбирает
  * рантайм с минимальной major-версией, которая ещё удовлетворяет
  * требованию (чтобы не запускать игру на излишне новом JDK).
  * <p>
@@ -22,28 +22,28 @@ import org.example.launcher.domain.model.VersionMetadata;
  * т.к. старые версии Minecraft рассчитаны на Java 8).
  * <p>
  * Пользовательский путь к Java задаётся через
- * {@link #setCustomJavaPath(Path)}; при установке детектор проверяет
+ * {@link #setCustomJavaPath(Path)}; при установке сканер проверяет
  * этот путь, и найденный рантайм включается в список кандидатов
  * наряду с системными.
  */
-public class DefaultJavaResolutionService implements JavaResolutionService {
+public class DefaultJavaFinder implements JavaFinder {
 
-    private final JavaDetector detector;
+    private final JavaScanner scanner;
     private final int fallbackMajor;
     private Path customJavaPath;
 
-    public DefaultJavaResolutionService(JavaDetector detector) {
-        this(detector, 8);
+    public DefaultJavaFinder(JavaScanner scanner) {
+        this(scanner, 8);
     }
 
-    public DefaultJavaResolutionService(JavaDetector detector, int fallbackMajor) {
-        this.detector = detector;
+    public DefaultJavaFinder(JavaScanner scanner, int fallbackMajor) {
+        this.scanner = scanner;
         this.fallbackMajor = fallbackMajor;
     }
 
     /**
      * Задаёт пользовательский путь к исполняемому файлу Java для
-     * учёта в будущих вызовах разрешения. {@code null} сбрасывает настройку.
+     * учёта в будущих вызовах поиска. {@code null} сбрасывает настройку.
      *
      * @param javaExe путь к исполняемому файлу {@code java}/{@code java.exe}
      */
@@ -52,20 +52,20 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
     }
 
     @Override
-    public JavaResolutionResult resolve(VersionMetadata metadata) {
+    public JavaFindResult find(VersionMetadata metadata) {
         int required = metadata.javaVersion()
                 .map(JavaVersion::majorVersion)
                 .orElse(fallbackMajor);
-        return resolve(required);
+        return find(required);
     }
 
     @Override
-    public JavaResolutionResult resolve(int requiredMajor) {
-        List<JavaRuntime> runtimes = new ArrayList<>(detector.detectInstalledRuntimes());
+    public JavaFindResult find(int requiredMajor) {
+        List<JavaRuntime> runtimes = new ArrayList<>(scanner.scanInstalledRuntimes());
 
         // Добавить пользовательский путь к Java, если задан
         if (customJavaPath != null) {
-            JavaRuntime custom = detector.detectFromPath(
+            JavaRuntime custom = scanner.detectFromPath(
                     customJavaPath.getParent().getParent(),
                     JavaRuntime.Source.CUSTOM);
             if (custom != null) {
@@ -74,7 +74,7 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
         }
 
         if (runtimes.isEmpty()) {
-            return JavaResolutionResult.notFound(
+            return JavaFindResult.notFound(
                     "No Java runtime was found on this system.");
         }
 
@@ -97,7 +97,7 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
                 int bestAvailable = runtimes.stream()
                         .mapToInt(JavaRuntime::majorVersion)
                         .max().orElse(0);
-                return JavaResolutionResult.incompatible(
+                return JavaFindResult.incompatible(
                         "This version requires Java " + requiredMajor
                         + " exactly (launchwrapper is incompatible with Java 9+)."
                         + " The best available runtime is Java " + bestAvailable
@@ -106,11 +106,11 @@ public class DefaultJavaResolutionService implements JavaResolutionService {
             int bestAvailable = runtimes.stream()
                     .mapToInt(JavaRuntime::majorVersion)
                     .max().orElse(0);
-            return JavaResolutionResult.incompatible(
+            return JavaFindResult.incompatible(
                     "Java " + requiredMajor + "+ is required, but the best "
                     + "available runtime is Java " + bestAvailable + ".");
         }
 
-        return JavaResolutionResult.found(compatible.get(0));
+        return JavaFindResult.found(compatible.get(0));
     }
 }

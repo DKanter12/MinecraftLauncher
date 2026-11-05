@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.JavaVersion;
@@ -38,7 +38,7 @@ public class BuildLaunchManager {
     private final BuildIntegrityChecker integrity;
     private final BuildRepairManager repair;
     private final ElyByAuthenticator authenticator;
-    private final JavaManager javaManager;
+    private final JavaEnvironmentManager javaEnvironmentManager;
     private final GameLaunchCommandBuilder commandBuilder;
     private final GameProcessManager processes;
     private final GameProcessMonitor monitor;
@@ -50,7 +50,7 @@ public class BuildLaunchManager {
     public BuildLaunchManager(BuildIntegrityChecker integrity,
                               BuildRepairManager repair,
                               ElyByAuthenticator authenticator,
-                              JavaManager javaManager,
+                              JavaEnvironmentManager javaEnvironmentManager,
                               GameLaunchCommandBuilder commandBuilder,
                               GameProcessManager processes,
                               GameProcessMonitor monitor,
@@ -60,7 +60,7 @@ public class BuildLaunchManager {
         this.integrity = Objects.requireNonNull(integrity, "integrity");
         this.repair = Objects.requireNonNull(repair, "repair");
         this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
-        this.javaManager = Objects.requireNonNull(javaManager, "javaManager");
+        this.javaEnvironmentManager = Objects.requireNonNull(javaEnvironmentManager, "javaEnvironmentManager");
         this.commandBuilder = Objects.requireNonNull(commandBuilder, "commandBuilder");
         this.processes = Objects.requireNonNull(processes, "processes");
         this.monitor = Objects.requireNonNull(monitor, "monitor");
@@ -160,14 +160,14 @@ public class BuildLaunchManager {
                     listener.onStage(LaunchStage.INSTALLING_JAVA);
                     JavaRuntime runtime;
                     try {
-                        runtime = javaManager.ensureInstalled(8,
+                        runtime = javaEnvironmentManager.ensureInstalled(8,
                                 storage.javaRuntimeDir("jre-legacy"));
                     } catch (Exception e) {
                         listener.onFailed(e.getClass().getSimpleName() + ": "
                                 + e.getMessage() + Lang.tr("launch.java.manual"));
                         return;
                     }
-                    javaManager.adoptManaged(runtime);
+                    javaEnvironmentManager.adoptManaged(runtime);
                 }
                 case REPAIR -> {
                     repaired = true;

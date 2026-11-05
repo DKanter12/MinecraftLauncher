@@ -1,176 +1,225 @@
-/* ============ Премиальная тёмная тема «Aurora» ============
- * Глубокий тёмно-синий фон, стеклянные панели, акцент индиго
- * с мягким свечением, скруглённые карточки, градиентные кнопки.
- * Имена классов не менять — их использует Java-код.
- * Палитра:
- *   фон #090C11 / база #0E131A / панели #141B25 / карточки #161E29
- *   рамки #232E3D / текст #F1F5F9 / вторичный #94A3B8
- *   индиго #4842B0→#35308A / небо #1E7FAE / янтарь #8F6E14
- *   роза #A63A52 (ошибки/удаление)
- *   версии ярче: мята #4ADE80, янтарь #FACC15, оранж #FB923C,
- *   синь #60A5FA, фиолет #A78BFA, сланец #B6C2D2
- * =================================================================== */
+/* ================================================================
+   PACKCRAFT — Modrinth-inspired dark theme
+   Palette (Modrinth "knossos" dark tokens):
+     bg          #121418        raised      #181A20
+     button      #444850        hover       #2A2F38
+     pressed     #3A404B        divider     #2B303A
+     text        #B0BAC5        bright      #ECF0F4
+     secondary   #8A93A1        muted       #75808E
+     brand       #10B981        link        #74B6F3
+     red         #FF4A6E
+   Radii: cards 16px, buttons 12px, chips/pills full.
+   ================================================================ */
 
 .root {
-    -fx-background-color: #141B25;
-    -fx-border-color: #232E3D;
-    -fx-border-width: 1;
-    -fx-focus-color: #4842B0;
-    -fx-faint-focus-color: rgba(72, 66, 176, 0.22);
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-font-size: 13px;
+    -fx-text-fill: #B0BAC5;
 }
 
 .root-pane {
-    -fx-background-color: linear-gradient(to bottom, #0E141C 0%, #090C11 60%, #0B1016 100%);
-    -fx-border-color: #4842B0 transparent transparent transparent;
-    -fx-border-width: 2 0 0 0;
+    -fx-background-color: #121418;
     -fx-padding: 0;
-    -fx-focus-color: #4842B0;
-    -fx-faint-focus-color: rgba(72, 66, 176, 0.22);
+    -fx-focus-color: #10B981;
+    -fx-faint-focus-color: rgba(16, 185, 129, 0.22);
 }
 
-/* ============================ Top bar ============================ */
+/* ============================ Header ============================ */
 
 .topbar {
-    -fx-background-color: rgba(20, 27, 37, 0.92);
-    -fx-border-color: transparent transparent #1E2836 transparent;
+    -fx-background-color: #121418;
+    -fx-border-color: transparent transparent #181A20 transparent;
     -fx-border-width: 0 0 1 0;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.45), 12, 0, 0, 2);
+    -fx-padding: 10 18 10 18;
 }
 
-.view-title {
-    -fx-font-size: 23px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #FFFFFF;
-}
-
-.account-pill {
-    -fx-background-color: rgba(30, 40, 54, 0.85);
-    -fx-background-radius: 20;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 20;
-    -fx-border-width: 1;
-    -fx-padding: 4 12 4 6;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 8, 0, 0, 2);
-}
-
-/* ========================= Navigation rail ========================= */
-
-.nav-rail {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: transparent #1E2836 transparent transparent;
-    -fx-border-width: 0 1 0 0;
-}
-
-.nav-button {
-    -fx-background-color: transparent;
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 14px;
+.brand-row {
     -fx-alignment: center-left;
+    -fx-padding: 0 10 0 0;
+}
+
+.brand-icon {
+    -fx-text-fill: #0B120D;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+    -fx-background-color: #10B981;
     -fx-background-radius: 10;
-    -fx-padding: 10 14 10 14;
+}
+
+.brand-name {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 15px;
+    -fx-font-weight: 800;
+}
+
+.brand-sub {
+    -fx-text-fill: #10B981;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+}
+
+.header-tabs {
+    -fx-alignment: center-left;
+}
+
+/* Глобальные вкладки: активная — зелёная подчёркивающая линия */
+.header-tab {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 10;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 2 0;
+    -fx-padding: 8 14 6 14;
     -fx-cursor: hand;
 }
 
-.nav-button:hover {
-    -fx-background-color: #1A2330;
-    -fx-text-fill: #FFFFFF;
+.header-tab:hover {
+    -fx-background-color: #181A20;
+    -fx-text-fill: #ECF0F4;
 }
 
-.nav-button-active {
-    -fx-background-color: linear-gradient(to right, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
-    -fx-background-radius: 10;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.35), 12, 0, 0, 0);
+.header-tab-active {
+    -fx-text-fill: #ECF0F4;
+    -fx-border-color: transparent transparent #10B981 transparent;
 }
 
-.nav-button-active:hover {
-    -fx-background-color: linear-gradient(to right, #5A59C4 0%, #4842B0 100%);
-    -fx-text-fill: #FFFFFF;
+.header-tab-active:hover {
+    -fx-background-color: rgba(16, 185, 129, 0.08);
+}
+
+.header-icon-button {
+    -fx-background-color: #181A20;
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 14px;
+    -fx-background-radius: 12;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 6 10 6 10;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.header-icon-button:hover {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+}
+
+.header-icon-button.header-tab-active {
+    -fx-border-color: #10B981;
+    -fx-text-fill: #10B981;
+    -fx-background-color: rgba(16, 185, 129, 0.10);
+}
+
+/* Аккаунт-капсула в Header: кнопка-пилюля с аватаром скина
+   и выпадающей стрелкой; hover — неоновая рамка */
+.account-pill {
+    -fx-background-color: rgba(32, 36, 45, 0.92);
+    -fx-background-radius: 999;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 4 12 4 4;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 10, 0, 0, 3);
+}
+
+.account-pill:hover {
+    -fx-border-color: rgba(16, 185, 129, 0.50);
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.20), 12, 0, 0, 3);
+}
+
+.account-pill-arrow {
+    -fx-text-fill: #6C727F;
+    -fx-font-size: 11px;
+    -fx-mouse-transparent: true;
 }
 
 /* ============================ Footer ============================ */
 
 .footer {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: #1E2836 transparent transparent transparent;
+    -fx-background-color: #121418;
+    -fx-border-color: #181A20 transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
+    -fx-padding: 6 18 6 18;
 }
 
 .status-label {
-    -fx-text-fill: #94A3B8;
+    -fx-text-fill: #8A93A1;
     -fx-font-size: 12px;
 }
 
 .footer-version {
-    -fx-text-fill: #5B6B7F;
+    -fx-text-fill: #5F6874;
     -fx-font-size: 11px;
 }
 
-/* ============================ Titles ============================ */
+/* ============================ Typography ============================ */
 
 .title-label {
-    -fx-font-size: 21px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
 }
 
 .section-title {
-    -fx-text-fill: #7D8EA3;
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-    -fx-padding: 0 0 2 0;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
 }
 
 .details-version {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
 }
 
 .details-info {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 13px;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
 }
 
 .metadata-item {
-    -fx-text-fill: #CBD5E1;
+    -fx-text-fill: #8A93A1;
     -fx-font-size: 12px;
-    -fx-line-spacing: 2;
 }
 
 .metadata-error {
-    -fx-text-fill: #A63A52;
+    -fx-text-fill: #FF4A6E;
     -fx-font-size: 12px;
 }
 
 .java-ok {
-    -fx-text-fill: #4ADE80;
+    -fx-text-fill: #10B981;
     -fx-font-size: 12px;
-    -fx-line-spacing: 2;
 }
 
 .java-warn {
-    -fx-text-fill: #FACC15;
+    -fx-text-fill: #F99E6B;
     -fx-font-size: 12px;
-    -fx-line-spacing: 2;
 }
 
 .java-error {
-    -fx-text-fill: #A63A52;
+    -fx-text-fill: #FF4A6E;
     -fx-font-size: 12px;
-    -fx-line-spacing: 2;
 }
 
 .quick-select-label {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 11px;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
 }
 
-/* ======================= Instance cards ======================= */
+/* ============================ Scroll / layout ============================ */
 
 .cards-scroll {
     -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
 }
 
 .cards-scroll > .viewport {
@@ -181,796 +230,784 @@
     -fx-background-color: transparent;
 }
 
-.instance-card {
-    -fx-background-color: linear-gradient(to bottom, #1A2330 0%, #151C26 100%);
+/* ============================ Chips / filters ============================ */
+
+.filter-row {
+    -fx-alignment: center-left;
+}
+
+.filter-button {
+    -fx-background-color: #181A20;
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 999;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 6 13 6 13;
+    -fx-cursor: hand;
+}
+
+.filter-button:hover {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+}
+
+.filter-button:selected,
+.filter-button-active {
+    -fx-background-color: rgba(16, 185, 129, 0.15);
+    -fx-border-color: #10B981;
+    -fx-text-fill: #10B981;
+    -fx-font-weight: bold;
+}
+
+.filter-mini {
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11px;
+}
+
+.filter-title {
+    -fx-text-fill: #75808E;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.store-count {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
+    -fx-background-color: #181A20;
+    -fx-background-radius: 999;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 3 10 3 10;
+}
+
+.store-filters {
+    -fx-background-color: #181A20;
     -fx-background-radius: 16;
-    -fx-border-color: #26303D;
+    -fx-border-color: #20242B;
     -fx-border-radius: 16;
     -fx-border-width: 1;
-    -fx-padding: 16;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.5), 16, 0, 0, 6);
+    -fx-padding: 14;
+}
+
+.store-loader-check {
+    -fx-text-fill: #B0BAC5;
+}
+
+/* ============================ Instance cards ============================ */
+
+/* Карточка инстанса: радиус 14, фон #1A1D24/blur-базовый,
+   hover — неоновая рамка rgba(16,185,129,0.4) + приподнятие -2px
+   (в JavaFX transition эмулируется мгновенным состоянием hover) */
+.instance-card {
+    -fx-background-color: #1A1D24;
+    -fx-background-radius: 14;
+    -fx-border-color: #23262E;
+    -fx-border-radius: 14;
+    -fx-border-width: 1;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.30), 10, 0, 0, 4);
 }
 
 .instance-card:hover {
-    -fx-border-color: #3B4B61;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 22, 0, 0, 8);
+    -fx-background-color: #1C2027;
+    -fx-border-color: rgba(16, 185, 129, 0.40);
+    -fx-translate-y: -2;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.40), 14, 0, 0, 6);
 }
 
 .instance-card-selected {
+    -fx-border-color: #10B981;
     -fx-border-width: 2;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.22), 20, 0, 0, 6);
+    -fx-background-color: rgba(16, 185, 129, 0.07);
 }
 
-.accent-vanilla.instance-card-selected {
-    -fx-border-color: #4ADE80;
+/* Баннер карточки: кастомная иконка или градиент загрузчика
+   (радиус = радиус карточки минус внутренний отступ) */
+.instance-banner {
+    -fx-background-color: #20242B;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-border-color: rgba(255, 255, 255, 0.04);
 }
 
-.accent-fabric.instance-card-selected {
-    -fx-border-color: #FACC15;
+.instance-banner.accent-vanilla {
+    -fx-background-color: linear-gradient(to bottom right, rgba(16, 185, 129, 0.45) 0%, rgba(9, 90, 63, 0.92) 100%);
 }
 
-.accent-forge.instance-card-selected {
-    -fx-border-color: #FB923C;
+.instance-banner.accent-fabric {
+    -fx-background-color: linear-gradient(to bottom right, rgba(219, 182, 155, 0.40) 0%, rgba(62, 45, 35, 0.92) 100%);
 }
 
-.accent-neoforge.instance-card-selected {
-    -fx-border-color: #60A5FA;
+.instance-banner.accent-forge {
+    -fx-background-color: linear-gradient(to bottom right, rgba(96, 165, 250, 0.40) 0%, rgba(37, 47, 90, 0.92) 100%);
 }
 
-.accent-quilt.instance-card-selected {
-    -fx-border-color: #A78BFA;
+.instance-banner.accent-neoforge {
+    -fx-background-color: linear-gradient(to bottom right, rgba(249, 158, 107, 0.40) 0%, rgba(88, 48, 28, 0.92) 100%);
+}
+
+.instance-banner.accent-quilt {
+    -fx-background-color: linear-gradient(to bottom right, rgba(199, 150, 249, 0.40) 0%, rgba(60, 38, 86, 0.92) 100%);
+}
+
+.instance-banner-letter,
+.instance-banner-logo {
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+    -fx-text-fill: rgba(236, 240, 244, 0.85);
+    -fx-text-alignment: center;
+}
+
+/* Быстрые действия на обложке: круглые иконки с полупрозрачным
+   фоном, плавно проявляются при наведении на карточку */
+.banner-actions {
+    -fx-opacity: 0;
+}
+
+.instance-card:hover .banner-actions {
+    -fx-opacity: 1;
+}
+
+.banner-action {
+    -fx-background-color: rgba(10, 12, 16, 0.62);
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 4 6 4 6;
+    -fx-cursor: hand;
+}
+
+.banner-action:hover {
+    -fx-background-color: rgba(16, 20, 26, 0.92);
+    -fx-border-color: rgba(16, 185, 129, 0.45);
+    -fx-text-fill: #ECF0F4;
+}
+
+/* Компактное меню «⋮» карточки: появляется только при наведении */
+.card-menu {
+    -fx-opacity: 0;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 14px;
+    -fx-background-radius: 10;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 0 6 2 6;
+    -fx-cursor: hand;
+}
+
+.card-menu:hover {
+    -fx-background-color: #2A2F38;
+    -fx-text-fill: #ECF0F4;
+}
+
+.card-menu:showing,
+.card-menu:armed {
+    -fx-opacity: 1;
+}
+
+.instance-card:hover .card-menu {
+    -fx-opacity: 1;
 }
 
 .instance-icon {
-    -fx-font-size: 18px;
+    -fx-font-size: 15px;
     -fx-font-weight: bold;
     -fx-alignment: center;
-    -fx-min-width: 48;
-    -fx-min-height: 48;
-    -fx-max-width: 48;
-    -fx-max-height: 48;
-    -fx-background-radius: 14;
-    -fx-border-radius: 14;
-    -fx-border-width: 1;
+    -fx-min-width: 40;
+    -fx-min-height: 40;
+    -fx-max-width: 40;
+    -fx-max-height: 40;
+    -fx-background-radius: 12;
+    -fx-text-fill: #ECF0F4;
+    -fx-background-color: rgba(16, 185, 129, 0.15);
 }
 
 .accent-vanilla .instance-icon {
-    -fx-background-color: rgba(74, 222, 128, 0.14);
-    -fx-text-fill: #4ADE80;
-    -fx-border-color: rgba(74, 222, 128, 0.45);
+    -fx-background-color: rgba(16, 185, 129, 0.15);
+    -fx-text-fill: #10B981;
 }
 
 .accent-fabric .instance-icon {
-    -fx-background-color: rgba(250, 204, 21, 0.13);
-    -fx-text-fill: #FACC15;
-    -fx-border-color: rgba(250, 204, 21, 0.45);
+    -fx-background-color: rgba(219, 182, 155, 0.18);
+    -fx-text-fill: #DBB69B;
 }
 
 .accent-forge .instance-icon {
-    -fx-background-color: rgba(251, 146, 60, 0.13);
-    -fx-text-fill: #FB923C;
-    -fx-border-color: rgba(251, 146, 60, 0.45);
+    -fx-background-color: rgba(149, 158, 239, 0.18);
+    -fx-text-fill: #959EEF;
 }
 
 .accent-neoforge .instance-icon {
-    -fx-background-color: rgba(96, 165, 250, 0.13);
-    -fx-text-fill: #60A5FA;
-    -fx-border-color: rgba(96, 165, 250, 0.45);
+    -fx-background-color: rgba(249, 158, 107, 0.18);
+    -fx-text-fill: #F99E6B;
 }
 
 .accent-quilt .instance-icon {
-    -fx-background-color: rgba(167, 139, 250, 0.13);
-    -fx-text-fill: #A78BFA;
-    -fx-border-color: rgba(167, 139, 250, 0.45);
+    -fx-background-color: rgba(199, 150, 249, 0.18);
+    -fx-text-fill: #C796F9;
 }
 
 .instance-card-name {
     -fx-text-fill: #FFFFFF;
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
 }
 
+/* Плашка-капсула метаданных: [Forge 1.20.1 • 14 модов] */
+.instance-badge {
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 11px;
+    -fx-background-color: #242832;
+    -fx-background-radius: 6;
+    -fx-padding: 3 9 3 9;
+}
+
+/* Дата последнего запуска — приглушённый низ инфо-блока */
 .instance-card-sub {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 12px;
-}
-
-.instance-card-build {
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
-}
-
-.accent-vanilla .instance-card-build {
-    -fx-text-fill: #4ADE80;
-}
-
-.accent-fabric .instance-card-build {
-    -fx-text-fill: #FACC15;
-}
-
-.accent-forge .instance-card-build {
-    -fx-text-fill: #FB923C;
-}
-
-.accent-neoforge .instance-card-build {
-    -fx-text-fill: #60A5FA;
-}
-
-.accent-quilt .instance-card-build {
-    -fx-text-fill: #A78BFA;
-}
-
-.instance-card-details {
-    -fx-border-color: #232E3D transparent transparent transparent;
-    -fx-border-width: 1 0 0 0;
-    -fx-padding: 8 0 0 0;
-}
-
-.instance-card-detail-line {
-    -fx-text-fill: #94A3B8;
+    -fx-text-fill: #6C727F;
     -fx-font-size: 11px;
 }
 
-/* Светящиеся кнопки запуска в цвете акцента. */
-
-.card-play {
-    -fx-background-color: linear-gradient(to bottom, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
+.instance-card-build {
+    -fx-text-fill: #10B981;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
-    -fx-font-size: 13px;
+}
+
+.accent-fabric .instance-card-build {
+    -fx-text-fill: #DBB69B;
+}
+
+.accent-forge .instance-card-build {
+    -fx-text-fill: #959EEF;
+}
+
+.accent-neoforge .instance-card-build {
+    -fx-text-fill: #F99E6B;
+}
+
+.accent-quilt .instance-card-build {
+    -fx-text-fill: #C796F9;
+}
+
+.instance-card-details {
+    -fx-background-color: #1F2227;
     -fx-background-radius: 10;
-    -fx-padding: 9 14 9 14;
+    -fx-padding: 8 10 8 10;
+}
+
+.instance-card-detail-line {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 11px;
+}
+
+/* Основная кнопка «Играть» в карточке: неон #10B981,
+   текст #081B13, hover — яркость + неоновое свечение */
+.card-play {
+    -fx-background-color: #10B981;
+    -fx-text-fill: #081B13;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-padding: 8 14 8 14;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.4), 12, 0, 0, 0);
+    -fx-alignment: center;
 }
 
 .card-play:hover {
-    -fx-background-color: linear-gradient(to bottom, #5A59C4 0%, #4842B0 100%);
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.55), 16, 0, 0, 0);
+    -fx-background-color: #34D399;
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.35), 14, 0, 0, 4);
 }
 
 .card-play:pressed {
-    -fx-background-color: #26226E;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.25), 6, 0, 0, 0);
+    -fx-background-color: #0E8C64;
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.25), 6, 0, 0, 2);
 }
 
 .card-play:disabled {
-    -fx-background-color: #232E3D;
-    -fx-text-fill: #5B6B7F;
-    -fx-effect: null;
+    -fx-opacity: 0.45;
 }
 
 .instance-card-launching {
-    -fx-border-color: #FACC15;
-    -fx-border-width: 2;
-    -fx-effect: dropshadow(three-pass-box, rgba(250, 204, 21, 0.4), 18, 0, 0, 0);
+    -fx-background-color: rgba(16, 185, 129, 0.16);
+    -fx-text-fill: #10B981;
+    -fx-font-weight: bold;
 }
 
+/* Вторичные кнопки карточки */
 .card-ghost-button {
-    -fx-background-color: rgba(255, 255, 255, 0.03);
-    -fx-text-fill: #CBD5E1;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #B0BAC5;
     -fx-font-size: 12px;
     -fx-background-radius: 10;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 10;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+
+.card-ghost-button:hover {
+    -fx-background-color: #2A2F38;
+    -fx-text-fill: #ECF0F4;
+}
+
+.card-danger-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #FF4A6E;
+    -fx-font-size: 12px;
+    -fx-background-radius: 10;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+
+.card-danger-button:hover {
+    -fx-background-color: rgba(255, 74, 110, 0.16);
+}
+
+.card-danger-button:pressed {
+    -fx-background-color: rgba(255, 74, 110, 0.28);
+}
+
+/* Плитка «Добавить сборку» */
+.add-instance-card {
+    -fx-background-color: transparent;
+    -fx-background-radius: 16;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 16;
+    -fx-border-width: 1;
+    -fx-border-style: segments(6) line-cap round;
+    -fx-cursor: hand;
+}
+
+.add-instance-card:hover {
+    -fx-border-color: #10B981;
+    -fx-background-color: rgba(16, 185, 129, 0.05);
+}
+
+.add-instance-plus {
+    -fx-text-fill: #5F6874;
+    -fx-font-size: 26px;
+}
+
+.add-instance-card:hover .add-instance-plus {
+    -fx-text-fill: #10B981;
+}
+
+.add-instance-text {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.add-instance-card:hover .add-instance-text {
+    -fx-text-fill: #ECF0F4;
+}
+
+/* ============================ Buttons ============================ */
+
+.quick-select-button {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 12;
     -fx-border-width: 1;
     -fx-padding: 7 14 7 14;
     -fx-cursor: hand;
 }
 
-.card-ghost-button:hover {
-    -fx-background-color: rgba(72, 66, 176, 0.1);
-    -fx-text-fill: #FFFFFF;
-    -fx-border-color: #4842B0;
-}
-
-.card-danger-button {
-    -fx-background-color: linear-gradient(to bottom, #A32440 0%, #8C1B35 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 10;
-    -fx-padding: 9 14 9 14;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(150, 35, 60, 0.35), 10, 0, 0, 0);
-}
-
-.card-danger-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #A63A52 0%, #A32440 100%);
-}
-
-.card-danger-button:pressed {
-    -fx-background-color: #6E1429;
-}
-
-/* Плитка «Добавить инстанс» со свечением при наведении. */
-
-.add-instance-card {
-    -fx-background-color: rgba(255, 255, 255, 0.015);
-    -fx-background-radius: 16;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 16;
-    -fx-border-width: 2;
-    -fx-border-style: dashed;
-}
-
-.add-instance-card:hover {
-    -fx-border-color: #4842B0;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 18, 0, 0, 0);
-}
-
-.add-instance-plus {
-    -fx-text-fill: #5B6B7F;
-    -fx-font-size: 36px;
-}
-
-.add-instance-card:hover .add-instance-plus {
-    -fx-text-fill: #4842B0;
-}
-
-.add-instance-text {
-    -fx-text-fill: #5B6B7F;
-    -fx-font-size: 13px;
-}
-
-.add-instance-card:hover .add-instance-text {
-    -fx-text-fill: #FFFFFF;
-}
-
-/* ===================== Вторичные кнопки ===================== */
-
-.quick-select-button {
-    -fx-background-color: linear-gradient(to bottom, #223041 0%, #1A2330 100%);
-    -fx-text-fill: #F1F5F9;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 10;
-    -fx-border-color: #314052;
-    -fx-border-radius: 10;
-    -fx-border-width: 1;
-    -fx-padding: 9 16 9 16;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.4), 8, 0, 0, 2);
-}
-
 .quick-select-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #2A3A4F 0%, #223041 100%);
-    -fx-border-color: #4842B0;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 12, 0, 0, 2);
+    -fx-background-color: #2A2F38;
+    -fx-text-fill: #ECF0F4;
 }
 
 .quick-select-button:pressed {
-    -fx-background-color: #141B25;
+    -fx-background-color: #3A404B;
 }
 
 .quick-select-button:disabled {
-    -fx-background-color: #1A2330;
-    -fx-text-fill: #5B6B7F;
-    -fx-border-color: #232E3D;
-    -fx-effect: null;
+    -fx-opacity: 0.45;
 }
 
 .browse-java-button {
-    -fx-background-color: #1A2330;
-    -fx-text-fill: #CBD5E1;
-    -fx-font-size: 12px;
-    -fx-background-radius: 10;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 10;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #B0BAC5;
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 12;
     -fx-border-width: 1;
-    -fx-padding: 5 14 5 14;
+    -fx-padding: 6 12 6 12;
     -fx-cursor: hand;
 }
 
 .browse-java-button:hover {
-    -fx-background-color: #223041;
-    -fx-text-fill: #FFFFFF;
-    -fx-border-color: #4842B0;
+    -fx-background-color: #2A2F38;
+    -fx-text-fill: #ECF0F4;
 }
 
 .browse-java-button:disabled {
-    -fx-background-color: #161E29;
-    -fx-text-fill: #5B6B7F;
+    -fx-opacity: 0.45;
 }
 
-/* Удаление аккаунта: розовая угроза. */
-
 .account-delete-button {
-    -fx-background-color: rgba(150, 35, 60, 0.1);
-    -fx-text-fill: #A63A52;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
+    -fx-background-color: transparent;
+    -fx-text-fill: #FF4A6E;
     -fx-background-radius: 10;
-    -fx-border-color: rgba(150, 35, 60, 0.45);
-    -fx-border-radius: 10;
-    -fx-border-width: 1;
-    -fx-padding: 5 14 5 14;
+    -fx-padding: 4 10 4 10;
     -fx-cursor: hand;
 }
 
 .account-delete-button:hover {
-    -fx-background-color: #8C1B35;
-    -fx-text-fill: #FFFFFF;
-    -fx-border-color: #8C1B35;
-    -fx-effect: dropshadow(three-pass-box, rgba(150, 35, 60, 0.4), 10, 0, 0, 0);
+    -fx-background-color: rgba(255, 74, 110, 0.16);
 }
 
 .account-delete-button:pressed {
-    -fx-background-color: #6E1429;
-    -fx-text-fill: #FFFFFF;
-    -fx-border-color: #6E1429;
+    -fx-background-color: rgba(255, 74, 110, 0.28);
 }
-
-/* Крестик в строке аккаунта. */
 
 .account-row-delete {
     -fx-background-color: transparent;
-    -fx-text-fill: #5B6B7F;
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #75808E;
+    -fx-font-size: 12px;
     -fx-background-radius: 8;
     -fx-padding: 2 8 2 8;
     -fx-cursor: hand;
 }
 
 .account-row-delete:hover {
-    -fx-background-color: #8C1B35;
-    -fx-text-fill: #FFFFFF;
+    -fx-background-color: rgba(255, 74, 110, 0.16);
+    -fx-text-fill: #FF4A6E;
 }
 
-.tooltip {
-    -fx-background-color: #1A2330;
-    -fx-text-fill: #F1F5F9;
-    -fx-font-size: 12px;
-    -fx-background-radius: 8;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 8;
-    -fx-border-width: 1;
-    -fx-padding: 7 11 7 11;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.5), 10, 0, 0, 3);
-}
-
-/* Чипы фильтров: стеклянные пилюли, активный светится. */
-
-.filter-button {
-    -fx-background-color: rgba(255, 255, 255, 0.04);
-    -fx-background-radius: 20;
-    -fx-border-color: #2B3644;
-    -fx-border-radius: 20;
-    -fx-border-width: 1;
-    -fx-padding: 7 16 7 16;
-    -fx-text-fill: #CBD5E1;
-    -fx-font-size: 12px;
-    -fx-cursor: hand;
-}
-
-.filter-button:hover {
-    -fx-border-color: #4842B0;
-    -fx-text-fill: #FFFFFF;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.25), 8, 0, 0, 0);
-}
-
-.filter-button:selected,
-.filter-button-active {
-    -fx-background-color: linear-gradient(to right, #4842B0 0%, #35308A 100%);
-    -fx-border-color: transparent;
-    -fx-text-fill: #FFFFFF;
+/* Brand-кнопки */
+.pack-install,
+.play-button,
+.play-button-compact {
+    -fx-background-color: #10B981;
+    -fx-text-fill: #0B120D;
     -fx-font-weight: bold;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.4), 10, 0, 0, 0);
-}
-
-.filter-row {
-    -fx-background-color: transparent;
-}
-
-/* ===================== Play / confirm ===================== */
-
-.play-button {
-    -fx-background-color: linear-gradient(to bottom, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
-    -fx-font-size: 17px;
+    -fx-font-size: 13px;
     -fx-background-radius: 12;
-    -fx-padding: 13 44 13 44;
+    -fx-padding: 9 16 9 16;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.45), 18, 0, 0, 4);
+    -fx-alignment: center;
 }
 
-.play-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #5A59C4 0%, #4842B0 100%);
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.6), 24, 0, 0, 6);
+.pack-install:hover,
+.play-button:hover,
+.play-button-compact:hover {
+    -fx-background-color: #34D399;
 }
 
-.play-button:pressed {
-    -fx-background-color: #26226E;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 8, 0, 0, 2);
+.pack-install:pressed,
+.play-button:pressed,
+.play-button-compact:pressed {
+    -fx-background-color: #0E8C64;
 }
 
-.play-button:disabled {
-    -fx-background-color: #232E3D;
-    -fx-text-fill: #5B6B7F;
-    -fx-effect: null;
+.pack-install:disabled,
+.play-button:disabled,
+.play-button-compact:disabled {
+    -fx-opacity: 0.45;
 }
 
 .play-button-compact {
-    -fx-background-color: linear-gradient(to bottom, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
-    -fx-font-size: 13px;
-    -fx-background-radius: 10;
-    -fx-padding: 7 22 7 22;
-    -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.4), 12, 0, 0, 2);
-}
-
-.play-button-compact:hover {
-    -fx-background-color: linear-gradient(to bottom, #5A59C4 0%, #4842B0 100%);
-}
-
-.play-button-compact:pressed {
-    -fx-background-color: #26226E;
-}
-
-.play-button-compact:disabled {
-    -fx-background-color: #232E3D;
-    -fx-text-fill: #5B6B7F;
-    -fx-effect: null;
+    -fx-font-size: 12px;
+    -fx-padding: 7 12 7 12;
 }
 
 .install-close-button {
-    -fx-background-color: linear-gradient(to bottom, #223041 0%, #1A2330 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-background-radius: 10;
-    -fx-border-color: #314052;
-    -fx-border-radius: 10;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 12;
     -fx-border-width: 1;
-    -fx-padding: 9 32 9 32;
+    -fx-padding: 7 16 7 16;
     -fx-cursor: hand;
 }
 
 .install-close-button:hover {
-    -fx-border-color: #4842B0;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 10, 0, 0, 0);
+    -fx-background-color: #2A2F38;
 }
 
 .install-close-button:pressed {
-    -fx-background-color: #141B25;
+    -fx-background-color: #3A404B;
 }
 
 .install-close-button:disabled {
-    -fx-background-color: #1A2330;
-    -fx-text-fill: #5B6B7F;
-    -fx-border-color: #232E3D;
+    -fx-opacity: 0.45;
 }
 
 .retry-button {
-    -fx-background-color: linear-gradient(to bottom, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
-    -fx-font-size: 14px;
-    -fx-background-radius: 10;
-    -fx-padding: 9 26 9 26;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 6 14 6 14;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.4), 12, 0, 0, 2);
 }
 
 .retry-button:hover {
-    -fx-background-color: linear-gradient(to bottom, #5A59C4 0%, #4842B0 100%);
+    -fx-background-color: #2A2F38;
 }
 
-/* ===================== Inputs ===================== */
+/* ============================ Inputs ============================ */
 
+/* Поля поиска: чуть контрастнее фон #20242D, скругление 8,
+   место под иконку лупы слева (в Java — паддинг 34 слева) */
 .search-field {
-    -fx-background-color: #0B0F15;
-    -fx-text-fill: #F1F5F9;
-    -fx-prompt-text-fill: #5B6B7F;
-    -fx-background-radius: 10;
-    -fx-border-color: #26303D;
-    -fx-border-radius: 10;
+    -fx-background-color: #20242D;
+    -fx-text-fill: #ECF0F4;
+    -fx-prompt-text-fill: #6C727F;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 8;
     -fx-border-width: 1;
-    -fx-padding: 9 13 9 13;
+    -fx-padding: 8 16 8 16;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.30), 8, 0, 0, 2);
 }
 
 .search-field:focused {
-    -fx-border-color: #4842B0;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 10, 0, 0, 0);
+    -fx-border-color: rgba(16, 185, 129, 0.60);
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.28), 12, 0, 0, 0);
 }
 
-/* ===================== Lists ===================== */
-
-.profile-list {
-    -fx-background-color: #0B0F15;
-    -fx-background-radius: 12;
-    -fx-border-color: #232E3D;
-    -fx-border-radius: 12;
-    -fx-border-width: 1;
-    -fx-padding: 5;
-}
-
-.profile-list .list-cell {
-    -fx-background-color: transparent;
-    -fx-text-fill: #F1F5F9;
-    -fx-background-radius: 8;
-    -fx-padding: 7 9 7 9;
-}
-
-.profile-list .list-cell:empty {
-    -fx-background-color: transparent;
-}
-
-.profile-list .list-cell:filled:hover {
-    -fx-background-color: #1A2330;
-}
-
-.profile-list .list-cell:filled:selected {
-    -fx-background-color: rgba(72, 66, 176, 0.16);
-}
-
-.profile-list .placeholder .label {
-    -fx-text-fill: #5B6B7F;
-    -fx-font-size: 12px;
-}
-
-.profile-name {
-    -fx-text-fill: #FFFFFF;
+/* Иконка лупы слева от поля поиска (Label поверх TextField в StackPane) */
+.search-icon {
+    -fx-text-fill: #8A93A1;
     -fx-font-size: 13px;
-    -fx-font-weight: bold;
+    -fx-mouse-transparent: true;
 }
 
-.profile-summary {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 11px;
+.search-wrap {
+    -fx-background-color: transparent;
+    -fx-min-height: 34;
 }
 
-.slot-box {
-    -fx-background-color: #1A2330;
-    -fx-border-color: #2B3644;
-    -fx-border-width: 1;
-    -fx-border-radius: 10;
+.text-field {
+    -fx-background-color: #14171C;
+    -fx-text-fill: #ECF0F4;
+    -fx-prompt-text-fill: #5F6874;
     -fx-background-radius: 10;
-    -fx-padding: 7 9 7 9;
-}
-
-/* ===================== Badges ===================== */
-
-.loader-badge-vanilla,
-.loader-badge-fabric,
-.loader-badge-forge,
-.loader-badge-neoforge,
-.loader-badge-quilt,
-.type-badge-release,
-.type-badge-snapshot,
-.type-badge-old-beta,
-.type-badge-old-alpha {
-    -fx-font-size: 9px;
-    -fx-font-weight: bold;
-    -fx-padding: 3 9 3 9;
-    -fx-background-radius: 20;
-    -fx-border-radius: 20;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 10;
     -fx-border-width: 1;
+    -fx-padding: 7 10 7 10;
 }
 
-.loader-badge-vanilla {
-    -fx-background-color: rgba(74, 222, 128, 0.12);
-    -fx-text-fill: #4ADE80;
-    -fx-border-color: rgba(74, 222, 128, 0.5);
+.text-field:focused {
+    -fx-border-color: #10B981;
 }
 
-.loader-badge-fabric {
-    -fx-background-color: rgba(250, 204, 21, 0.12);
-    -fx-text-fill: #FACC15;
-    -fx-border-color: rgba(250, 204, 21, 0.5);
+.password-field {
+    -fx-background-color: #14171C;
+    -fx-text-fill: #ECF0F4;
+    -fx-prompt-text-fill: #5F6874;
+    -fx-background-radius: 10;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 7 10 7 10;
 }
 
-.loader-badge-forge {
-    -fx-background-color: rgba(251, 146, 60, 0.12);
-    -fx-text-fill: #FB923C;
-    -fx-border-color: rgba(251, 146, 60, 0.5);
+.password-field:focused {
+    -fx-border-color: #10B981;
 }
 
-.loader-badge-neoforge {
-    -fx-background-color: rgba(96, 165, 250, 0.12);
-    -fx-text-fill: #60A5FA;
-    -fx-border-color: rgba(96, 165, 250, 0.5);
-}
-
-.loader-badge-quilt {
-    -fx-background-color: rgba(167, 139, 250, 0.12);
-    -fx-text-fill: #A78BFA;
-    -fx-border-color: rgba(167, 139, 250, 0.5);
-}
-
-.type-badge-release {
-    -fx-background-color: rgba(74, 222, 128, 0.12);
-    -fx-text-fill: #4ADE80;
-    -fx-border-color: rgba(74, 222, 128, 0.5);
-}
-
-.type-badge-snapshot {
-    -fx-background-color: rgba(96, 165, 250, 0.12);
-    -fx-text-fill: #60A5FA;
-    -fx-border-color: rgba(96, 165, 250, 0.5);
-}
-
-.type-badge-old-beta {
-    -fx-background-color: rgba(251, 146, 60, 0.12);
-    -fx-text-fill: #FB923C;
-    -fx-border-color: rgba(251, 146, 60, 0.5);
-}
-
-.type-badge-old-alpha {
-    -fx-background-color: rgba(148, 163, 184, 0.12);
-    -fx-text-fill: #B6C2D2;
-    -fx-border-color: rgba(148, 163, 184, 0.5);
-}
-
-.version-type-hint {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 10px;
-    -fx-padding: 1 5 1 5;
-    -fx-background-color: #223041;
-    -fx-background-radius: 6;
-}
-
-/* ===================== Combo boxes ===================== */
+/* ============================ Combo box ============================ */
 
 .combo-box {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: #26303D;
+    -fx-background-color: #20242B;
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 12;
     -fx-border-width: 1;
-    -fx-background-radius: 10;
-    -fx-border-radius: 10;
-    -fx-padding: 2;
-    -fx-cursor: hand;
+    -fx-padding: 1 2 1 2;
 }
 
 .combo-box:hover {
-    -fx-border-color: #3B4B61;
+    -fx-background-color: #2A2F38;
 }
 
 .combo-box .list-cell {
-    -fx-background-color: transparent;
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #ECF0F4;
     -fx-font-size: 12px;
+    -fx-padding: 5 8 5 8;
 }
 
 .combo-box .arrow-button {
     -fx-background-color: transparent;
-    -fx-padding: 0 8 0 4;
 }
 
 .combo-box > .arrow-button > .arrow {
-    -fx-background-color: #94A3B8;
+    -fx-background-color: #8A93A1;
 }
 
 .combo-box-popup > .list-view {
-    -fx-background-color: #141B25;
-    -fx-border-color: #2B3644;
+    -fx-background-color: #181A20;
+    -fx-border-color: #2B303A;
     -fx-border-width: 1;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 16, 0, 0, 6);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 4;
 }
 
 .combo-box-popup .list-cell {
+    -fx-text-fill: #B0BAC5;
     -fx-background-color: transparent;
-    -fx-text-fill: #CBD5E1;
-    -fx-padding: 7 9 7 9;
+    -fx-background-radius: 8;
+    -fx-padding: 7 10 7 10;
 }
 
 .combo-box-popup .list-cell:hover {
-    -fx-background-color: #223041;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
 }
 
 .combo-box-popup .list-cell:selected {
-    -fx-background-color: rgba(72, 66, 176, 0.16);
-    -fx-text-fill: #FFFFFF;
+    -fx-background-color: rgba(16, 185, 129, 0.15);
+    -fx-text-fill: #10B981;
 }
 
-/* ===================== Check boxes ===================== */
+/* ============================ Check box ============================ */
 
 .check-box {
-    -fx-text-fill: #CBD5E1;
+    -fx-text-fill: #B0BAC5;
     -fx-font-size: 12px;
     -fx-cursor: hand;
 }
 
 .check-box .box {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: #3B4B61;
+    -fx-background-color: #14171C;
+    -fx-border-color: #5F6874;
     -fx-border-width: 1;
     -fx-background-radius: 6;
     -fx-border-radius: 6;
     -fx-padding: 2;
 }
 
-.check-box:selected > .box > .mark {
-    -fx-background-color: #4842B0;
-}
-
 .check-box:hover .box {
-    -fx-border-color: #4842B0;
+    -fx-border-color: #8A93A1;
 }
 
-/* ===================== Context menus ===================== */
+.check-box:selected > .box {
+    -fx-background-color: #10B981;
+    -fx-border-color: #10B981;
+}
+
+.check-box:selected > .box > .mark,
+.store-loader-check:selected > .box > .mark {
+    -fx-background-color: #0B120D;
+}
+
+/* ============================ Tooltip / menus ============================ */
+
+.tooltip {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 11px;
+    -fx-background-radius: 8;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 8;
+    -fx-padding: 5 9 5 9;
+}
 
 .context-menu {
-    -fx-background-color: #1A2330;
-    -fx-border-color: #2B3644;
+    -fx-background-color: #181A20;
+    -fx-background-radius: 12;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 12;
     -fx-border-width: 1;
-    -fx-background-radius: 10;
-    -fx-border-radius: 10;
-    -fx-padding: 5;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.6), 16, 0, 0, 6);
+    -fx-padding: 4;
+}
+
+.context-menu .menu-item {
+    -fx-background-radius: 8;
+    -fx-padding: 2 4 2 4;
 }
 
 .context-menu .menu-item .label {
-    -fx-text-fill: #CBD5E1;
+    -fx-text-fill: #B0BAC5;
     -fx-font-size: 12px;
 }
 
 .context-menu .menu-item:focused {
-    -fx-background-color: rgba(72, 66, 176, 0.16);
+    -fx-background-color: #20242B;
 }
 
 .context-menu .menu-item:focused .label {
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #ECF0F4;
 }
 
 .menu-item-danger .label {
-    -fx-text-fill: #A63A52;
+    -fx-text-fill: #FF4A6E;
 }
 
-/* ===================== Alert dialogs ===================== */
+/* ============================ Dialogs ============================ */
 
 .dialog-pane {
-    -fx-background-color: #141B25;
-    -fx-border-color: #2B3644;
+    -fx-background-color: #121418;
+    -fx-border-color: #2B303A;
     -fx-border-width: 1;
 }
 
 .dialog-pane .header-panel {
-    -fx-background-color: #141B25;
+    -fx-background-color: #181A20;
 }
 
 .dialog-pane .header-panel .label {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
 }
 
 .dialog-pane .content.label {
-    -fx-text-fill: #CBD5E1;
+    -fx-text-fill: #B0BAC5;
     -fx-font-size: 12px;
 }
 
 .dialog-pane .button {
-    -fx-background-color: linear-gradient(to bottom, #4842B0 0%, #35308A 100%);
-    -fx-text-fill: #FFFFFF;
-    -fx-font-weight: bold;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
     -fx-background-radius: 10;
-    -fx-padding: 7 20 7 20;
+    -fx-padding: 6 14 6 14;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.35), 10, 0, 0, 0);
 }
 
 .dialog-pane .button:hover {
-    -fx-background-color: linear-gradient(to bottom, #5A59C4 0%, #4842B0 100%);
+    -fx-background-color: #2A2F38;
 }
 
-/* ===================== Scroll bars ===================== */
+/* ============================ Scroll bars ============================ */
 
 .scroll-bar {
     -fx-background-color: transparent;
 }
 
 .scroll-bar .thumb {
-    -fx-background-color: #2B3644;
+    -fx-background-color: #2B303A;
     -fx-background-radius: 8;
 }
 
 .scroll-bar .thumb:hover {
-    -fx-background-color: #4842B0;
+    -fx-background-color: #5F6874;
 }
 
 .scroll-bar .track {
@@ -980,259 +1017,896 @@
 .scroll-bar .increment-button,
 .scroll-bar .decrement-button {
     -fx-background-color: transparent;
-    -fx-padding: 4;
+    -fx-padding: 0;
 }
 
 .scroll-bar .increment-arrow,
 .scroll-bar .decrement-arrow {
-    -fx-background-color: #3B4B61;
+    -fx-background-color: transparent;
+    -fx-padding: 0;
 }
 
-/* ===================== Progress ===================== */
+/* ============================ Progress ============================ */
 
 .progress-bar {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: #232E3D;
-    -fx-border-width: 1;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
-    -fx-padding: 3;
+    -fx-accent: #10B981;
 }
 
 .progress-bar > .bar {
-    -fx-background-color: linear-gradient(to right, #35308A 0%, #4842B0 60%, #5A59C4 100%);
-    -fx-background-radius: 5;
+    -fx-background-color: linear-gradient(to right, #0E8C64 0%, #10B981 100%);
+    -fx-background-radius: 6;
     -fx-background-insets: 0;
-    -fx-padding: 5;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.5), 8, 0, 0, 0);
 }
 
 .progress-bar > .track {
-    -fx-background-color: transparent;
+    -fx-background-color: #181A20;
+    -fx-background-radius: 6;
 }
 
 .progress-indicator {
-    -fx-progress-color: #4842B0;
+    -fx-progress-color: #10B981;
 }
 
-/* ===================== Dialog text ===================== */
+/* ============================ Profiles / accounts ============================ */
+
+.profile-list {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-border-color: transparent;
+}
+
+.profile-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 4 2 4 2;
+}
+
+.profile-list .list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.profile-list .list-cell:filled:hover {
+    -fx-background-color: transparent;
+}
+
+.profile-list .list-cell:filled:selected {
+    -fx-background-color: transparent;
+}
+
+.profile-list .placeholder .label {
+    -fx-text-fill: #5F6874;
+}
+
+.profile-name {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
+
+.profile-summary {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 12px;
+}
+
+.slot-box {
+    -fx-background-color: #14171C;
+    -fx-background-radius: 14;
+    -fx-border-color: #2B303A;
+    -fx-border-radius: 14;
+    -fx-border-width: 1;
+    -fx-border-style: segments(6) line-cap round;
+}
 
 .account-title {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 17px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
 }
 
 .account-hint {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 12px;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 11px;
 }
 
 .account-error {
-    -fx-text-fill: #A63A52;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #FF4A6E;
+    -fx-font-size: 11px;
 }
 
 .account-label {
-    -fx-text-fill: #94A3B8;
+    -fx-text-fill: #8A93A1;
     -fx-font-size: 12px;
 }
 
 .account-name {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
 }
 
 .account-type-ely {
-    -fx-text-fill: #A78BFA;
-    -fx-font-size: 10px;
-}
-
-.account-type-offline {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 10px;
-}
-
-.account-row {
-    -fx-background-color: #1A2330;
-    -fx-background-radius: 12;
-    -fx-border-color: #26303D;
-    -fx-border-radius: 12;
-    -fx-border-width: 1;
-    -fx-padding: 11 13 11 13;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 8, 0, 0, 2);
-}
-
-.account-row-active {
-    -fx-border-color: #4842B0;
-    -fx-border-width: 2;
-    -fx-effect: dropshadow(three-pass-box, rgba(72, 66, 176, 0.3), 12, 0, 0, 0);
-}
-
-.account-tile {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-    -fx-alignment: center;
-    -fx-min-width: 40;
-    -fx-min-height: 40;
-    -fx-max-width: 40;
-    -fx-max-height: 40;
-    -fx-background-radius: 12;
-}
-
-.account-tile-ely {
-    -fx-background-color: rgba(167, 139, 250, 0.14);
-    -fx-text-fill: #A78BFA;
-}
-
-.account-tile-offline {
-    -fx-background-color: #223041;
-    -fx-text-fill: #94A3B8;
-}
-
-.account-row-name {
-    -fx-text-fill: #FFFFFF;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-}
-
-.account-row-sub {
-    -fx-text-fill: #94A3B8;
+    -fx-text-fill: #C796F9;
     -fx-font-size: 11px;
 }
 
+.account-type-offline {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 11px;
+}
+
+.account-row {
+    -fx-background-color: #181A20;
+    -fx-background-radius: 12;
+    -fx-border-color: #20242B;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 8 12 8 12;
+    -fx-cursor: hand;
+}
+
+.account-row:hover {
+    -fx-background-color: #23272F;
+    -fx-border-color: #2B303A;
+}
+
+.account-row-active {
+    -fx-border-color: #10B981;
+    -fx-background-color: #152620;
+}
+
+.account-tile {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+    -fx-background-radius: 10;
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+}
+
+.account-tile-ely {
+    -fx-background-color: rgba(199, 150, 249, 0.18);
+    -fx-text-fill: #C796F9;
+}
+
+.account-tile-offline {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #B0BAC5;
+}
+
+.account-row-name {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.account-row-sub {
+    -fx-text-fill: #75808E;
+    -fx-font-size: 11px;
+}
+
+/* ============================ Settings ============================ */
+
 .settings-group {
-    -fx-background-color: rgba(255, 255, 255, 0.025);
-    -fx-background-radius: 14;
-    -fx-border-color: #232E3D;
-    -fx-border-radius: 14;
+    -fx-background-color: #181A20;
+    -fx-background-radius: 16;
+    -fx-border-color: #20242B;
+    -fx-border-radius: 16;
     -fx-border-width: 1;
     -fx-padding: 16;
-    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.3), 10, 0, 0, 3);
 }
 
 .settings-value {
-    -fx-text-fill: #CBD5E1;
+    -fx-text-fill: #8A93A1;
     -fx-font-size: 12px;
 }
 
-.install-status {
-    -fx-text-fill: #FFFFFF;
+/* ============================ Store cards ============================ */
+
+.server-builds-placeholder {
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 13px;
+    -fx-padding: 12 4 4 4;
+}
+
+.pack-card {
+    -fx-background-color: rgba(24, 26, 32, 0.78);
+    -fx-background-radius: 16;
+    -fx-border-color: #23262E;
+    -fx-border-radius: 16;
+    -fx-border-width: 1;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 14, 0, 0, 5);
+}
+
+.pack-card:hover {
+    -fx-background-color: rgba(30, 33, 40, 0.85);
+    -fx-border-color: #2B303A;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.45), 18, 0, 0, 7);
+}
+
+.pack-banner {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-alignment: center;
+}
+
+.pack-banner-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: 800;
+    -fx-alignment: center;
+    -fx-text-alignment: center;
+    -fx-text-fill: #ECF0F4;
+}
+
+.pack-version-badge {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(0, 0, 0, 0.55);
+    -fx-background-radius: 8;
+    -fx-padding: 3 8 3 8;
+}
+
+.pack-name {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
+
+.pack-desc {
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 12px;
+}
+
+/* Баннеры — цвета платформ Modrinth */
+.pack-banner.accent-vanilla {
+    -fx-background-color: linear-gradient(to bottom right, rgba(16, 185, 129, 0.45) 0%, rgba(14, 122, 62, 0.9) 100%);
+    -fx-border-color: rgba(16, 185, 129, 0.40);
+}
+
+.pack-banner.accent-fabric {
+    -fx-background-color: linear-gradient(to bottom right, rgba(219, 182, 155, 0.45) 0%, rgba(80, 58, 45, 0.92) 100%);
+    -fx-border-color: rgba(219, 182, 155, 0.40);
+}
+
+.pack-banner.accent-forge {
+    -fx-background-color: linear-gradient(to bottom right, rgba(149, 158, 239, 0.45) 0%, rgba(48, 53, 104, 0.92) 100%);
+    -fx-border-color: rgba(149, 158, 239, 0.40);
+}
+
+.pack-banner.accent-neoforge {
+    -fx-background-color: linear-gradient(to bottom right, rgba(249, 158, 107, 0.45) 0%, rgba(104, 57, 34, 0.92) 100%);
+    -fx-border-color: rgba(249, 158, 107, 0.40);
+}
+
+.pack-banner.accent-quilt {
+    -fx-background-color: linear-gradient(to bottom right, rgba(199, 150, 249, 0.45) 0%, rgba(72, 45, 104, 0.92) 100%);
+    -fx-border-color: rgba(199, 150, 249, 0.40);
+}
+
+.pack-banner.accent-fabric .pack-banner-title  { -fx-text-fill: #DBB69B; }
+.pack-banner.accent-forge .pack-banner-title   { -fx-text-fill: #959EEF; }
+.pack-banner.accent-neoforge .pack-banner-title { -fx-text-fill: #F99E6B; }
+.pack-banner.accent-quilt .pack-banner-title   { -fx-text-fill: #C796F9; }
+.pack-banner.accent-vanilla .pack-banner-title { -fx-text-fill: #10B981; }
+
+/* ============================ Crash analyzer bar ============================ */
+
+.alert-bar {
+    -fx-background-color: rgba(255, 74, 110, 0.10);
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(255, 74, 110, 0.50);
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 10 14 10 14;
+}
+
+.alert-icon {
+    -fx-text-fill: #FF4A6E;
+    -fx-font-size: 20px;
+}
+
+.alert-title {
+    -fx-text-fill: #FFD5DD;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.alert-text {
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 12px;
+}
+
+.alert-details-button {
+    -fx-background-color: #20242B;
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(193, 190, 209, 0.12);
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+
+.alert-details-button:hover {
+    -fx-background-color: #2A2F38;
+}
+
+.alert-close {
+    -fx-background-color: transparent;
+    -fx-text-fill: #5F6874;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8;
+    -fx-padding: 4 8 4 8;
+    -fx-cursor: hand;
+}
+
+.alert-close:hover {
+    -fx-background-color: rgba(255, 74, 110, 0.18);
+    -fx-text-fill: #FF4A6E;
+}
+
+/* ============================ Import view ============================ */
+
+/* Dropzone: карточка на всю ширину рабочей зоны,
+   dashed-рамка, при наведении файла — неон */
+.import-dropzone {
+    -fx-background-color: rgba(16, 185, 129, 0.04);
+    -fx-background-radius: 14;
+    -fx-border-color: rgba(16, 185, 129, 0.45);
+    -fx-border-radius: 14;
+    -fx-border-width: 2;
+    -fx-border-style: segments(8) line-cap round;
+    -fx-padding: 34 28 34 28;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.25), 12, 0, 0, 4);
+}
+
+.import-dropzone.dropzone-active {
+    -fx-border-color: #10B981;
+    -fx-background-color: rgba(16, 185, 129, 0.10);
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.30), 16, 0, 0, 4);
+}
+
+.import-drop-icon {
+    -fx-font-size: 34px;
+    -fx-alignment: center;
+    -fx-min-width: 60;
+    -fx-min-height: 60;
+    -fx-max-width: 60;
+    -fx-max-height: 60;
+    -fx-background-radius: 999;
+    -fx-background-color: rgba(16, 185, 129, 0.12);
+    -fx-border-color: rgba(16, 185, 129, 0.35);
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+}
+
+.import-title {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 19px;
+    -fx-font-weight: 800;
+    -fx-text-alignment: center;
+}
+
+.import-text {
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 13px;
+    -fx-text-alignment: center;
+}
+
+.import-hint {
+    -fx-text-fill: #5F6874;
+    -fx-font-size: 11px;
+    -fx-text-alignment: center;
+}
+
+/* Инфо-панель с подсказками (шаги импорта + справка) */
+.import-guide-card {
+    -fx-background-color: #1A1D25;
+    -fx-background-radius: 12;
+    -fx-border-color: #23262E;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 18 20 18 20;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.25), 10, 0, 0, 4);
+}
+
+.import-guide-title {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+}
+
+.import-guide-step {
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 12px;
+}
+
+.import-guide-note {
+    -fx-text-fill: #6C727F;
+    -fx-font-size: 11px;
+    -fx-padding: 2 0 0 0;
+}
+
+/* ============================ Create view ============================ */
+
+/* Hero-баннер: во всю ширину (padding 32 даёт контейнер;
+   здесь форма — стеклянный #1A1D25 с зелёным градиентным акцентом) */
+.create-hero {
+    -fx-background-color: linear-gradient(to bottom right,
+            rgba(16, 185, 129, 0.14) 0%,
+            #1A1D25 42%,
+            #1A1D25 100%);
+    -fx-background-radius: 16;
+    -fx-border-color: rgba(16, 185, 129, 0.35);
+    -fx-border-radius: 16;
+    -fx-border-width: 1;
+    -fx-padding: 24;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 16, 0, 0, 6);
+}
+
+.create-hero-title {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+}
+
+/* Контрастное описание по сетке */
+.create-hero-text {
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 13px;
+}
+
+/* Крупная заметная CTA-кнопка баннера */
+.create-hero-cta {
+    -fx-font-size: 15px;
+    -fx-padding: 13 28 13 28;
+}
+
+/* Заголовок секции (отступ сверху задаётся в Java: 8 + spacing) */
+.create-section-title {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+}
+
+/* Карточки бандлов: #1A1D25, radius 12, ровная 3-колоночная сетка */
+.bundle-card {
+    -fx-background-color: #1A1D25;
+    -fx-background-radius: 12;
+    -fx-border-color: #23262E;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-cursor: default;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.30), 10, 0, 0, 4);
+}
+
+.bundle-card:hover {
+    -fx-border-color: rgba(16, 185, 129, 0.40);
+    -fx-translate-y: -2;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.40), 14, 0, 0, 6);
+}
+
+.bundle-icon {
     -fx-font-size: 17px;
+    -fx-text-fill: #ECF0F4;
+    -fx-alignment: center;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-background-radius: 10;
+    -fx-background-color: rgba(16, 185, 129, 0.12);
+}
+
+.bundle-name {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
+
+.bundle-badge {
+    -fx-text-fill: #10B981;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(16, 185, 129, 0.12);
+    -fx-background-radius: 999;
+    -fx-border-color: rgba(16, 185, 129, 0.45);
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 2 8 2 8;
+}
+
+/* ============================ Game version badges ============================ */
+
+.loader-badge-vanilla {
+    -fx-text-fill: #10B981;
+    -fx-background-color: rgba(16, 185, 129, 0.14);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
     -fx-font-weight: bold;
 }
 
+.loader-badge-fabric {
+    -fx-text-fill: #DBB69B;
+    -fx-background-color: rgba(219, 182, 155, 0.14);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.loader-badge-forge {
+    -fx-text-fill: #959EEF;
+    -fx-background-color: rgba(149, 158, 239, 0.14);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.loader-badge-neoforge {
+    -fx-text-fill: #F99E6B;
+    -fx-background-color: rgba(249, 158, 107, 0.14);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.loader-badge-quilt {
+    -fx-text-fill: #C796F9;
+    -fx-background-color: rgba(199, 150, 249, 0.14);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.type-badge-release {
+    -fx-text-fill: #10B981;
+    -fx-background-color: rgba(16, 185, 129, 0.12);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.type-badge-snapshot {
+    -fx-text-fill: #F99E6B;
+    -fx-background-color: rgba(249, 158, 107, 0.12);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.type-badge-old-beta {
+    -fx-text-fill: #74B6F3;
+    -fx-background-color: rgba(116, 182, 243, 0.12);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.type-badge-old-alpha {
+    -fx-text-fill: #C796F9;
+    -fx-background-color: rgba(199, 150, 249, 0.12);
+    -fx-background-radius: 999;
+    -fx-padding: 2 8 2 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.version-type-hint {
+    -fx-text-fill: #75808E;
+    -fx-font-size: 11px;
+}
+
+/* ============================ Install / errors ============================ */
+
+.install-status {
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 12px;
+}
+
 .install-category {
-    -fx-text-fill: #4ADE80;
-    -fx-font-size: 13px;
+    -fx-text-fill: #10B981;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
 }
 
 .install-file {
-    -fx-text-fill: #94A3B8;
-    -fx-font-size: 12px;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 11px;
 }
 
 .install-stats {
-    -fx-text-fill: #5B6B7F;
-    -fx-font-size: 12px;
+    -fx-text-fill: #75808E;
+    -fx-font-size: 11px;
 }
 
 .error-label {
-    -fx-text-fill: #A63A52;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-text-alignment: center;
+    -fx-text-fill: #FF4A6E;
+    -fx-font-size: 12px;
 }
 
 .error-title {
-    -fx-text-fill: #A63A52;
-    -fx-font-size: 16px;
+    -fx-text-fill: #FF4A6E;
+    -fx-font-size: 15px;
     -fx-font-weight: bold;
 }
 
 .error-text {
-    -fx-control-inner-background: #0B0F15;
-    -fx-text-fill: #F1F5F9;
+    -fx-text-fill: #B0BAC5;
     -fx-font-size: 12px;
-    -fx-font-family: monospace;
 }
 
 .hyperlink {
-    -fx-text-fill: #3E86B8;
-    -fx-font-size: 12px;
+    -fx-text-fill: #74B6F3;
+    -fx-underline: true;
 }
 
-/* ===================== Legacy containers ===================== */
+/* ============================ Legacy tables (dialogs) ============================ */
 
 .sidebar {
-    -fx-background-color: #0B0F15;
+    -fx-background-color: #14171C;
+    -fx-border-color: transparent #181A20 transparent transparent;
+    -fx-border-width: 0 1 0 0;
 }
 
 .header {
-    -fx-background-color: #141B25;
+    -fx-background-color: #121418;
+    -fx-border-color: transparent transparent #181A20 transparent;
+    -fx-border-width: 0 0 1 0;
 }
 
 .metadata-panel {
-    -fx-background-color: transparent;
+    -fx-background-color: #181A20;
+    -fx-background-radius: 16;
+    -fx-padding: 14;
 }
 
 .center-panel {
-    -fx-background-color: transparent;
+    -fx-background-color: #121418;
 }
 
 .details-panel-outer {
-    -fx-background-color: transparent;
-    -fx-padding: 14 20 14 20;
+    -fx-background-color: #121418;
 }
 
 .version-table {
-    -fx-background-color: #0B0F15;
-    -fx-border-color: #232E3D;
+    -fx-background-color: transparent;
+    -fx-border-color: #181A20;
     -fx-border-width: 1;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
 }
 
 .version-table .column-header-background {
-    -fx-background-color: #141B25;
+    -fx-background-color: #181A20;
 }
 
 .version-table .column-header .label {
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #8A93A1;
+    -fx-font-size: 11px;
     -fx-font-weight: bold;
-    -fx-font-size: 12px;
 }
 
 .version-table .column-header {
-    -fx-border-color: transparent transparent #232E3D transparent;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #2B303A transparent;
     -fx-border-width: 0 0 1 0;
 }
 
 .table-row-cell {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent transparent #1E2836 transparent;
+    -fx-background-color: #14171C;
+    -fx-border-color: transparent transparent #181A20 transparent;
     -fx-border-width: 0 0 1 0;
 }
 
 .table-row-cell:odd {
-    -fx-background-color: rgba(255, 255, 255, 0.02);
+    -fx-background-color: #1E2126;
 }
 
 .table-row-cell:selected {
-    -fx-background-color: rgba(72, 66, 176, 0.16);
+    -fx-background-color: rgba(16, 185, 129, 0.15);
 }
 
 .table-row-cell:selected .text {
-    -fx-fill: #FFFFFF;
+    -fx-fill: #ECF0F4;
 }
 
 .table-cell {
-    -fx-text-fill: #CBD5E1;
-    -fx-font-size: 13px;
-    -fx-padding: 8 10 8 10;
+    -fx-text-fill: #B0BAC5;
+    -fx-font-size: 12px;
+    -fx-border-color: transparent;
 }
 
 .table-row-cell:selected .table-cell {
+    -fx-text-fill: #ECF0F4;
+}
+
+/* ============================ Glassmorphism modal ============================ */
+
+/* Фон под окном: затемнение rgba(10,12,16,0.75);
+   blur подложкой даёт размытый снапшот главного окна (см. Java) */
+.modal-overlay {
+    -fx-background-color: transparent;
+}
+
+/* Контейнер модального окна: #1A1D25, radius 16,
+   мягкая рамка и глубокая тень 0 20px 50px */
+.modal-card {
+    -fx-background-color: #1A1D25;
+    -fx-background-radius: 16;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-radius: 16;
+    -fx-border-width: 1;
+    -fx-padding: 24;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.60), 50, 0.2, 0, 20);
+}
+
+/* Шапка окна */
+.modal-title {
     -fx-text-fill: #FFFFFF;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+.modal-close {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 12px;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-width: 0;
+    -fx-padding: 4 9 4 9;
+    -fx-cursor: hand;
+}
+
+.modal-close:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+    -fx-text-fill: #ECF0F4;
+}
+
+.modal-close:pressed {
+    -fx-background-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Поле ввода имени сборки */
+.modal-input {
+    -fx-background-color: #12141A;
+    -fx-text-fill: #ECF0F4;
+    -fx-prompt-text-fill: #6C727F;
+    -fx-font-size: 13px;
+    -fx-background-radius: 10;
+    -fx-border-color: #2A2E39;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 12 16 12 16;
+}
+
+.modal-input:focused {
+    -fx-border-color: #10B981;
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.25), 6, 0, 0, 0);
+}
+
+/* Чипсы выбора ядра и типов версий */
+.modal-chip {
+    -fx-background-color: #222632;
+    -fx-text-fill: #A0A5B1;
+    -fx-font-size: 13px;
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-border-width: 0;
+    -fx-padding: 8 16 8 16;
+    -fx-graphic-text-gap: 6;
+    -fx-cursor: hand;
+}
+
+.modal-chip:hover {
+    -fx-background-color: #2A2F3C;
+    -fx-text-fill: #ECF0F4;
+}
+
+.modal-chip-active {
+    -fx-background-color: #10B981;
+    -fx-text-fill: #081B13;
+    -fx-font-weight: bold;
+}
+
+/* Нижняя панель кнопок */
+.modal-button-ghost {
+    -fx-background-color: #262A36;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 13px;
+    -fx-background-radius: 10;
+    -fx-padding: 10 18 10 18;
+    -fx-cursor: hand;
+}
+
+.modal-button-ghost:hover {
+    -fx-background-color: #2E3341;
+}
+
+.modal-button-primary {
+    -fx-background-color: #10B981;
+    -fx-text-fill: #081B13;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-padding: 10 18 10 18;
+    -fx-cursor: hand;
+}
+
+.modal-button-primary:hover {
+    -fx-background-color: #34D399;
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.35), 14, 0, 0, 4);
+}
+
+.modal-button-primary:disabled {
+    -fx-opacity: 0.45;
+}
+/* ============================ Add Account modal ============================ */
+
+/* Карточки-выбора типа аккаунта (Radio Cards) */
+.account-card {
+    -fx-background-color: #1C2029;
+    -fx-background-radius: 12;
+    -fx-border-color: #2A2E39;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 10 12 10 12;
+    -fx-alignment: center-left;
+    -fx-background-insets: 1;
+    -fx-cursor: hand;
+    -fx-graphic-text-gap: 0;
+}
+
+.account-card:hover {
+    -fx-background-color: #20242F;
+}
+
+.account-card:selected {
+    -fx-border-color: #10B981;
+    -fx-border-width: 2;
+    -fx-background-color: rgba(16, 185, 129, 0.10);
+}
+
+.account-card-icon {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 15px;
+    -fx-alignment: center;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+    -fx-background-radius: 999;
+    -fx-text-alignment: center;
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+}
+
+.account-card-title {
+    -fx-text-fill: #ECF0F4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.account-card-subtitle {
+    -fx-text-fill: #6C727F;
+    -fx-font-size: 11px;
+}
+
+.account-card-hint {
+    -fx-text-fill: #6C727F;
+    -fx-font-size: 11px;
 }

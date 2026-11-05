@@ -60,7 +60,7 @@ public final class ModLoaderRegistry {
     public static ModLoaderRegistry createDefault(
             java.net.http.HttpClient httpClient,
             FileDownloader fileDownloader,
-            org.example.launcher.infrastructure.java.JavaResolutionService javaResolutionService,
+            org.example.launcher.infrastructure.java.JavaFinder javaFinder,
             ModLoaderMetadataMerger merger,
             InstallationService installationService) {
         ModLoaderRegistry registry = new ModLoaderRegistry();
@@ -80,13 +80,13 @@ public final class ModLoaderRegistry {
         registry.register(ModLoaderType.FORGE,
                 new ForgeVersionProvider(),
                 new InstallerJarModLoaderInstaller(
-                        fileDownloader, javaResolutionService,
+                        fileDownloader, javaFinder,
                         merger, installationService));
 
         registry.register(ModLoaderType.NEOFORGE,
                 new NeoForgeVersionProvider(),
                 new InstallerJarModLoaderInstaller(
-                        fileDownloader, javaResolutionService,
+                        fileDownloader, javaFinder,
                         merger, installationService));
 
         return registry;

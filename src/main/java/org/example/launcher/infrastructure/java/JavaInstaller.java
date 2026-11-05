@@ -8,7 +8,7 @@ import org.example.launcher.domain.model.JavaRuntime;
  * Устанавливает рантаймы Java в управляемый каталог лаунчера.
  * <p>
  * Интерфейс — точка расширения для будущей функциональности: когда
- * {@link JavaResolutionService} сообщает об отсутствии подходящего рантайма,
+ * {@link JavaFinder} сообщает об отсутствии подходящего рантайма,
  * лаунчер может вызвать установщик для скачивания и распаковки
  * совместимого JRE (например, из Mojang
  * {@code java-runtime-manifest} или Eclipse Adoptium).
@@ -16,7 +16,7 @@ import org.example.launcher.domain.model.JavaRuntime;
  * Первая реализация будет заглушкой; конкретную реализацию
  * можно добавить позже без изменения точек вызова.
  */
-public interface JavaRuntimeInstaller {
+public interface JavaInstaller {
 
     /**
      * Устанавливает рантайм Java под заданный идентификатор компонента Mojang.

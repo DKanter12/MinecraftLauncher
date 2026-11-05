@@ -3,7 +3,7 @@ package org.example.launcher.application.launch;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.domain.ErrorCode;
 import org.example.launcher.domain.JavaException;
 import org.example.launcher.domain.model.JavaRuntime;
@@ -16,10 +16,10 @@ import org.example.launcher.domain.model.VersionMetadata;
  */
 public class JavaRuntimeManager {
 
-    private final JavaManager javaManager;
+    private final JavaEnvironmentManager javaEnvironmentManager;
 
-    public JavaRuntimeManager(JavaManager javaManager) {
-        this.javaManager = Objects.requireNonNull(javaManager, "javaManager");
+    public JavaRuntimeManager(JavaEnvironmentManager javaEnvironmentManager) {
+        this.javaEnvironmentManager = Objects.requireNonNull(javaEnvironmentManager, "javaEnvironmentManager");
     }
 
     /**
@@ -30,7 +30,7 @@ public class JavaRuntimeManager {
     public JavaRuntime getJavaFor(VersionMetadata metadata)
             throws JavaException {
         Objects.requireNonNull(metadata, "metadata");
-        return javaManager.resolve(metadata)
+        return javaEnvironmentManager.find(metadata)
                 .orElseThrow(() -> new JavaException(ErrorCode.JAVA_NOT_FOUND,
                         "No suitable Java runtime found for "
                                 + metadata.id()));

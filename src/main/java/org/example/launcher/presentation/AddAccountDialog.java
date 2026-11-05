@@ -10,7 +10,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -18,9 +22,9 @@ import javafx.stage.StageStyle;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Единый диалог добавления аккаунта.
- * Пользователь выбирает тип аккаунта (Offline или Ely.by) в одном месте
- * вместо двух отдельных кнопок в главном окне.
+ * Единый диалог добавления аккаунта в стиле Glassmorphism.
+ * Пользователь выбирает тип аккаунта двумя карточками-выбора
+ * (Radio Cards): Офлайн или Ely.by, затем заполняет короткую форму.
  * <p>
  * Для Offline нужно только имя игрока; для Ely.by — логин + пароль.
  */
@@ -41,57 +45,75 @@ public class AddAccountDialog extends Stage {
     private Type selectedType = Type.OFFLINE;
 
     public AddAccountDialog(Stage owner) {
-        initStyle(StageStyle.UTILITY);
+        // Прозрачный stage: окно рисуется само (overlay + карточка),
+        // «backdrop-filter» эмулируется размытым снапшотом главного окна
+        initStyle(StageStyle.TRANSPARENT);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        setTitle(Lang.tr("account.title"));
+        if (owner != null) {
+            setWidth(owner.getWidth());
+            setHeight(owner.getHeight());
+            setX(owner.getX());
+            setY(owner.getY());
+        }
 
-        Label titleLabel = new Label(Lang.tr("account.title"));
-        titleLabel.getStyleClass().add("account-title");
+        // --- Шапка модального окна: заголовок + круглый крестик ---
+        Label headerTitle = new Label(Lang.tr("account.title"));
+        headerTitle.getStyleClass().add("modal-title");
+        Button closeButton = new Button("\u2715");
+        closeButton.getStyleClass().add("modal-close");
+        closeButton.setOnAction(e -> close());
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox headerRow = new HBox(12, headerTitle, headerSpacer,
+                closeButton);
+        headerRow.setAlignment(Pos.CENTER_RIGHT);
 
-        Label hintLabel = new Label(Lang.tr("account.hint"));
-        hintLabel.getStyleClass().add("account-hint");
-        hintLabel.setWrapText(true);
-        hintLabel.setMaxWidth(380);
-
-        // --- Переключатель типа ---
+        // --- Карточки-выбора типа (Radio Cards) ---
         ToggleGroup typeGroup = new ToggleGroup();
-        ToggleButton offlineToggle = new ToggleButton(Lang.tr("account.offline"));
-        offlineToggle.setToggleGroup(typeGroup);
+        ToggleButton offlineToggle = typeCard(typeGroup, "\uD83D\uDC64",
+                Lang.tr("account.card.offline.title"),
+                Lang.tr("account.card.offline.sub"));
         offlineToggle.setSelected(true);
-        offlineToggle.getStyleClass().add("filter-button");
-        ToggleButton elyToggle = new ToggleButton("Ely.by");
-        elyToggle.setToggleGroup(typeGroup);
-        elyToggle.getStyleClass().add("filter-button");
+        ToggleButton elyToggle = typeCard(typeGroup, "\uD83E\uDD8A",
+                Lang.tr("account.card.ely.title"),
+                Lang.tr("account.card.ely.sub"));
         HBox typeRow = new HBox(8, offlineToggle, elyToggle);
         typeRow.setAlignment(Pos.CENTER_LEFT);
 
         // --- Панель Offline ---
-        Label offlineLabel = new Label(Lang.tr("account.name"));
-        offlineLabel.getStyleClass().add("section-title");
+        Label offlineNameTitle = new Label(Lang.tr("account.name"));
+        offlineNameTitle.getStyleClass().add("section-title");
         offlineNameField.setPromptText(Lang.tr("account.name.prompt"));
-        offlineNameField.getStyleClass().add("search-field");
+        offlineNameField.getStyleClass().add("modal-input");
+        offlineNameField.setPrefHeight(44);
+        offlineNameField.setMaxWidth(Double.MAX_VALUE);
         Label offlineHint = new Label(Lang.tr("account.name.hint"));
-        offlineHint.getStyleClass().add("quick-select-label");
-        VBox offlineBox = new VBox(4, offlineLabel, offlineNameField, offlineHint);
+        offlineHint.getStyleClass().add("account-card-hint");
+        VBox offlineBox = new VBox(6, offlineNameTitle,
+                offlineNameField, offlineHint);
 
         // --- Панель Ely.by ---
-        Label elyLabel = new Label(Lang.tr("account.ely"));
-        elyLabel.getStyleClass().add("section-title");
+        Label elyTitle = new Label(Lang.tr("account.ely"));
+        elyTitle.getStyleClass().add("section-title");
         elyUserField.setPromptText(Lang.tr("account.user.prompt"));
-        elyUserField.getStyleClass().add("search-field");
+        elyUserField.getStyleClass().add("modal-input");
+        elyUserField.setPrefHeight(44);
+        elyUserField.setMaxWidth(Double.MAX_VALUE);
         elyPassField.setPromptText(Lang.tr("server.password"));
-        elyPassField.getStyleClass().add("search-field");
+        elyPassField.getStyleClass().add("modal-input");
+        elyPassField.setPrefHeight(44);
+        elyPassField.setMaxWidth(Double.MAX_VALUE);
         Label elyHint = new Label(Lang.tr("account.ely.hint"));
-        elyHint.getStyleClass().add("quick-select-label");
+        elyHint.getStyleClass().add("account-card-hint");
         elyHint.setWrapText(true);
-        elyHint.setMaxWidth(380);
-        VBox elyBox = new VBox(6, elyLabel, elyUserField, elyPassField, elyHint);
+        VBox elyBox = new VBox(6, elyTitle, elyUserField, elyPassField,
+                elyHint);
         elyBox.setVisible(false);
         elyBox.setManaged(false);
 
-        // Логика переключения
+        // Логика переключения карточек
         typeGroup.selectedToggleProperty().addListener((obs, old, val) -> {
             boolean isOffline = val == offlineToggle;
             if (val == null) {
@@ -108,23 +130,26 @@ public class AddAccountDialog extends Stage {
             errorLabel.setVisible(false);
             errorLabel.setManaged(false);
             updateActionButton();
-            sizeToScene();
         });
 
         errorLabel.getStyleClass().add("account-error");
         errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
-        errorLabel.setMaxWidth(380);
 
-        actionButton.getStyleClass().add("install-close-button");
+        // --- Footer: одинаковая ширина, прижаты вправо ---
+        actionButton.getStyleClass().add("modal-button-primary");
         actionButton.setDefaultButton(true);
         actionButton.setDisable(true);
+        actionButton.setPrefWidth(140);
+        actionButton.setMinWidth(Region.USE_PREF_SIZE);
         actionButton.setOnAction(e -> onAction());
 
         Button cancelButton = new Button(Lang.tr("button.cancel"));
-        cancelButton.getStyleClass().add("browse-java-button");
+        cancelButton.getStyleClass().add("modal-button-ghost");
         cancelButton.setCancelButton(true);
+        cancelButton.setPrefWidth(140);
+        cancelButton.setMinWidth(Region.USE_PREF_SIZE);
         cancelButton.setOnAction(e -> close());
 
         offlineNameField.textProperty().addListener((obs, o, v) -> {
@@ -145,21 +170,61 @@ public class AddAccountDialog extends Stage {
 
         HBox buttons = new HBox(8, cancelButton, actionButton);
         buttons.setAlignment(Pos.CENTER_RIGHT);
-        buttons.setPadding(new Insets(10, 0, 0, 0));
+        buttons.setPadding(new Insets(16, 0, 0, 0));
 
-        VBox content = new VBox(10, titleLabel, hintLabel, typeRow, offlineBox, elyBox, errorLabel, buttons);
-        content.setPadding(new Insets(20));
+        VBox content = new VBox(12, headerRow, typeRow, offlineBox,
+                elyBox, errorLabel, buttons);
         content.setPrefWidth(420);
-        content.setMinHeight(320);
 
-        Scene scene = new Scene(content, 420, 360);
+        VBox card = new VBox(content);
+        card.getStyleClass().add("modal-card");
+        card.setMinHeight(340);
+        card.setMaxWidth(420);
+
+        // -- Glassmorphism backdrop (общий с NewInstanceDialog);
+        // карточка центрируется и сохраняет собственный размер --
+        StackPane overlay = new StackPane();
+        NewInstanceDialog.addBlurBackdrop(overlay, owner);
+        HBox centered = new HBox(card);
+        centered.setAlignment(Pos.CENTER);
+        overlay.getChildren().add(centered);
+
+        Scene scene = new Scene(overlay, owner != null ? owner.getWidth()
+                : 480, owner != null ? owner.getHeight() : 420);
+        scene.setFill(Color.TRANSPARENT);
         var css = getClass().getResource("/styles.css");
         if (css != null) scene.getStylesheets().add(css.toExternalForm());
         setScene(scene);
-        setMinWidth(420);
-        setMinHeight(360);
 
         updateActionButton();
+    }
+
+    /** Карточка-выбор (Radio Card): иконка-бейдж + название + подсказка. */
+    private static ToggleButton typeCard(ToggleGroup group, String glyph,
+                                         String title, String subtitle) {
+        Label icon = new Label(glyph);
+        icon.getStyleClass().add("account-card-icon");
+
+        Label titleLbl = new Label(title);
+        titleLbl.getStyleClass().add("account-card-title");
+
+        Label subLbl = new Label(subtitle);
+        subLbl.getStyleClass().add("account-card-subtitle");
+        subLbl.setWrapText(true);
+
+        VBox text = new VBox(2, titleLbl, subLbl);
+        text.setAlignment(Pos.CENTER_LEFT);
+
+        HBox row = new HBox(10, icon, text);
+        row.setAlignment(Pos.CENTER_LEFT);
+
+        ToggleButton card = new ToggleButton();
+        card.setGraphic(row);
+        card.setText("");
+        card.setMaxWidth(Double.MAX_VALUE);
+        card.getStyleClass().add("account-card");
+        card.setToggleGroup(group);
+        return card;
     }
 
     private void updateActionButton() {
@@ -210,7 +275,6 @@ public class AddAccountDialog extends Stage {
         errorLabel.setText(text);
         errorLabel.setVisible(true);
         errorLabel.setManaged(true);
-        sizeToScene();
     }
 
     public Result getResult() { return result; }

@@ -2,11 +2,11 @@ package org.example.launcher.core;
 
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaFinder;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.application.launch.BuildLaunchManager;
 import org.example.launcher.infrastructure.mojang.VersionService;
@@ -21,8 +21,8 @@ import org.example.launcher.infrastructure.skins.SkinService;
 public final class LauncherContext {
 
     private final VersionService versionService;
-    private final JavaResolutionService javaResolutionService;
-    private final JavaManager javaManager;
+    private final JavaFinder javaFinder;
+    private final JavaEnvironmentManager javaEnvironmentManager;
     private final ProfileService profileService;
     private final FileSettingsRepository preferences;
     private final ElyAuthService elyAuthService;
@@ -36,8 +36,8 @@ public final class LauncherContext {
     @SuppressWarnings("checkstyle:ParameterNumber")
     public LauncherContext(
             VersionService versionService,
-            JavaResolutionService javaResolutionService,
-            JavaManager javaManager,
+            JavaFinder javaFinder,
+            JavaEnvironmentManager javaEnvironmentManager,
             ProfileService profileService,
             FileSettingsRepository preferences,
             ElyAuthService elyAuthService,
@@ -48,8 +48,8 @@ public final class LauncherContext {
             AccountManager accountManager,
             BuildLaunchManager buildLaunchManager) {
         this.versionService = versionService;
-        this.javaResolutionService = javaResolutionService;
-        this.javaManager = javaManager;
+        this.javaFinder = javaFinder;
+        this.javaEnvironmentManager = javaEnvironmentManager;
         this.profileService = profileService;
         this.preferences = preferences;
         this.elyAuthService = elyAuthService;
@@ -65,12 +65,12 @@ public final class LauncherContext {
         return versionService;
     }
 
-    public JavaResolutionService javaResolutionService() {
-        return javaResolutionService;
+    public JavaFinder javaFinder() {
+        return javaFinder;
     }
 
-    public JavaManager javaManager() {
-        return javaManager;
+    public JavaEnvironmentManager javaEnvironmentManager() {
+        return javaEnvironmentManager;
     }
 
     public ProfileService profileService() {

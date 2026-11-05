@@ -17,10 +17,20 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.effect.GaussianBlur;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -99,14 +109,23 @@ public class NewInstanceDialog extends Stage {
      */
     public NewInstanceDialog(Stage owner,
                              ModLoaderRegistry registry,
-                             List<MinecraftVersion> manifestVersions) {
+                             List<MinecraftVersion> manifestVersions,
+                             ModLoaderType initialLoader) {
         this.registry = registry;
         this.manifestVersions = manifestVersions;
 
-        initStyle(StageStyle.UTILITY);
+        // Transparent stage: окно рисуется само (overlay + карточка),
+        // «backdrop-filter» эмулируется размытым снапшотом главного окна
+        initStyle(StageStyle.TRANSPARENT);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
+        if (owner != null) {
+            setWidth(owner.getWidth());
+            setHeight(owner.getHeight());
+            setX(owner.getX());
+            setY(owner.getY());
+        }
         MinecraftVersion shownVersion =
                 (manifestVersions != null && !manifestVersions.isEmpty()
                         ? manifestVersions.get(0) : null);
@@ -117,7 +136,7 @@ public class NewInstanceDialog extends Stage {
         Label nameTitle = new Label(Lang.tr("new.name"));
         nameTitle.getStyleClass().add("section-title");
         nameField.setPromptText(Lang.tr("new.name.prompt"));
-        nameField.getStyleClass().add("search-field");
+        nameField.getStyleClass().add("modal-input");
         nameField.setMaxWidth(Double.MAX_VALUE);
         VBox nameBox = new VBox(4, nameTitle, nameField);
 
@@ -134,14 +153,15 @@ public class NewInstanceDialog extends Stage {
         }
         for (ModLoaderType type : loaders) {
             ToggleButton chip = new ToggleButton(type.displayName());
-            chip.getStyleClass().add("filter-button");
+            chip.getStyleClass().add("modal-chip");
+            chip.setGraphic(chipIcon(type));
             chip.setToggleGroup(loaderGroup);
             chip.setUserData(type);
             chip.setOnAction(e -> onLoaderChanged());
             loaderChips.getChildren().add(chip);
             if (type == ModLoaderType.VANILLA) {
                 chip.setSelected(true);
-                chip.getStyleClass().add("filter-button-active");
+                chip.getStyleClass().add("modal-chip-active");
             }
         }
         loaderGroup.selectedToggleProperty().addListener((obs, old, val) -> {
@@ -160,14 +180,14 @@ public class NewInstanceDialog extends Stage {
                 VersionType.SNAPSHOT, VersionType.BETA,
                 VersionType.ALPHA)) {
             ToggleButton chip = new ToggleButton(categoryLabel(type));
-            chip.getStyleClass().add("filter-button");
+            chip.getStyleClass().add("modal-chip");
             chip.setToggleGroup(categoryGroup);
             chip.setUserData(type);
             chip.setOnAction(e -> refreshVersionList());
             categoryChips.getChildren().add(chip);
             if (type == VersionType.RELEASE) {
                 chip.setSelected(true);
-                chip.getStyleClass().add("filter-button-active");
+                chip.getStyleClass().add("modal-chip-active");
             }
         }
         categoryGroup.selectedToggleProperty().addListener((obs, old, val) -> {
@@ -238,26 +258,35 @@ public class NewInstanceDialog extends Stage {
                 loaderStatusRow);
 
         // -- Кнопки --
-        createButton.getStyleClass().add("install-close-button");
+        createButton.getStyleClass().add("modal-button-primary");
         createButton.setDefaultButton(true);
         createButton.setText(Lang.tr("button.create"));
         createButton.setOnAction(e -> {
             ModLoaderType type = selectedLoader();
+            MinecraftVersion mc = effectiveVersion();
+            ModLoaderVersion loaderVersion = type == ModLoaderType.VANILLA
+                    ? null : loaderCombo.getValue();
+            if (mc == null || (type != ModLoaderType.VANILLA
+                    && !isConsistent(type, mc, loaderVersion))) {
+                // Клик в момент перезагрузки списка версий загрузчика —
+                // не создаём пару, которая не пройдёт валидацию BuildRequest
+                updateCreateButtonState();
+                return;
+            }
             result = new Result(
                     type,
-                    effectiveVersion(),
-                    type == ModLoaderType.VANILLA ? null
-                            : loaderCombo.getValue(),
+                    mc,
+                    loaderVersion,
                     nameField.getText().trim());
             close();
         });
         Button cancelButton = new Button(Lang.tr("button.cancel"));
-        cancelButton.getStyleClass().add("install-close-button");
+        cancelButton.getStyleClass().add("modal-button-ghost");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> close());
         HBox buttons = new HBox(8, cancelButton, createButton);
         buttons.setAlignment(Pos.CENTER_RIGHT);
-        buttons.setPadding(new Insets(8, 0, 0, 0));
+        buttons.setPadding(new Insets(16, 0, 0, 0));
 
         // -- Начальное состояние: новейший релиз предвыбран --
         refreshVersionList();
@@ -265,22 +294,114 @@ public class NewInstanceDialog extends Stage {
             onInputsChanged();
         }
 
-        VBox content = new VBox(6,
+        // -- Шапка модального окна: заголовок + круглый крестик --
+        Label headerTitle = new Label(Lang.tr("new.title"));
+        headerTitle.getStyleClass().add("modal-title");
+        Button closeButton = new Button("\u2715");
+        closeButton.getStyleClass().add("modal-close");
+        closeButton.setOnAction(e -> close());
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox headerRow = new HBox(12, headerTitle, headerSpacer,
+                closeButton);
+        headerRow.setAlignment(Pos.CENTER_RIGHT);
+
+        VBox content = new VBox(10,
                 nameBox,
                 loaderChipsBox,
                 categoryBox,
                 versionListBox,
                 loaderBox,
                 buttons);
-        content.setPadding(new Insets(18));
-        content.setPrefWidth(440);
+        content.setPadding(new Insets(4, 0, 0, 0));
+        content.setPrefWidth(480);
 
-        Scene scene = new Scene(content);
+        VBox card = new VBox(headerRow, content);
+        card.getStyleClass().add("modal-card");
+        card.setMaxWidth(480);
+
+        // -- Glassmorphism backdrop: размытый снапшот главного окна
+        // + полупрозрачное затемнение rgba(10,12,16,0.75) --
+        StackPane overlay = new StackPane();
+        addBlurBackdrop(overlay, owner);
+        HBox centered = new HBox(card);
+        centered.setAlignment(Pos.CENTER);
+        overlay.getChildren().add(centered);
+
+        Scene scene = new Scene(overlay);
+        scene.setFill(Color.TRANSPARENT);
         var css = getClass().getResource("/styles.css");
         if (css != null) {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+
+        // Предвыбор загрузчика (например, из «умного бандла») — строго
+        // после сборки всех узлов: onLoaderChanged() управляет
+        // видимостью чипов категорий, списка версий и выпадающего
+        // списка версий загрузчика, созданных выше.
+        if (initialLoader != null) {
+            selectLoaderChip(initialLoader);
+        }
+    }
+
+    /**
+     * Накладывает на {@code overlay} фоновые слои: размытый снапшот
+     * сцены владельца (имитация {@code backdrop-filter: blur(10px)})
+     * и полупрозрачное затемнение. При неудаче остаётся только
+     * затемнение.
+     */
+    static void addBlurBackdrop(StackPane overlay, Stage owner) {
+        ImageView blurred = null;
+        if (owner != null && owner.getScene() != null
+                && owner.getScene().getRoot() != null
+                && owner.getWidth() > 0) {
+            try {
+                SnapshotParameters params = new SnapshotParameters();
+                params.setFill(Color.TRANSPARENT);
+                WritableImage snap = owner.getScene().getRoot()
+                        .snapshot(params, null);
+                if (snap != null && snap.getWidth() > 1
+                        && snap.getHeight() > 1) {
+                    blurred = new ImageView(snap);
+                    blurred.setFitWidth(snap.getWidth());
+                    blurred.setFitHeight(snap.getHeight());
+                }
+            } catch (Throwable ignored) {
+                blurred = null;
+            }
+        }
+        // Слои идут под карточкой, поверх — затемнение
+        if (blurred != null) {
+            blurred.setEffect(new GaussianBlur(10));
+            overlay.getChildren().add(0, blurred);
+        }
+        Region dim = new Region();
+        dim.setBackground(new Background(new BackgroundFill(
+                Color.rgb(10, 12, 16, 0.75), CornerRadii.EMPTY,
+                Insets.EMPTY)));
+        overlay.getChildren().add(1, dim);
+    }
+
+    /** Иконка загрузчика 16px для чипса (официальные PNG из ресурсов). */
+    private static javafx.scene.Node chipIcon(ModLoaderType type) {
+        String name = switch (type) {
+            case VANILLA -> "vanilla";
+            case FABRIC -> "fabric";
+            case FORGE -> "forge";
+            case NEOFORGE -> "neoforge";
+            case QUILT -> "quilt";
+        };
+        var url = NewInstanceDialog.class.getResource(
+                "/icons/loader/" + name + ".png");
+        if (url == null) {
+            return null;
+        }
+        ImageView icon = new ImageView(new Image(url.toExternalForm()));
+        icon.setFitWidth(16);
+        icon.setFitHeight(16);
+        icon.setPreserveRatio(true);
+        return icon;
     }
 
     /** Локализованная подпись чипа типа версии. */
@@ -295,6 +416,22 @@ public class NewInstanceDialog extends Stage {
             return Lang.tr("new.type.oldbeta");
         }
         return Lang.tr("new.type.oldalpha");
+    }
+
+    /**
+     * Программная предвыборка чипа загрузчика: срабатывает как обычный
+     * клик — скрывает чипы типов версий и грузит версии загрузчика.
+     */
+    private void selectLoaderChip(ModLoaderType type) {
+        for (var node : loaderChips.getChildren()) {
+            if (node instanceof ToggleButton chip
+                    && chip.getUserData() == type) {
+                chip.setSelected(true);
+                chip.getStyleClass().add("modal-chip-active");
+                break;
+            }
+        }
+        onLoaderChanged();
     }
 
     /** Текущее выбранное семейство загрузчиков (по умолчанию Vanilla). */
@@ -393,6 +530,8 @@ public class NewInstanceDialog extends Stage {
 
         if (!modded || mc == null) {
             loaderStatusLabel.setText("");
+            loaderCombo.getItems().clear();
+            loaderCombo.setValue(null);
             fetchedLoader = null;
             fetchedMcId = null;
             return;
@@ -404,6 +543,12 @@ public class NewInstanceDialog extends Stage {
             loaderCombo.setDisable(loaderCombo.getItems().isEmpty());
             return;
         }
+
+        // Загрузчик или версия игры сменились: прежний список версий
+        // загрузчика не соответствует новой паре (MC, загрузчик) —
+        // очистка не даёт создать сборку с уводившимся значением
+        loaderCombo.getItems().clear();
+        loaderCombo.setValue(null);
 
         var regEntry = registry.get(loader).orElse(null);
         if (regEntry == null) {
@@ -430,6 +575,8 @@ public class NewInstanceDialog extends Stage {
                                 ex.getMessage()));
                         fetchedLoader = null;
                         fetchedMcId = null;
+                        loaderCombo.getItems().clear();
+                        loaderCombo.setValue(null);
                         updateCreateButtonState();
                     }
                 });
@@ -465,18 +612,32 @@ public class NewInstanceDialog extends Stage {
 
     private void updateCreateButtonState() {
         MinecraftVersion mc = effectiveVersion();
-        boolean modded = selectedLoader() != ModLoaderType.VANILLA;
+        ModLoaderType loader = selectedLoader();
         createButton.setDisable(mc == null
-                || (modded && loaderCombo.getValue() == null));
+                || (loader != ModLoaderType.VANILLA
+                        && !isConsistent(loader, mc,
+                                loaderCombo.getValue())));
+    }
+
+    /**
+     * Версия загрузчика относится к текущей паре (MC, загрузчик):
+     * защита от гонок и от выбора из устаревшего списка.
+     */
+    private static boolean isConsistent(ModLoaderType loader,
+                                        MinecraftVersion mc,
+                                        ModLoaderVersion value) {
+        return value != null && loader != ModLoaderType.VANILLA
+                && value.loaderType() == loader
+                && mc != null && mc.id().equals(value.minecraftVersion());
     }
 
     private static void updateChipStyles(HBox chips) {
         for (var node : chips.getChildren()) {
             if (node instanceof ToggleButton btn) {
                 if (btn.isSelected()) {
-                    btn.getStyleClass().add("filter-button-active");
+                    btn.getStyleClass().add("modal-chip-active");
                 } else {
-                    btn.getStyleClass().remove("filter-button-active");
+                    btn.getStyleClass().remove("modal-chip-active");
                 }
             }
         }
@@ -495,8 +656,19 @@ public class NewInstanceDialog extends Stage {
     public static Result show(Stage owner,
                               ModLoaderRegistry registry,
                               List<MinecraftVersion> manifestVersions) {
+        return show(owner, registry, manifestVersions, null);
+    }
+
+    /**
+     * Как {@link #show(Stage, ModLoaderRegistry, List)}, но с
+     * предвыбранным загрузчиком (из «умного бандла»).
+     */
+    public static Result show(Stage owner,
+                              ModLoaderRegistry registry,
+                              List<MinecraftVersion> manifestVersions,
+                              ModLoaderType initialLoader) {
         NewInstanceDialog dialog = new NewInstanceDialog(
-                owner, registry, manifestVersions);
+                owner, registry, manifestVersions, initialLoader);
         dialog.showAndWait();
         return dialog.result;
     }

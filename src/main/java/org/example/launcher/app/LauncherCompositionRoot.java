@@ -3,7 +3,7 @@ package org.example.launcher.app;
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.MinecraftVersionManager;
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.application.launch.BuildIntegrityChecker;
 import org.example.launcher.application.launch.BuildLaunchManager;
 import org.example.launcher.application.launch.BuildRepairManager;
@@ -29,11 +29,11 @@ import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
 import org.example.launcher.infrastructure.http.HttpDefaults;
-import org.example.launcher.infrastructure.java.AdoptiumJavaRuntimeInstaller;
-import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
-import org.example.launcher.infrastructure.java.SystemJavaDetector;
+import org.example.launcher.infrastructure.java.AdoptiumJavaInstaller;
+import org.example.launcher.infrastructure.java.DefaultJavaFinder;
+import org.example.launcher.infrastructure.java.JavaFinder;
+import org.example.launcher.infrastructure.java.JavaInstaller;
+import org.example.launcher.infrastructure.java.SystemJavaScanner;
 import org.example.launcher.infrastructure.loaders.ModLoaderMetadataMerger;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.infrastructure.loaders.ModdedProfileVerificationService;
@@ -67,6 +67,7 @@ public final class LauncherCompositionRoot {
 
         MojangVersionService mojangVersionService = new MojangVersionService();
         VersionService versionService = mojangVersionService;
+
         MojangVersionMetadataService mojangMetadataService =
                 new MojangVersionMetadataService();
         VersionMetadataService metadataService = mojangMetadataService;
@@ -78,10 +79,10 @@ public final class LauncherCompositionRoot {
         InstallationService installationService = new MinecraftInstaller(
                 fileDownloader, checksumVerifier, assetIndexService);
 
-        JavaResolutionService javaResolutionService =
-                new DefaultJavaResolutionService(new SystemJavaDetector());
-        JavaRuntimeInstaller javaRuntimeInstaller =
-                new AdoptiumJavaRuntimeInstaller(fileDownloader);
+        JavaFinder javaFinder =
+                new DefaultJavaFinder(new SystemJavaScanner());
+        JavaInstaller javaInstaller =
+                new AdoptiumJavaInstaller(fileDownloader);
 
         AuthlibInjectorManager authlibInjectorManager =
                 new AuthlibInjectorManager(defaultGameDir);
@@ -104,7 +105,7 @@ public final class LauncherCompositionRoot {
                 mojangMetadataService);
         ModLoaderRegistry modLoaderRegistry = ModLoaderRegistry.createDefault(
                 HttpDefaults.newClient(),
-                fileDownloader, javaResolutionService, merger,
+                fileDownloader, javaFinder, merger,
                 installationService);
         ModdedVersionService moddedVersionService = new ModdedVersionService(
                 mojangVersionService, mojangMetadataService, merger);
@@ -115,8 +116,9 @@ public final class LauncherCompositionRoot {
                 new ModdedProfileVerificationService(
                         moddedVersionService, mojangVersionService,
                         mojangMetadataService, modLoaderRegistry,
-                        integrityChecker, javaResolutionService,
+                        integrityChecker, javaFinder,
                         installationService);
+
 
         MinecraftVersionManager versionManager = new MinecraftVersionManager(
                 metadataService, installationService, modLoaderRegistry,
@@ -124,12 +126,12 @@ public final class LauncherCompositionRoot {
         CreateBuildUseCase createBuild = new CreateBuildUseCase(
                 versionManager, buildRepository, defaultGameDir);
         AccountManager accountManager = new AccountManager(profileService);
-        JavaManager javaManager = new JavaManager(
-                javaResolutionService, javaRuntimeInstaller);
+        JavaEnvironmentManager javaEnvironmentManager = new JavaEnvironmentManager(
+                javaFinder, javaInstaller);
         ElyByAuthenticator elyAuthenticator =
                 new ElyByAuthenticator(elyAuthService);
         JavaRuntimeManager javaRuntimeManager = new JavaRuntimeManager(
-                javaManager);
+                javaEnvironmentManager);
         GameAuthenticationProvider authProvider =
                 new GameAuthenticationProvider(elyAuthService);
         GameLaunchCommandBuilder commandBuilder = new GameLaunchCommandBuilder(
@@ -145,12 +147,12 @@ public final class LauncherCompositionRoot {
 
         return new LauncherContext(
                 versionService,
-                javaResolutionService,
-                javaManager, profileService, preferences, elyAuthService,
+                javaFinder,
+                javaEnvironmentManager, profileService, preferences, elyAuthService,
                 skinService, modLoaderRegistry,
                 buildRepository, createBuild,
                 accountManager, buildLaunchManager(
-                        buildIntegrity, repair, elyAuthenticator, javaManager,
+                        buildIntegrity, repair, elyAuthenticator, javaEnvironmentManager,
                         commandBuilder, processes, monitor, exitHandler,
                         buildRepository, windows));
     }
@@ -159,7 +161,7 @@ public final class LauncherCompositionRoot {
             BuildIntegrityChecker integrity,
             BuildRepairManager repair,
             ElyByAuthenticator authenticator,
-            JavaManager javaManager,
+            JavaEnvironmentManager javaEnvironmentManager,
             GameLaunchCommandBuilder commandBuilder,
             GameProcessManager processes,
             GameProcessMonitor monitor,
@@ -167,7 +169,7 @@ public final class LauncherCompositionRoot {
             FileSystemBuildRepository builds,
             LauncherWindowManager windows) {
         return new BuildLaunchManager(integrity, repair, authenticator,
-                javaManager, commandBuilder, processes, monitor, exitHandler,
+                javaEnvironmentManager, commandBuilder, processes, monitor, exitHandler,
                 windows, builds);
     }
 }

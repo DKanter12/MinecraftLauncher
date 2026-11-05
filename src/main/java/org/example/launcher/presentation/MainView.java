@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
@@ -20,6 +21,9 @@ import java.util.logging.Logger;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
@@ -28,17 +32,25 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundImage;
+import javafx.scene.layout.BackgroundPosition;
+import javafx.scene.layout.BackgroundRepeat;
+import javafx.scene.layout.BackgroundSize;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -46,9 +58,14 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 
+import org.example.launcher.infrastructure.server.BuildSummary;
 import org.example.launcher.infrastructure.server.DistributionSources;
 import org.example.launcher.infrastructure.server.ServerAuthService;
 import org.example.launcher.infrastructure.server.ServerSession;
@@ -56,14 +73,16 @@ import org.example.launcher.infrastructure.server.api.LauncherServerApi;
 import org.example.launcher.infrastructure.server.api.OfflineLauncherServerApi;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationResult;
+import org.example.launcher.application.build.ModpackImporter;
+import org.example.launcher.application.build.ServerBuildInstaller;
 import org.example.launcher.domain.model.GameProfile;
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.infrastructure.http.UrlFetcher;
-import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
+import org.example.launcher.infrastructure.java.DefaultJavaFinder;
 import org.example.launcher.infrastructure.elyby.ElyAuthService;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaFinder;
 import org.example.launcher.domain.model.LauncherPreferences;
 import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
@@ -77,7 +96,7 @@ import org.example.launcher.application.build.CreateBuildUseCase;
 import org.example.launcher.application.build.BuildRequest;
 import org.example.launcher.application.account.AccountManager;
 import org.example.launcher.application.build.ModScanner;
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.application.launch.BuildLaunchListener;
 import org.example.launcher.application.launch.BuildLaunchManager;
 import org.example.launcher.application.launch.CrashReport;
@@ -120,8 +139,8 @@ public class MainView {
     private static final String APP_VERSION = AppVersion.BUILT_IN;
 
     private final VersionService versionService;
-    private final JavaResolutionService javaResolutionService;
-    private final JavaManager javaManager;
+    private final JavaFinder javaFinder;
+    private final JavaEnvironmentManager javaEnvironmentManager;
     private final ProfileService profileService;
     private final FileSettingsRepository preferences;
     private final ElyAuthService elyAuthService;
@@ -131,26 +150,34 @@ public class MainView {
     private final CreateBuildUseCase createBuildUseCase;
     private final AccountManager accountManager;
     private final BuildLaunchManager buildLaunchManager;
+    private final ModpackImporter modpackImporter;
 
     private BorderPane root;
     private Label statusLabel;
     private boolean versionsLoadFailed = false;
 
-    // Навигационная панель + виды
+    // Header-навигация + виды
     private enum View {
-        INSTANCES, PROFILES, SETTINGS
+        INSTANCES, PROFILES, SERVER, IMPORT, CREATE, SETTINGS
     }
 
     private View currentView = View.INSTANCES;
-    private final List<Button> navButtons = new ArrayList<>();
+    /** Табы Header: текстовые + иконочные (профили, настройки). */
+    private final List<Button> headerTabs = new ArrayList<>();
     private StackPane viewStack;
-    private Label viewTitleLabel;
     private TextField instanceSearchField;
+
+    // Виды «Импорт» и «Создать»
+    private VBox importView;
+    private VBox createView;
+    private Label importStatusLabel;
+    private HBox importDropzone;
 
     // Вид инстансов (сетка карточек)
     private FlowPane instanceCards;
     private ScrollPane instancesScroll;
-    private HBox instanceFilterChips;
+    private VBox instanceFilterChips;
+    private Label instanceCountLabel;
     private ToggleGroup instanceFilterGroup;
     private String selectedInstanceId;
     private String instanceSearchText = "";
@@ -190,6 +217,33 @@ public class MainView {
     private ServerAuthService serverAuthService;
     private ServerSession serverSession;
 
+    // Вкладка «Сборки от Админа»: текущий бэкенд + установщик серверных сборок
+    private LauncherServerApi buildsBackend;
+    private ServerBuildInstaller serverBuildInstaller;
+    private VBox serverView;
+    private VBox serverBuildsList;
+    private Label serverModeLabel;
+    private List<BuildSummary> serverBuilds = List.of();
+    private boolean serverBuildsLoading = false;
+
+    // Магазин сборок (по референсу): счётчик, поиск, фильтры-чипы, сортировка
+    private Label serverCountLabel;
+    private TextField serverSearchField;
+    private String serverSearchText = "";
+    private ComboBox<String> serverSortCombo;
+    private HBox serverMcChips;
+    private ToggleGroup serverMcChipGroup;
+    private String serverMcFilter;
+    private VBox serverLoaderBox;
+    private final List<CheckBox> serverLoaderChecks = new ArrayList<>();
+    private FlowPane serverCardsFlow;
+
+    // Плашка Crash Analyzer: последний краш запуска (живёт до закрытия)
+    private VBox serverCrashBar;
+    private Label serverCrashTextLabel;
+    private CrashReport serverLastCrash;
+    private ModdedProfile serverLastCrashProfile;
+
     // Состояние запуска инстанса
 
     // Аккаунт
@@ -205,8 +259,8 @@ public class MainView {
 
     public MainView(LauncherContext context) {
         this.versionService = context.versionService();
-        this.javaResolutionService = context.javaResolutionService();
-        this.javaManager = context.javaManager();
+        this.javaFinder = context.javaFinder();
+        this.javaEnvironmentManager = context.javaEnvironmentManager();
         this.profileService = context.profileService();
         this.preferences = context.preferences();
         this.elyAuthService = context.elyAuthService();
@@ -216,6 +270,8 @@ public class MainView {
         this.createBuildUseCase = context.createBuildUseCase();
         this.accountManager = context.accountManager();
         this.buildLaunchManager = context.buildLaunchManager();
+        this.modpackImporter = new ModpackImporter(createBuildUseCase,
+                modLoaderRegistry, buildRepository, new UrlFetcher());
         serverSession = null;
         applyDistributionSettings();
         serverSession = serverAuthService.restoreSession().orElse(null);
@@ -257,6 +313,9 @@ public class MainView {
         } else {
             backend = DistributionSources.createYandexBackend(token, yandexLink);
         }
+        buildsBackend = backend;
+        serverBuildInstaller = new ServerBuildInstaller(backend,
+                modLoaderRegistry, createBuildUseCase, buildRepository);
         serverAuthService = new ServerAuthService(backend,
                 GameDirectory.defaultDirectory().root()
                         .resolve(ServerAuthService.SESSION_FILE_NAME));
@@ -281,40 +340,56 @@ public class MainView {
         instancesView = buildInstancesView();
         profilesView = buildProfilesView();
         settingsView = buildSettingsView();
-        viewStack = new StackPane(instancesView, profilesView,
-                settingsView);
+        serverView = buildServerView();
+        importView = buildImportView();
+        createView = buildCreateView();
+        viewStack = new StackPane(instancesView, profilesView, serverView,
+                importView, createView, settingsView);
 
-        root.setTop(buildTopBar());
-        root.setLeft(buildNavRail());
+        root.setTop(buildHeader());
         root.setCenter(viewStack);
         root.setBottom(buildFooter());
         showView(View.INSTANCES);
     }
 
-    // --- Верхняя панель ---
+    // --- Верхний Header: бренд, вкладки, профиль игрока ---
 
-    private HBox buildTopBar() {
-        viewTitleLabel = new Label(Lang.tr("nav.instances"));
-        viewTitleLabel.getStyleClass().add("view-title");
+    /** Собирает Header: бренд, глобальные вкладки, профиль игрока. */
+    private HBox buildHeader() {
+        // Бренд-блок: фиолетовая иконка + название лаунчера
+        Label brandIcon = new Label("\u25C6");
+        brandIcon.getStyleClass().add("brand-icon");
+        Label brandName = new Label("PACKCRAFT");
+        brandName.getStyleClass().add("brand-name");
+        Label brandSub = new Label("LAUNCHER");
+        brandSub.getStyleClass().add("brand-sub");
+        VBox brandText = new VBox(1, brandName, brandSub);
+        HBox brandRow = new HBox(9, brandIcon, brandText);
+        brandRow.setAlignment(Pos.CENTER_LEFT);
+        brandRow.getStyleClass().add("brand-row");
 
-        instanceSearchField = new TextField();
-        instanceSearchField.setPromptText(Lang.tr("search.instances"));
-        instanceSearchField.getStyleClass().add("search-field");
-        instanceSearchField.setPrefWidth(260);
-        instanceSearchField.textProperty().addListener((obs, old, val) -> {
-            instanceSearchText = val == null ? "" : val.trim().toLowerCase();
-            refreshInstanceCards();
-        });
+        // Глобальные вкладки навигации
+        HBox tabs = new HBox(8);
+        tabs.getStyleClass().add("header-tabs");
+        addHeaderTab(tabs, Lang.tr("nav.library"), View.INSTANCES);
+        addHeaderTab(tabs, Lang.tr("nav.catalog"), View.SERVER);
+        addHeaderTab(tabs, Lang.tr("nav.import"), View.IMPORT);
+        addHeaderTab(tabs, Lang.tr("nav.create"), View.CREATE);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Виджет аккаунта (быстрый переключатель; полное управление — в Профилях)
         avatarView = new ImageView();
-        avatarView.setFitWidth(28);
-        avatarView.setFitHeight(28);
+        avatarView.setFitWidth(38);
+        avatarView.setFitHeight(38);
         avatarView.setPreserveRatio(true);
+        avatarView.setClip(new Circle(19, 19, 19));
         avatarView.setVisible(false);
+
+        // Выпадающая стрелка аккаунт-капсулы (декоративная)
+        Label accountArrow = new Label("\u25BE");
+        accountArrow.getStyleClass().add("account-pill-arrow");
 
         accountCombo = new ComboBox<>();
         accountCombo.setPrefWidth(180);
@@ -422,39 +497,302 @@ public class MainView {
         addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
 
         HBox accountBox = new HBox(8, avatarView, accountCombo,
-                addAccountButton);
+                addAccountButton, accountArrow);
         accountBox.setAlignment(Pos.CENTER);
         accountBox.getStyleClass().add("account-pill");
 
-        HBox topBar = new HBox(16, viewTitleLabel, instanceSearchField,
-                spacer, accountBox);
-        topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(12, 20, 12, 20));
-        topBar.getStyleClass().add("topbar");
-        return topBar;
+        // Системные кнопки Header: профили и настройки
+        Button profilesButton = headerIconButton("\uD83D\uDC64",
+                "nav.profiles", View.PROFILES);
+        Button settingsButton = headerIconButton("\u2699",
+                "nav.settings", View.SETTINGS);
+
+        HBox header = new HBox(16, brandRow, tabs, spacer, accountBox,
+                profilesButton, settingsButton);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(12, 20, 12, 20));
+        header.getStyleClass().add("topbar");
+        return header;
     }
 
-    // --- Навигационная панель ---
-
-    private VBox buildNavRail() {
-        VBox rail = new VBox(6);
-        rail.setPrefWidth(190);
-        rail.setPadding(new Insets(16, 10, 16, 10));
-        rail.getStyleClass().add("nav-rail");
-        addNavButton(rail, Lang.tr("nav.instances"), View.INSTANCES);
-        addNavButton(rail, Lang.tr("nav.profiles"), View.PROFILES);
-        addNavButton(rail, Lang.tr("nav.settings"), View.SETTINGS);
-        return rail;
+    /** Текстовый таб Header; активное состояние подсвечивается в {@code showView}. */
+    private void addHeaderTab(HBox tabs, String text, View view) {
+        Button tab = new Button(text);
+        tab.getStyleClass().add("header-tab");
+        tab.setUserData(view);
+        tab.setOnAction(e -> showView(view));
+        headerTabs.add(tab);
+        tabs.getChildren().add(tab);
     }
 
-    private void addNavButton(VBox rail, String text, View view) {
-        Button button = new Button(text);
-        button.getStyleClass().add("nav-button");
-        button.setMaxWidth(Double.MAX_VALUE);
+    /** Иконочная кнопка Header (профили/настройки) с подсказкой. */
+    private Button headerIconButton(String glyph, String tipKey, View view) {
+        Button button = new Button(glyph);
+        button.getStyleClass().add("header-icon-button");
         button.setUserData(view);
+        button.setTooltip(new Tooltip(Lang.tr(tipKey)));
         button.setOnAction(e -> showView(view));
-        navButtons.add(button);
-        rail.getChildren().add(button);
+        headerTabs.add(button);
+        return button;
+    }
+
+    // --- Вид «Импорт»: .mrpack / .zip в новый изолированный инстанс ---
+
+    /** Hero-вид импорта: drop-zone, выбор файла, статус и подсказки. */
+    private VBox buildImportView() {
+        Label dropIcon = new Label("\uD83D\uDCE5");
+        dropIcon.getStyleClass().add("import-drop-icon");
+
+        Label dropTitle = new Label(Lang.tr("import.title"));
+        dropTitle.getStyleClass().add("import-title");
+
+        Label dropText = new Label(Lang.tr("import.drop.text"));
+        dropText.getStyleClass().add("import-text");
+        dropText.setWrapText(true);
+        dropText.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        Button choose = new Button(Lang.tr("import.drop.button"));
+        choose.getStyleClass().add("pack-install");
+        choose.setMaxWidth(Region.USE_PREF_SIZE);
+        choose.setOnAction(e -> chooseImportFile());
+
+        VBox dropContent = new VBox(10, dropIcon, dropTitle, dropText,
+                choose);
+        dropContent.setAlignment(Pos.CENTER);
+
+        importStatusLabel = new Label();
+        importStatusLabel.getStyleClass().add("alert-text");
+        importStatusLabel.setWrapText(true);
+        importStatusLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        // Карточка перетаскивания: вся ширина рабочей зоны, центрировано
+        importDropzone = new HBox(dropContent);
+        importDropzone.setAlignment(Pos.CENTER);
+        importDropzone.getStyleClass().add("import-dropzone");
+        importDropzone.setMaxWidth(Double.MAX_VALUE);
+        importDropzone.setMinHeight(230);
+
+        // Drag & drop: файлы из проводника можно тянуть прямо в лаунчер
+        importDropzone.setOnDragOver(this::onImportDragOver);
+        importDropzone.setOnDragDropped(this::onImportDragDropped);
+        importDropzone.setOnDragExited(e -> importDropzone
+                .getStyleClass().remove("dropzone-active"));
+
+        // --- Инфо-панель: как экспортировать и импортировать сборки ---
+        Label guideTitle = new Label(Lang.tr("import.guide.title"));
+        guideTitle.getStyleClass().add("import-guide-title");
+        Label step1 = new Label(Lang.tr("import.guide.step1"));
+        Label step2 = new Label(Lang.tr("import.guide.step2"));
+        Label step3 = new Label(Lang.tr("import.guide.step3"));
+        Label safety = new Label(Lang.tr("import.guide.safety"));
+        step1.getStyleClass().add("import-guide-step");
+        step2.getStyleClass().add("import-guide-step");
+        step3.getStyleClass().add("import-guide-step");
+        safety.getStyleClass().add("import-guide-note");
+        safety.setWrapText(true);
+        VBox guideCard = new VBox(8, guideTitle, step1, step2, step3,
+                safety);
+        guideCard.getStyleClass().add("import-guide-card");
+
+        Label tipsTitle = new Label(Lang.tr("import.tips.title"));
+        tipsTitle.getStyleClass().add("import-guide-title");
+        Label formats = new Label(Lang.tr("import.tips.formats"));
+        Label paths = new Label(Lang.tr("import.tips.paths"));
+        Label custom = new Label(Lang.tr("import.tips.custom"));
+        formats.getStyleClass().add("import-guide-step");
+        paths.getStyleClass().add("import-guide-step");
+        custom.getStyleClass().add("import-guide-step");
+        VBox tipsCard = new VBox(8, tipsTitle, formats, paths, custom);
+        tipsCard.getStyleClass().add("import-guide-card");
+
+        // Две колонки 1:1 на всю ширину — страница не смотрится пустой
+        HBox info = new HBox(16, guideCard, tipsCard);
+        for (var child : info.getChildren()) {
+            HBox.setHgrow(child, Priority.ALWAYS);
+        }
+        info.setMaxWidth(Double.MAX_VALUE);
+
+        VBox view = new VBox(20, importDropzone, importStatusLabel, info);
+        view.setPadding(new Insets(32));
+        return view;
+    }
+
+    private void onImportDragOver(DragEvent event) {
+        Dragboard board = event.getDragboard();
+        if (board.hasFiles()) {
+            importDropzone.getStyleClass()
+                    .add("dropzone-active");
+            event.acceptTransferModes(TransferMode.COPY);
+        }
+        event.consume();
+    }
+
+    private void onImportDragDropped(DragEvent event) {
+        Dragboard board = event.getDragboard();
+        importDropzone.getStyleClass().remove("dropzone-active");
+        boolean handled = false;
+        if (board.hasFiles()) {
+            for (java.io.File file : board.getFiles()) {
+                String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+                if (name.endsWith(".mrpack") || name.endsWith(".zip")) {
+                    startImport(file.toPath());
+                    handled = true;
+                    break;
+                }
+            }
+            if (!handled) {
+                importStatusLabel.setText(Lang.tr("import.wrong.type"));
+            }
+        }
+        event.setDropCompleted(handled);
+        event.consume();
+    }
+
+    /** Диалог выбора архива модпака (.mrpack / .zip). */
+    private void chooseImportFile() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.tr("import.chooser.title"));
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter(
+                        Lang.tr("import.chooser.filter"),
+                        "*.mrpack", "*.zip"),
+                new FileChooser.ExtensionFilter("All files", "*.*"));
+        Stage owner = (Stage) root.getScene().getWindow();
+        java.io.File file = chooser.showOpenDialog(owner);
+        if (file != null) {
+            startImport(file.toPath());
+        }
+    }
+
+    /**
+     * Запускает фоновый импорт: версии Mojang должны быть загружены
+     * (манифест нужен для подбора версии игры из .mrpack).
+     */
+    private void startImport(Path pack) {
+        if (manifestVersions.isEmpty()) {
+            importStatusLabel.setText(
+                    versionsLoadFailed ? Lang.tr("versions.retry")
+                            : Lang.tr("versions.wait"));
+            if (versionsLoadFailed) {
+                loadVersions();
+            }
+            return;
+        }
+        importStatusLabel.setText(Lang.tr("import.running"));
+        LOG.info(() -> "Import started: " + pack);
+        Stage owner = (Stage) root.getScene().getWindow();
+        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
+        progressDialog.setTitle(Lang.tr("import.progress.title"));
+
+        Task<ModpackImporter.Result> task = new Task<>() {
+            @Override
+            protected ModpackImporter.Result call() throws Exception {
+                return modpackImporter.importPack(pack, manifestVersions,
+                        progressDialog);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ModpackImporter.Result result = task.getValue();
+            importStatusLabel.setText(Lang.tr("import.done",
+                    result.packName(), result.downloaded(), result.failed()));
+            statusLabel.setText(Lang.tr("import.done.status",
+                    result.packName()));
+            jumpToInstance(result.profile());
+        });
+        task.setOnFailed(e -> {
+            Throwable cause = task.getException();
+            LOG.log(Level.WARNING, "Modpack import failed", cause);
+            importStatusLabel.setText(Lang.tr("import.failed",
+                    cause == null ? "" : cause.getMessage()));
+            statusLabel.setText(Lang.tr("import.failed.short"));
+        });
+        FxTasks.run("import-pack", task);
+    }
+
+    // --- Вид «Создать»: hero-панель мастера + умные бандлы (быстрый старт) ---
+
+    /** Hero-вид создания сборки: мастер + превью умных бандлов. */
+    private VBox buildCreateView() {
+        Label heroTitle = new Label(Lang.tr("create.hero.title"));
+        heroTitle.getStyleClass().add("create-hero-title");
+        heroTitle.setWrapText(true);
+
+        Label heroText = new Label(Lang.tr("create.hero.text"));
+        heroText.getStyleClass().add("create-hero-text");
+        heroText.setWrapText(true);
+
+        Button openWizard = new Button(Lang.tr("instances.create"));
+        openWizard.getStyleClass().addAll("pack-install",
+                "create-hero-cta");
+        openWizard.setTooltip(new Tooltip(Lang.tr("instances.create.tip")));
+        openWizard.setMaxWidth(Region.USE_PREF_SIZE);
+        openWizard.setOnAction(e -> onNewInstance());
+
+        VBox hero = new VBox(12, heroTitle, heroText, openWizard);
+        hero.getStyleClass().add("create-hero");
+        hero.setMaxWidth(Double.MAX_VALUE);
+
+        Label bundlesTitle = new Label(Lang.tr("create.bundles.title"));
+        bundlesTitle.getStyleClass().add("create-section-title");
+
+        // Ровная сетка «3 колонки» на всю ширину: каждый бандл
+        // получает свою треть свободного места (эквивалент 1fr)
+        HBox bundles = new HBox(16,
+                buildBundleCard("create.bundle.fps.name",
+                        "create.bundle.fps.desc", "\u26A1",
+                        ModLoaderType.FABRIC),
+                buildBundleCard("create.bundle.shader.name",
+                        "create.bundle.shader.desc", "\uD83C\uDF0C",
+                        ModLoaderType.FABRIC),
+                buildBundleCard("create.bundle.network.name",
+                        "create.bundle.network.desc", "\uD83D\uDC9C",
+                        ModLoaderType.FORGE));
+        for (var child : bundles.getChildren()) {
+            HBox.setHgrow(child, Priority.ALWAYS);
+        }
+        bundles.setMaxWidth(Double.MAX_VALUE);
+
+        VBox view = new VBox(24, hero, bundlesTitle, bundles);
+        VBox.setMargin(bundlesTitle, new Insets(8, 0, 0, 0));
+        view.setPadding(new Insets(32));
+        return view;
+    }
+
+    /**
+     * Карточка умного бандла: рабочий ярлык мастера создания сборки —
+     * клик открывает окно создания с предвыбранным загрузчиком, бейдж
+     * показывает целевое семейство (Fabric / Forge).
+     */
+    private VBox buildBundleCard(String nameKey, String descKey,
+                                 String icon, ModLoaderType loader) {
+        Label iconLabel = new Label(icon);
+        iconLabel.getStyleClass().add("bundle-icon");
+
+        Label name = new Label(Lang.tr(nameKey));
+        name.getStyleClass().add("bundle-name");
+        Label loaderBadge = new Label(loader.displayName());
+        loaderBadge.getStyleClass().add("bundle-badge");
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+
+        // Шапка карточки: иконка + название + бейдж загрузчика справа
+        HBox header = new HBox(10, iconLabel, name, headerSpacer,
+                loaderBadge);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        Label description = new Label(Lang.tr(descKey));
+        description.getStyleClass().add("pack-desc");
+        description.setWrapText(true);
+
+        VBox card = new VBox(10, header, description);
+        card.getStyleClass().add("bundle-card");
+        card.setPrefWidth(300);
+        card.setPadding(new Insets(16));
+        card.setMaxWidth(Double.MAX_VALUE);
+        card.setCursor(javafx.scene.Cursor.HAND);
+        card.setOnMouseClicked(e -> onNewInstance(loader));
+        return card;
     }
 
     // --- Подвал (статус слева, информация о лаунчере справа) ---
@@ -474,29 +812,65 @@ public class MainView {
         return footer;
     }
 
-    // --- Вид инстансов: чипы фильтров + сетка карточек ---
+    // --- Вид инстансов: двухколоночный (фильтры слева + сетка справа) ---
 
     private VBox buildInstancesView() {
-        instanceFilterChips = new HBox(8);
+        // Поиск инстансов: лупа слева поверх поля (StackPane-оверлей)
+        instanceSearchField = new TextField();
+        instanceSearchField.setPromptText(Lang.tr("search.instances"));
+        instanceSearchField.getStyleClass().add("search-field");
+        instanceSearchField.setPadding(new Insets(8, 12, 8, 34));
+        instanceSearchField.setMaxWidth(Double.MAX_VALUE);
+        instanceSearchField.textProperty().addListener((obs, old, val) -> {
+            instanceSearchText = val == null ? "" : val.trim().toLowerCase();
+            refreshInstanceCards();
+        });
+
+        Label searchIcon = new Label("\uD83D\uDD0D");
+        searchIcon.getStyleClass().add("search-icon");
+        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 11));
+        StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
+        StackPane searchWrap = new StackPane(instanceSearchField, searchIcon);
+        searchWrap.getStyleClass().add("search-wrap");
+        searchWrap.setPrefWidth(320);
+        searchWrap.setMinWidth(220);
+
+        instanceFilterChips = new VBox(6);
         instanceFilterChips.getStyleClass().add("filter-row");
+        instanceFilterChips.setAlignment(Pos.TOP_LEFT);
         instanceFilterGroup = new ToggleGroup();
         addInstanceFilterChip(Lang.tr("filter.all"), null);
         for (ModLoaderType loader : ModLoaderType.values()) {
             addInstanceFilterChip(loader.displayName(), loader);
         }
-        Region filterSpacer = new Region();
-        HBox.setHgrow(filterSpacer, Priority.ALWAYS);
+
+        Label filtersTitle = new Label(Lang.tr("filter.title"));
+        filtersTitle.getStyleClass().add("filter-title");
+
+        VBox filters = new VBox(10, filtersTitle, instanceFilterChips);
+        filters.getStyleClass().add("store-filters");
+        filters.setPrefWidth(220);
+        filters.setPadding(new Insets(14));
+
+        Label libraryTitle = new Label(Lang.tr("nav.library"));
+        libraryTitle.getStyleClass().add("title-label");
+        instanceCountLabel = new Label();
+        instanceCountLabel.getStyleClass().add("store-count");
+        Region topSpacer = new Region();
+        HBox.setHgrow(topSpacer, Priority.ALWAYS);
         Button createBuildButton = new Button(Lang.tr("instances.create"));
-        createBuildButton.getStyleClass().add("quick-select-button");
+        createBuildButton.getStyleClass().add("pack-install");
         createBuildButton.setTooltip(new Tooltip(Lang.tr("instances.create.tip")));
         createBuildButton.setOnAction(e -> onNewInstance());
-        instanceFilterChips.getChildren().addAll(filterSpacer,
-                createBuildButton);
+
+        HBox topRow = new HBox(10, libraryTitle, instanceCountLabel, topSpacer,
+                searchWrap, createBuildButton);;
+        topRow.setAlignment(Pos.CENTER_LEFT);
 
         instanceCards = new FlowPane();
-        instanceCards.setHgap(14);
-        instanceCards.setVgap(14);
-        instanceCards.setPadding(new Insets(4));
+        instanceCards.setHgap(16);
+        instanceCards.setVgap(16);
+        instanceCards.setPadding(new Insets(2, 0, 24, 0));
         instanceCards.getStyleClass().add("cards-flow");
 
         instancesScroll = new ScrollPane(instanceCards);
@@ -505,19 +879,40 @@ public class MainView {
         instancesScroll.getStyleClass().add("cards-scroll");
         VBox.setVgrow(instancesScroll, Priority.ALWAYS);
 
-        VBox view = new VBox(10, instanceFilterChips, instancesScroll);
-        view.setPadding(new Insets(16));
+        VBox content = new VBox(16, topRow, instancesScroll);
+        HBox.setHgrow(content, Priority.ALWAYS);
+
+        HBox layout = new HBox(18, filters, content);
+        HBox.setHgrow(content, Priority.ALWAYS);
+
+        VBox view = new VBox(0, layout);
+        view.setPadding(new Insets(18, 24, 18, 24));
         VBox.setVgrow(view, Priority.ALWAYS);
         return view;
     }
 
+    /** Чип фильтра в левом сайдбаре: иконка загрузчика + счётчик инстансов. */
     private ToggleButton makeInstanceFilterChip(String text,
                                                   ModLoaderType loader) {
-        ToggleButton chip = new ToggleButton(text);
+        long count = loader == null ? moddedProfiles.size()
+                : moddedProfiles.stream().filter(
+                        p -> p.loaderType() == loader).count();
+        String label = text + "  ·  " + count;
+        ToggleButton chip = new ToggleButton(label);
+        if (loader != null) {
+            ImageView icon = loaderImage(loader);
+            if (icon != null) {
+                icon.setFitWidth(16);
+                icon.setFitHeight(16);
+                chip.setGraphic(icon);
+            }
+        }
         chip.getStyleClass().add("filter-button");
         chip.setToggleGroup(instanceFilterGroup);
         chip.setUserData(loader);
         chip.setSelected(loader == null);
+        chip.setMaxWidth(Double.MAX_VALUE);
+        chip.setAlignment(Pos.CENTER_LEFT);
         chip.setOnAction(e -> {
             // Фильтр с одиночным выбором не бывает пустым: повторный клик
             // по активному чипу сохраняет его
@@ -536,8 +931,12 @@ public class MainView {
                 makeInstanceFilterChip(text, loader));
     }
 
-    /** Перестраивает чипы фильтров на текущем языке. */
+    /**
+     * Перестраивает чипы фильтров с иконками загрузчиков и счётчиками
+     * инстансов (иконка — буквы буквы, счётчик — число инстансов).
+     */
     private void rebuildInstanceFilterChips() {
+        if (instanceFilterChips == null) return;
         ModLoaderType keep = instanceLoaderFilter;
         instanceFilterGroup = new ToggleGroup();
         List<ToggleButton> chips = new ArrayList<>();
@@ -545,46 +944,49 @@ public class MainView {
         for (ModLoaderType loader : ModLoaderType.values()) {
             chips.add(makeInstanceFilterChip(loader.displayName(), loader));
         }
-        instanceFilterChips.getChildren()
-                .removeIf(node -> node instanceof ToggleButton);
-        instanceFilterChips.getChildren().addAll(0, chips);
+        instanceFilterChips.getChildren().setAll(chips);
         instanceLoaderFilter = keep;
         syncInstanceFilterChips();
     }
 
-    /** Переключает центральный вид и обновляет заголовок, поиск и навигацию. */
+    /**
+     * Переключает центральный вид: header-табы подсвечиваются,
+     * статичные виды (Импорт/Создать) просто показываются.
+     */
     private void showView(View view) {
         currentView = view;
         instancesView.setVisible(view == View.INSTANCES);
         instancesView.setManaged(view == View.INSTANCES);
         profilesView.setVisible(view == View.PROFILES);
         profilesView.setManaged(view == View.PROFILES);
+        serverView.setVisible(view == View.SERVER);
+        serverView.setManaged(view == View.SERVER);
+        importView.setVisible(view == View.IMPORT);
+        importView.setManaged(view == View.IMPORT);
+        createView.setVisible(view == View.CREATE);
+        createView.setManaged(view == View.CREATE);
         settingsView.setVisible(view == View.SETTINGS);
         settingsView.setManaged(view == View.SETTINGS);
-        viewTitleLabel.setText(switch (view) {
-            case INSTANCES -> Lang.tr("nav.instances");
-            case PROFILES -> Lang.tr("nav.profiles");
-            case SETTINGS -> Lang.tr("nav.settings");
-        });
-        instanceSearchField.setVisible(view == View.INSTANCES);
-        instanceSearchField.setManaged(view == View.INSTANCES);
-        for (Button nav : navButtons) {
-            boolean active = nav.getUserData() == view;
+        for (Button tab : headerTabs) {
+            boolean active = tab.getUserData() == view;
             if (active) {
-                if (!nav.getStyleClass().contains("nav-button-active")) {
-                    nav.getStyleClass().add("nav-button-active");
+                if (!tab.getStyleClass().contains("header-tab-active")) {
+                    tab.getStyleClass().add("header-tab-active");
                 }
             } else {
-                nav.getStyleClass().remove("nav-button-active");
+                tab.getStyleClass().remove("header-tab-active");
             }
         }
         if (view == View.INSTANCES) {
             refreshInstanceCards();
         } else if (view == View.PROFILES) {
             refreshProfilesView();
+        } else if (view == View.SERVER) {
+            refreshServerBuildsView();
         } else if (view == View.SETTINGS) {
             refreshSettingsView();
         }
+        // IMPORT/CREATE — статичные виды без фоновых обновлений
     }
 
     private static final DateTimeFormatter DATE_FORMATTER =
@@ -647,11 +1049,6 @@ public class MainView {
             } else {
                 node.getStyleClass().remove("instance-card-selected");
             }
-            Object details = node.getProperties().get("details");
-            if (details instanceof Region region) {
-                region.setVisible(sel);
-                region.setManaged(sel);
-            }
         }
     }
 
@@ -678,6 +1075,11 @@ public class MainView {
     /** Перестраивает сетку карточек по текущим фильтру + поиску. */
     private void refreshInstanceCards() {
         if (instanceCards == null) return;
+        if (instanceCountLabel != null) {
+            instanceCountLabel.setText(moddedProfiles.isEmpty() ? ""
+                    : Lang.tr("instances.count", moddedProfiles.size()));
+        }
+        rebuildInstanceFilterChips();
         double scroll = instancesScroll != null
                 ? instancesScroll.getVvalue() : 0;
         instanceCards.getChildren().clear();
@@ -712,8 +1114,8 @@ public class MainView {
 
     private VBox buildInstanceCard(ModdedProfile profile) {
         boolean selected = profile.id().equals(selectedInstanceId);
-        VBox card = new VBox(8);
-        card.setPrefWidth(300);
+        VBox card = new VBox(10);
+        card.setPrefWidth(248);
         card.setUserData(profile.id());
         card.getStyleClass().addAll("instance-card",
                 accentClass(profile.loaderType()));
@@ -725,52 +1127,44 @@ public class MainView {
             card.getStyleClass().add("instance-card-launching");
         }
 
-        Label icon = new Label(iconText(profile.loaderType()));
-        icon.getStyleClass().addAll("instance-icon",
-                accentClass(profile.loaderType()));
+        // Обложка: кастомная картинка 16:9 или тёмный градиент
+        // с логотипом загрузчика; в углу — папка и настройки (hover)
+        card.getChildren().add(buildInstanceBanner(profile));
 
+        // Название: одна строка, троеточие при переполнении,
+        // полный текст — в Tooltip при наведении
         Label name = new Label(profile.name());
         name.getStyleClass().add("instance-card-name");
-        name.setWrapText(true);
-        Label sub = new Label(cardSubLine(profile));
-        sub.getStyleClass().add("instance-card-sub");
+        name.setWrapText(false);
+        name.setTextOverrun(OverrunStyle.ELLIPSIS);
+        name.setMaxWidth(Double.MAX_VALUE);
+        name.setTooltip(new Tooltip(profile.name()));
+
+        // Бейдж версии и модов: [Fabric 1.21.4 • 12 модов]
+        Label badge = new Label(cardSubLine(profile));
+        badge.getStyleClass().add("instance-badge");
+
+        // Дата последнего запуска — мелкий серый текст
         Label played = new Label(cardPlayedLine(profile));
         played.getStyleClass().add("instance-card-sub");
-        VBox titles = new VBox(2, name, sub, played);
 
-        HBox top = new HBox(10, icon, titles);
-        top.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(titles, Priority.ALWAYS);
-        card.getChildren().add(top);
+        VBox titles = new VBox(5, name, badge, played);
+        card.getChildren().add(titles);
 
         Button play = new Button(
-                launching ? launchingStatusText : Lang.tr("button.play"));
+                launching ? launchingStatusText
+                        : Lang.tr("button.play").toUpperCase());
         play.getStyleClass().add("card-play");
         play.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(play, Priority.ALWAYS);
         play.setDisable(versionPlayInFlight || launching);
         play.setOnAction(e -> {
             selectInstance(profile.id());
             startInstanceLaunch(profile);
         });
-
-        Button folder = new Button(Lang.tr("button.folder"));
-        folder.getStyleClass().add("card-ghost-button");
-        folder.setOnAction(e -> onOpenProfileFolder(profile));
-
-        Button edit = new Button(Lang.tr("button.edit"));
-        edit.getStyleClass().add("card-ghost-button");
-        edit.setOnAction(e -> onEditProfile(profile));
-
-        HBox actions = new HBox(6, play, folder, edit);
-        actions.setAlignment(Pos.CENTER_LEFT);
-        card.getChildren().add(actions);
-
-        VBox details = buildInstanceDetails(profile);
-        details.setVisible(selected);
-        details.setManaged(selected);
-        card.getProperties().put("details", details);
-        card.getChildren().add(details);
+        if (launching) {
+            startLaunchDots(play);
+        }
+        card.getChildren().add(play);
 
         card.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
@@ -785,39 +1179,171 @@ public class MainView {
         return card;
     }
 
-    /** Раскрытый блок выбранной карточки: факты + сборки + удаление. */
-    private VBox buildInstanceDetails(ModdedProfile profile) {
-        VBox details = new VBox(3);
-        details.getStyleClass().add("instance-card-details");
-        details.getChildren().add(detailLine(profile.isVanilla()
-                ? Lang.tr("card.version.vanilla", profile.minecraftVersion())
-                : "MC " + profile.minecraftVersion() + "  ·  "
-                        + profile.loaderType().displayName() + " "
-                        + profile.loaderVersion()));
-        Path dir = buildRepository.resolveGameDir(profile);
-        details.getChildren().add(detailLine(Lang.tr("card.gamedir",
-                shortGameDir(dir))));
-        details.getChildren().add(detailLine(Lang.tr("card.memory",
-                FileSystemBuildRepository.formatMemory(profile.memoryMb()))));
-        details.getChildren().add(detailLine(Lang.tr("card.jvm",
-                profile.extraJvmArgs().isEmpty() ? Lang.tr("card.none")
-                        : String.join(" ", profile.extraJvmArgs()))));
-        details.getChildren().add(detailLine(Lang.tr("card.created",
-                profile.createdTime().map(MainView::formatDate).orElse("—"))));
+    /**
+     * Обложка карточки (16:9): кастомная картинка инстанса на весь баннер,
+     * иначе тёмный градиент с логотипом загрузчика по центру. В правом
+     * верхнем углу — два иконочных действия, видимые при наведении:
+     * открыть папку игры и меню настроек профиля.
+     */
+    private javafx.scene.Node buildInstanceBanner(ModdedProfile profile) {
+        StackPane banner = new StackPane();
+        banner.setPrefHeight(126);
+        banner.setMaxHeight(126);
+        banner.getStyleClass().addAll("instance-banner",
+                accentClass(profile.loaderType()));
 
-        Button delete = new Button(Lang.tr("button.delete.instance"));
-        delete.getStyleClass().add("card-danger-button");
-        delete.setMaxWidth(Double.MAX_VALUE);
-        delete.setOnAction(e -> onDeleteProfile(profile));
-        details.getChildren().add(delete);
-        return details;
+        // Логотип загрузчика по центру: официальный PNG (Prism Launcher),
+        // при недоступности ресурса — текстовый фолбэк (V / Fb / Fo / N / Q)
+        javafx.scene.Node logo;
+        ImageView loaderIcon = loaderImage(profile.loaderType());
+        if (loaderIcon != null) {
+            logo = loaderIcon;
+            StackPane.setAlignment(loaderIcon, Pos.CENTER);
+        } else {
+            Label fallback = new Label(iconText(profile.loaderType()));
+            fallback.getStyleClass().add("instance-banner-logo");
+            StackPane.setAlignment(fallback, Pos.CENTER);
+            logo = fallback;
+        }
+
+        // Логотип по центру оверлеем: показывает и под картинкой
+        // (поверх затемнения), скрывается при отсутствии картинки
+        Path custom = customInstanceIcon(profile);
+        if (custom != null) {
+            try {
+                Image image = new Image(custom.toUri().toString());
+                if (!image.isError()) {
+                    banner.setBackground(new Background(new BackgroundImage(
+                            image,
+                            BackgroundRepeat.NO_REPEAT,
+                            BackgroundRepeat.NO_REPEAT,
+                            BackgroundPosition.CENTER,
+                            new BackgroundSize(100, 100, true, true,
+                                    false, true))));
+                } else {
+                    banner.getChildren().add(logo);
+                }
+            } catch (Exception ignored) {
+                banner.getChildren().add(logo);
+            }
+        } else {
+            banner.getChildren().add(logo);
+        }
+
+        // Быстрые действия в углу обложки: 📁 папка игры + ⚙ настройки
+        HBox quick = new HBox(4);
+        quick.getStyleClass().add("banner-actions");
+
+        Button folder = new Button("\u2750");
+        folder.getStyleClass().add("banner-action");
+        folder.setTooltip(new Tooltip(Lang.tr("button.folder")));
+        folder.setOnAction(e -> onOpenProfileFolder(profile));
+        folder.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
+
+        Button settings = new Button("\u2699");
+        settings.getStyleClass().add("banner-action");
+        settings.setTooltip(new Tooltip(Lang.tr("instance.menu.tip")));
+        settings.setOnAction(e -> onEditProfile(profile));
+        settings.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
+
+        quick.getChildren().addAll(folder, settings);
+        StackPane.setAlignment(quick, Pos.TOP_RIGHT);
+        StackPane.setMargin(quick, new Insets(6));
+        banner.getChildren().add(quick);
+
+        return banner;
     }
 
-    private static Label detailLine(String text) {
-        Label line = new Label(text);
-        line.getStyleClass().add("instance-card-detail-line");
-        line.setWrapText(true);
-        return line;
+    /** Путь к пользовательской иконке инстанса, если она есть. */
+    private Path customInstanceIcon(ModdedProfile profile) {
+        try {
+            Path dir = buildRepository.resolveGameDir(profile);
+            for (String name : List.of("icon.png", "icon.jpg", "pack.png")) {
+                Path candidate = dir.resolve(name);
+                if (Files.isRegularFile(candidate)) {
+                    return candidate;
+                }
+            }
+        } catch (Exception ignored) {
+            // недоступный каталог — считаем иконки нет
+        }
+        return null;
+    }
+
+    /**
+     * Меню карточки → «Сменить иконку»: копирует выбранное изображение
+     * в папку инстанса как icon.png и перерисовывает сетку.
+     */
+    private void changeInstanceIcon(ModdedProfile profile) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(Lang.tr("instance.icon.chooser"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                Lang.tr("instance.icon.filter"),
+                "*.png", "*.jpg", "*.jpeg"));
+        Stage owner = (Stage) root.getScene().getWindow();
+        java.io.File file = chooser.showOpenDialog(owner);
+        if (file == null) {
+            return;
+        }
+        try {
+            Path target = buildRepository.resolveGameDir(profile)
+                    .resolve("icon.png");
+            Files.createDirectories(target.getParent());
+            Files.copy(file.toPath(), target,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            statusLabel.setText(Lang.tr("instance.icon.done", profile.name()));
+            refreshInstanceCards();
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("instance.icon.failed", e.getMessage()));
+        }
+    }
+
+    /**
+     * Официальная иконка загрузчика (PNG из ресурсов, источник —
+     * Prism Launcher) для баннера карточки; null, если ресурса нет.
+     */
+    private static ImageView loaderImage(ModLoaderType type) {
+        String name = switch (type) {
+            case VANILLA -> "vanilla";
+            case FABRIC -> "fabric";
+            case FORGE -> "forge";
+            case NEOFORGE -> "neoforge";
+            case QUILT -> "quilt";
+        };
+        var url = MainView.class.getResource(
+                "/icons/loader/" + name + ".png");
+        if (url == null) {
+            return null;
+        }
+        ImageView view = new ImageView(new Image(url.toExternalForm()));
+        view.setFitWidth(64);
+        view.setFitHeight(64);
+        view.setPreserveRatio(true);
+        return view;
+    }
+
+    /**
+     * Анимация статуса запуска на кнопке «Играть»: текст статуса
+     * + бегущие точки (…). Останавливается, когда карточка уходит
+     * из сцены (перестройка сетки или закрытие вида).
+     */
+    private void startLaunchDots(Button play) {
+        String base = launchingStatusText;
+        final String stem = base.replaceAll("\\.+$", "");
+        final int[] tick = {0};
+        Timeline dots = new Timeline(new KeyFrame(
+                javafx.util.Duration.millis(400), e -> {
+            tick[0] = (tick[0] + 1) % 4;
+            play.setText(stem + ".".repeat(tick[0] == 0 ? 0 : tick[0]));
+        }));
+        dots.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        dots.playFromStart();
+        play.sceneProperty().addListener((obs, oldScene, scene) -> {
+            if (scene == null) {
+                dots.stop();
+            }
+        });
     }
 
     private VBox buildAddInstanceCard() {
@@ -827,7 +1353,7 @@ public class MainView {
         text.getStyleClass().add("add-instance-text");
         VBox card = new VBox(6, plus, text);
         card.setAlignment(Pos.CENTER);
-        card.setPrefWidth(300);
+        card.setPrefWidth(248);
         card.setMinHeight(190);
         card.getStyleClass().add("add-instance-card");
         card.setCursor(javafx.scene.Cursor.HAND);
@@ -887,15 +1413,6 @@ public class MainView {
     private int modsCount(ModdedProfile profile) {
         return ModScanner.countMods(
                 buildRepository.resolveGameDir(profile), profile.isVanilla());
-    }
-
-    private static String shortGameDir(Path dir) {
-        Path root = GameDirectory.defaultDirectory().root();
-        try {
-            return root.relativize(dir).toString();
-        } catch (IllegalArgumentException e) {
-            return dir.toString();
-        }
     }
 
     private static String relativeTime(OffsetDateTime time) {
@@ -1338,13 +1855,19 @@ public class MainView {
      * автоматически при следующем открытии.
      */
     private void applyLanguage() {
-        for (Button nav : navButtons) {
-            if (nav.getUserData() == View.INSTANCES) {
-                nav.setText(Lang.tr("nav.instances"));
-            } else if (nav.getUserData() == View.PROFILES) {
-                nav.setText(Lang.tr("nav.profiles"));
-            } else if (nav.getUserData() == View.SETTINGS) {
-                nav.setText(Lang.tr("nav.settings"));
+        for (Button tab : headerTabs) {
+            Object data = tab.getUserData();
+            if (data == View.PROFILES || data == View.SETTINGS) {
+                tab.setTooltip(new Tooltip(Lang.tr(data == View.PROFILES
+                        ? "nav.profiles" : "nav.settings")));
+            } else {
+                tab.setText(switch ((View) data) {
+                    case INSTANCES -> Lang.tr("nav.library");
+                    case SERVER -> Lang.tr("nav.catalog");
+                    case IMPORT -> Lang.tr("nav.import");
+                    case CREATE -> Lang.tr("nav.create");
+                    case PROFILES, SETTINGS -> tab.getText();
+                });
             }
         }
         instanceSearchField.setPromptText(Lang.tr("search.instances"));
@@ -1390,7 +1913,7 @@ public class MainView {
     private void onApplyJava() {
         String path = javaPathField.getText() == null ? ""
                 : javaPathField.getText().trim();
-        if (javaResolutionService instanceof DefaultJavaResolutionService svc) {
+        if (javaFinder instanceof DefaultJavaFinder svc) {
             svc.setCustomJavaPath(path.isEmpty() ? null : Path.of(path));
             statusLabel.setText(path.isEmpty()
                     ? Lang.tr("settings.java.saved.auto")
@@ -1494,6 +2017,537 @@ public class MainView {
         }
         refreshProfilesView();
         refreshSettingsView();
+    }
+
+    // ------------------------------------------------------------------
+    //  Сборки от Админа: список с сервера + установка одним кликом
+    // ------------------------------------------------------------------
+
+    /** Вид «Сборки от Админа»: фильтры слева, карточки, поиск и краш-плашка. */
+    private VBox buildServerView() {
+        serverModeLabel = new Label();
+        serverModeLabel.getStyleClass().add("settings-value");
+
+        // Заголовочная строка: источник, счётчик, поиск, кнопка обновления
+        serverCountLabel = new Label();
+        serverCountLabel.getStyleClass().add("store-count");
+
+        serverSearchField = new TextField();
+        serverSearchField.setPromptText(Lang.tr("server.builds.search.prompt"));
+        serverSearchField.getStyleClass().add("search-field");
+        serverSearchField.setPrefWidth(280);
+        serverSearchField.textProperty().addListener((obs, old, val) -> {
+            serverSearchText = val == null ? "" : val.trim().toLowerCase();
+            renderServerBuilds();
+        });
+
+        Button refresh = new Button(Lang.tr("server.builds.refresh"));
+        refresh.getStyleClass().add("quick-select-button");
+        refresh.setTooltip(new Tooltip(Lang.tr("server.builds.refresh.tip")));
+        refresh.setOnAction(e -> {
+            serverMcFilter = null;
+            refreshServerBuildsView();
+        });
+
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        HBox header = new HBox(12, serverModeLabel, serverCountLabel,
+                headerSpacer, serverSearchField, refresh);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        // --- Левая колонка фильтров ---
+        serverSortCombo = new ComboBox<>();
+        serverSortCombo.getItems().addAll(
+                Lang.tr("server.builds.sort.recommended"),
+                Lang.tr("server.builds.sort.newest"),
+                Lang.tr("server.builds.sort.name"));
+        serverSortCombo.getSelectionModel().select(0);
+        serverSortCombo.setMaxWidth(Double.MAX_VALUE);
+        serverSortCombo.valueProperty().addListener(
+                (obs, old, val) -> renderServerBuilds());
+
+        Label mcTitle = filterTitle("server.builds.filters.mc");
+        serverMcChips = new HBox(6);
+        serverMcChips.getStyleClass().add("filter-row");
+        serverMcChipGroup = new ToggleGroup();
+
+        Label loaderTitle = filterTitle("server.builds.filters.loader");
+        serverLoaderBox = new VBox(6);
+
+        VBox filters = new VBox(10, filterTitle("server.builds.filters.sort"),
+                serverSortCombo, mcTitle, serverMcChips, loaderTitle,
+                serverLoaderBox);
+        filters.getStyleClass().add("store-filters");
+        filters.setPrefWidth(232);
+        filters.setPadding(new Insets(4, 12, 12, 4));
+        VBox.setVgrow(filters, Priority.NEVER);
+
+        // --- Сетка карточек ---
+        serverBuildsList = new VBox(0);
+        serverCardsFlow = new FlowPane();
+        serverCardsFlow.setHgap(14);
+        serverCardsFlow.setVgap(14);
+        serverCardsFlow.setPadding(new Insets(4));
+        serverCardsFlow.getStyleClass().add("cards-flow");
+        serverCardsFlow.getChildren().add(serverBuildsList);
+
+        ScrollPane scroll = new ScrollPane(serverCardsFlow);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.getStyleClass().add("cards-scroll");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
+        // --- Плашка Crash Analyzer ---
+        serverCrashBar = buildServerCrashBar();
+        serverCrashBar.setVisible(false);
+        serverCrashBar.setManaged(false);
+
+        HBox content = new HBox(14, filters, scroll);
+        HBox.setHgrow(scroll, Priority.ALWAYS);
+
+        VBox view = new VBox(10, header, content, serverCrashBar);
+        view.setPadding(new Insets(16));
+        VBox.setVgrow(view, Priority.ALWAYS);
+        return view;
+    }
+
+    private Label filterTitle(String key) {
+        Label title = new Label(Lang.tr(key));
+        title.getStyleClass().add("filter-title");
+        return title;
+    }
+
+    private void updateServerModeLabel() {
+        if (serverModeLabel == null || buildsModeCombo == null) return;
+        DistributionSources.BuildsSource mode = buildsModeCombo
+                .getSelectionModel().getSelectedItem();
+        String source = switch (mode == null ? DistributionSources.BuildsSource.LOCAL
+                : mode) {
+            case LOCAL -> Lang.tr("settings.builds.local");
+            case GITHUB -> Lang.tr("settings.builds.github");
+            case YANDEX -> Lang.tr("settings.builds.yandex");
+        };
+        serverModeLabel.setText(Lang.tr("server.builds.source", source));
+    }
+
+    /** Загружает список сборок администратора в фоне и рисует карточки. */
+    private void refreshServerBuildsView() {
+        updateServerModeLabel();
+        if (serverBuildsLoading) {
+            return;
+        }
+        if (buildsBackend == null
+                || buildsBackend instanceof OfflineLauncherServerApi) {
+            serverBuilds = List.of();
+            renderServerBuilds();
+            return;
+        }
+        serverBuildsLoading = true;
+        LOG.info(() -> "Server builds refresh via "
+                + buildsBackend.getClass().getSimpleName()
+                + ", session present: " + (serverSession != null));
+        showServerBuildsPlaceholder(
+                serverModeLabel == null ? "" : Lang.tr("server.builds.loading"),
+                null);
+        Task<List<BuildSummary>> task = new Task<>() {
+            @Override
+            protected List<BuildSummary> call() throws Exception {
+                return buildsBackend.listBuilds(serverSession);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            serverBuildsLoading = false;
+            serverBuilds = task.getValue() == null ? List.of() : task.getValue();
+            LOG.info(() -> "Server builds loaded: " + serverBuilds.size());
+            refreshServerLoaderChecks();
+            renderServerBuilds();
+        });
+        task.setOnFailed(e -> {
+            serverBuildsLoading = false;
+            serverBuilds = List.of();
+            refreshServerLoaderChecks();
+            Throwable cause = task.getException();
+            showServerBuildsPlaceholder(
+                    Lang.tr("server.builds.load.failed",
+                            cause == null ? "" : cause.getMessage()),
+                    cause);
+        });
+        FxTasks.run("server-builds-list", task);
+    }
+
+    private void showServerBuildsPlaceholder(String text, Throwable cause) {
+        if (cause != null) {
+            LOG.log(Level.WARNING, "Server builds list failed", cause);
+        }
+        Label label = new Label(text);
+        label.getStyleClass().add("server-builds-placeholder");
+        label.setWrapText(true);
+        serverCardsFlow.getChildren().setAll(label);
+    }
+
+    /**
+     * Чекбоксы загрузчиков с количеством сборок (Forge/Fabric/NeoForge/Quilt).
+     * Снимается, когда ни один не выбран — показываются все.
+     */
+    private void refreshServerLoaderChecks() {
+        if (serverLoaderBox == null) return;
+        for (CheckBox cb : serverLoaderChecks) {
+            ModLoaderType type = (ModLoaderType) cb.getUserData();
+            long count = serverBuilds.stream().filter(
+                    b -> b.loaderType() == type).count();
+            cb.setText(Lang.tr("server.builds.filters.with.count",
+                    type.displayName(), count));
+        }
+        if (serverLoaderChecks.isEmpty()) {
+            for (ModLoaderType type : ModLoaderType.values()) {
+                if (type == ModLoaderType.VANILLA) continue;
+                CheckBox cb = new CheckBox(type.displayName());
+                cb.getStyleClass().add("store-loader-check");
+                cb.setUserData(type);
+                cb.selectedProperty().addListener(
+                        (obs, was, sel) -> renderServerBuilds());
+                serverLoaderChecks.add(cb);
+                serverLoaderBox.getChildren().add(cb);
+            }
+            refreshServerLoaderChecks();
+        }
+    }
+
+    /** Активные фильтры загрузчиков; пустое множество = все. */
+    private Set<ModLoaderType> activeServerLoaderFilter() {
+        Set<ModLoaderType> loaders = new java.util.HashSet<>();
+        for (CheckBox cb : serverLoaderChecks) {
+            if (cb.isSelected()) {
+                loaders.add((ModLoaderType) cb.getUserData());
+            }
+        }
+        return loaders;
+    }
+
+    /** Перезаполняет чипы версий Minecraft по тому, что отдают сборки. */
+    private void rebuildServerMcChips() {
+        if (serverMcChips == null) {
+            return;
+        }
+        List<String> versions = serverBuilds.stream()
+                .map(BuildSummary::minecraftVersion)
+                .distinct()
+                .sorted(new MinecraftVersionComparator())
+                .toList();
+        if (serverMcFilter != null && !versions.contains(serverMcFilter)) {
+            serverMcFilter = null;
+        }
+        serverMcChipGroup = new ToggleGroup();
+        List<ToggleButton> chips = new ArrayList<>();
+        chips.add(makeServerMcChip(Lang.tr("server.builds.mc.all"), null));
+        for (String version : versions) {
+            chips.add(makeServerMcChip(version, version));
+        }
+        serverMcChips.getChildren().setAll(chips);
+        if (serverMcFilter == null) {
+            chips.get(0).setSelected(true);
+        } else {
+            for (ToggleButton chip : chips) {
+                if (serverMcFilter.equals(chip.getUserData())) {
+                    chip.setSelected(true);
+                    break;
+                }
+            }
+        }
+    }
+
+    /** Один чип версии; {@code version == null} означает «все». */
+    private ToggleButton makeServerMcChip(String text, String version) {
+        ToggleButton chip = new ToggleButton(text);
+        chip.getStyleClass().addAll("filter-button", "filter-mini");
+        chip.setToggleGroup(serverMcChipGroup);
+        chip.setUserData(version);
+        chip.setOnAction(e -> {
+            if (!chip.isSelected()) {
+                chip.setSelected(true);
+                return;
+            }
+            serverMcFilter = version;
+            renderServerBuilds();
+        });
+        return chip;
+    }
+
+    /** Сортировка версий по убыванию (наибольшая первой). */
+    private static final class MinecraftVersionComparator
+            implements Comparator<String> {
+        @Override
+        public int compare(String a, String b) {
+            List<Integer> orderA = versionOrder(a);
+            List<Integer> orderB = versionOrder(b);
+            int size = Math.min(orderA.size(), orderB.size());
+            for (int i = 0; i < size; i++) {
+                int diff = orderB.get(i) - orderA.get(i);
+                if (diff != 0) {
+                    return diff;
+                }
+            }
+            return Integer.compare(orderB.size(), orderA.size());
+        }
+
+        private List<Integer> versionOrder(String version) {
+            List<Integer> parts = new ArrayList<>();
+            for (String part : version.split("[+._-]")) {
+                String digits = part.replaceAll("\\D", "");
+                if (!digits.isEmpty()) {
+                    parts.add(Integer.parseInt(digits));
+                }
+            }
+            return parts;
+        }
+    }
+
+    /**
+     * Фильтрует и сортирует сборки по текущим настройкам и рисует карточки.
+     * Фильтры: поиск по имени/описанию, чип версии Minecraft, чекбоксы
+     * загрузчиков; сортировка: рекомендованные/новые/по имени.
+     */
+    private void renderServerBuilds() {
+        if (serverCountLabel != null) {
+            serverCountLabel.setText(!serverBuilds.isEmpty()
+                    ? Lang.tr("server.builds.count", serverBuilds.size())
+                    : "");
+        }
+        rebuildServerMcChips();
+        List<BuildSummary> visible = filteredServerBuilds();
+        if (visible.isEmpty()) {
+            showServerBuildsPlaceholder(serverBuilds.isEmpty()
+                    ? Lang.tr("server.builds.empty")
+                    : Lang.tr("server.builds.no.matches"), null);
+            return;
+        }
+        List<VBox> cards = new ArrayList<>();
+        for (BuildSummary summary : visible) {
+            cards.add(buildServerBuildCard(summary));
+        }
+        serverCardsFlow.getChildren().setAll(cards);
+    }
+
+    private List<BuildSummary> filteredServerBuilds() {
+        Set<ModLoaderType> loaders = activeServerLoaderFilter();
+        List<BuildSummary> result = new ArrayList<>();
+        for (BuildSummary summary : serverBuilds) {
+            if (serverMcFilter != null
+                    && !summary.minecraftVersion().equals(serverMcFilter)) {
+                continue;
+            }
+            if (!loaders.isEmpty() && !loaders.contains(summary.loaderType())) {
+                continue;
+            }
+            if (!serverSearchText.isEmpty()) {
+                String haystack = (summary.displayName() + " "
+                        + (summary.description() == null ? "" : summary.description()))
+                        .toLowerCase();
+                if (!haystack.contains(serverSearchText)) {
+                    continue;
+                }
+            }
+            result.add(summary);
+        }
+        int sortMode = serverSortCombo == null || serverSortCombo.getValue() == null
+                ? 0 : serverSortCombo.getSelectionModel().getSelectedIndex();
+        if (sortMode == 1) {
+            // MinecraftVersionComparator уже сортирует по убыванию
+            result.sort(java.util.Comparator.comparing(BuildSummary::version,
+                    new MinecraftVersionComparator()));
+        } else if (sortMode == 2) {
+            result.sort(java.util.Comparator.comparing(
+                    summary -> summary.displayName().toLowerCase()));
+        }
+        return result;
+    }
+
+    /**
+     * Карточка сборки в стиле магазина: цветной баннер, бейдж версии,
+     * чипы загрузчика и Minecraft, описание и кнопка «Установить».
+     */
+    private VBox buildServerBuildCard(BuildSummary summary) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add("pack-card");
+        card.setPrefWidth(300);
+
+        // Баннер: пер-загрузочный градиент + крупное имя + бейдж версии
+        Label bannerTitle = new Label(summary.displayName());
+        bannerTitle.getStyleClass().add("pack-banner-title");
+        bannerTitle.setWrapText(true);
+        Label versionBadge = new Label("v" + summary.version());
+        versionBadge.getStyleClass().add("pack-version-badge");
+        StackPane banner = new StackPane(bannerTitle, versionBadge);
+        banner.getStyleClass().addAll("pack-banner", "accent-"
+                + summary.loaderType().name().toLowerCase(
+                        java.util.Locale.ROOT));
+        StackPane.setAlignment(bannerTitle, Pos.CENTER);
+        StackPane.setAlignment(versionBadge, Pos.TOP_RIGHT);
+        banner.setPrefHeight(110);
+
+        // Чипы: загрузчик + версия Minecraft
+        HBox chips = new HBox(6);
+        Label loaderChip = new Label(summary.loaderType().displayName());
+        loaderChip.getStyleClass().add("loader-badge-"
+                + summary.loaderType().name().toLowerCase(java.util.Locale.ROOT));
+        Label mcChip = new Label(summary.minecraftVersion());
+        mcChip.getStyleClass().add("type-badge-snapshot");
+        chips.getChildren().addAll(loaderChip, mcChip);
+
+        Label name = new Label(summary.displayName());
+        name.getStyleClass().add("pack-name");
+
+        VBox body = new VBox(6, chips, name);
+        if (summary.description() != null && !summary.description().isBlank()) {
+            Label description = new Label(summary.description());
+            description.getStyleClass().add("pack-desc");
+            description.setWrapText(true);
+            body.getChildren().add(description);
+        }
+        if (summary.loaderType() != ModLoaderType.VANILLA) {
+            Label loaderVersion = new Label(Lang.tr(
+                    "server.builds.loader.line", summary.loaderVersion()));
+            loaderVersion.getStyleClass().add("pack-desc");
+            body.getChildren().add(loaderVersion);
+        }
+
+        Button install = new Button(Lang.tr("server.builds.install"));
+        install.getStyleClass().add("pack-install");
+        install.setMaxWidth(Double.MAX_VALUE);
+        install.setOnAction(e -> installServerBuild(summary));
+
+        card.getChildren().addAll(banner, body, install);
+        return card;
+    }
+
+    /**
+     * Плашка Crash Analyzer: читаемая причина последнего краша,
+     * кнопка «Подробнее» и крестик закрытия.
+     */
+    private VBox buildServerCrashBar() {
+        Label icon = new Label("\u26A0");
+        icon.getStyleClass().add("alert-icon");
+
+        Label title = new Label(Lang.tr("server.builds.crash.title"));
+        title.getStyleClass().add("alert-title");
+        serverCrashTextLabel = new Label();
+        serverCrashTextLabel.getStyleClass().add("alert-text");
+        serverCrashTextLabel.setWrapText(true);
+        VBox text = new VBox(2, title, serverCrashTextLabel);
+        HBox.setHgrow(text, Priority.ALWAYS);
+
+        Button details = new Button(Lang.tr("server.builds.crash.details"));
+        details.getStyleClass().add("alert-details-button");
+        details.setOnAction(e -> {
+            if (serverLastCrash != null) {
+                CrashWindow.show((Stage) root.getScene().getWindow(),
+                        serverLastCrash);
+            }
+        });
+
+        Button close = new Button("\u2715");
+        close.getStyleClass().add("alert-close");
+        close.setOnAction(e -> hideServerCrashBar());
+
+        HBox bar = new HBox(12, icon, text, details, close);
+        bar.setAlignment(Pos.CENTER_LEFT);
+        bar.getStyleClass().add("alert-bar");
+
+        VBox wrap = new VBox(bar);
+        return wrap;
+    }
+
+    /** Показывает плашку после краша; вызывается из слушателей запуска. */
+    private void showServerCrashBar(ModdedProfile profile, CrashReport report) {
+        if (serverCrashTextLabel == null) {
+            return;
+        }
+        serverLastCrash = report;
+        serverLastCrashProfile = profile;
+        String suggestion = report.suggestion().orElse("");
+        serverCrashTextLabel.setText(report.reason()
+                + (suggestion.isBlank() ? "" : "\n" + suggestion));
+        serverCrashBar.setVisible(true);
+        serverCrashBar.setManaged(true);
+    }
+
+    private void hideServerCrashBar() {
+        serverLastCrash = null;
+        serverLastCrashProfile = null;
+        if (serverCrashBar != null) {
+            serverCrashBar.setVisible(false);
+            serverCrashBar.setManaged(false);
+        }
+    }
+
+    /**
+     * Установка серверной сборки одним кликом: панель прогресса переиспользуется,
+     * пайплайн целиком — {@link ServerBuildInstaller#provision}. После успеха
+     * открывается созданный инстанс на вкладке «Мои инстансы».
+     */
+    private void installServerBuild(BuildSummary summary) {
+        if (serverBuildInstaller == null) {
+            statusLabel.setText(Lang.tr("server.builds.no.backend"));
+            return;
+        }
+        // Версия Minecraft берётся из уже загруженного манифеста Mojang
+        MinecraftVersion mcVersion = null;
+        for (MinecraftVersion candidate : manifestVersions) {
+            if (candidate.id().equals(summary.minecraftVersion())) {
+                mcVersion = candidate;
+                break;
+            }
+        }
+        if (mcVersion == null) {
+            statusLabel.setText(manifestVersions.isEmpty()
+                    ? Lang.tr("versions.wait")
+                    : Lang.tr("server.builds.no.mc",
+                            summary.minecraftVersion()));
+            return;
+        }
+
+        statusLabel.setText(Lang.tr("server.builds.installing",
+                summary.summaryLine()));
+        Stage owner = (Stage) root.getScene().getWindow();
+        InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
+        progressDialog.setTitle(Lang.tr("server.builds.install.title"));
+        progressDialog.show();
+
+        MinecraftVersion finalMcVersion = mcVersion;
+        Task<ServerBuildInstaller.Outcome> task = new Task<>() {
+            @Override
+            protected ServerBuildInstaller.Outcome call() throws Exception {
+                return serverBuildInstaller.provision(serverSession, summary,
+                        summary.displayName(), finalMcVersion,
+                        progressDialog);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServerBuildInstaller.Outcome outcome = task.getValue();
+            progressDialog.onComplete(new InstallationResult(
+                    0, 0, 0, 0, 0, List.of()));
+            if (outcome.failed() > 0) {
+                statusLabel.setText(Lang.tr("server.builds.partial",
+                        outcome.failed()));
+            } else {
+                statusLabel.setText(Lang.tr("server.builds.ready",
+                        outcome.profile().name()));
+            }
+            jumpToInstance(outcome.profile());
+        });
+        task.setOnFailed(e -> {
+            Throwable cause = task.getException();
+            progressDialog.onComplete(new InstallationResult(
+                    0, 0, 0, 1, 0, List.of()));
+            UiErrors.fail(statusLabel, owner,
+                    Lang.tr("server.builds.install.failed",
+                            cause == null ? "" : cause.getMessage()),
+                    Lang.tr("server.builds.install.failed.title"), cause);
+            if (currentView == View.SERVER) {
+                refreshServerBuildsView();
+            }
+        });
+        FxTasks.run("server-build-install", task);
     }
 
     // ------------------------------------------------------------------
@@ -1753,7 +2807,7 @@ public class MainView {
             avatarView.setVisible(false);
             return;
         }
-        skinService.loadAvatarAsync(profile, 32)
+        skinService.loadAvatarAsync(profile, 64)
                 .thenAccept(optImg -> Platform.runLater(() -> {
                     if (requestId != avatarRequestId.get()) {
                         return;
@@ -1846,6 +2900,7 @@ public class MainView {
     private void authenticateElyBy(String user, String pass) {
         Stage launcherStage = (Stage) root.getScene().getWindow();
         statusLabel.setText(Lang.tr("ely.signing"));
+        LOG.info(() -> "Ely.by authentication requested for " + user);
         if (addAccountButton != null) addAccountButton.setDisable(true);
 
         Task<GameProfile> authTask = new Task<>() {
@@ -1905,6 +2960,14 @@ public class MainView {
      * Выбор версии живёт здесь, на главной вкладке.
      */
     private void onNewInstance() {
+        onNewInstance(null);
+    }
+
+    /**
+     * Открывает мастер создания инстанса; источник вызова может
+     * предвыбрать загрузчик (клик по «умному бандлу»).
+     */
+    private void onNewInstance(ModLoaderType initialLoader) {
         if (manifestVersions.isEmpty()) {
             if (versionsLoadFailed) {
                 statusLabel.setText(Lang.tr("versions.retry"));
@@ -1916,7 +2979,7 @@ public class MainView {
         }
         NewInstanceDialog.Result result = NewInstanceDialog.show(
                 (Stage) root.getScene().getWindow(),
-                modLoaderRegistry, manifestVersions);
+                modLoaderRegistry, manifestVersions, initialLoader);
         if (result != null) {
             createInstance(result);
         }
@@ -1972,6 +3035,8 @@ public class MainView {
                 request.type() == ModLoaderType.VANILLA ? "vanilla " + request.mcVersion().id()
                         : request.type().displayName() + " " + request.loader().loaderVersion()
                                 + " for MC " + request.mcVersion().id()));
+        LOG.info(() -> "Creating instance: " + request.effectiveName()
+                + " (" + request.versionId() + ")");
 
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
@@ -1991,6 +3056,8 @@ public class MainView {
             ModdedProfile profile = task.getValue();
             progressDialog.onComplete(new InstallationResult(0, 0, 0, 0, 0,
                     List.of()));
+            LOG.info(() -> "Instance created: " + profile.name() + " ("
+                    + profile.versionId() + ")");
             jumpToInstance(profile);
             statusLabel.setText(Lang.tr("instance.ready", profile.name(),
                     profile.isVanilla() ? ""
@@ -2062,15 +3129,21 @@ public class MainView {
     private void onEditProfile(ModdedProfile profile) {
         if (profile == null) return;
 
-        EditProfileDialog.Result result = EditProfileDialog.show(
-                (Stage) root.getScene().getWindow(), profile);
+        Path gameDir = buildRepository.resolveGameDir(profile);
+
+        // Модальная панель с вкладками; удаление — через onDeleteProfile
+        // (его Alert-подтверждение, как раньше из карточки)
+        InstanceSettingsDialog.Result result = InstanceSettingsDialog.show(
+                (Stage) root.getScene().getWindow(), profile, gameDir,
+                this::onDeleteProfile,
+                () -> changeInstanceIcon(profile));
         if (result == null) return;
 
         try {
             // Переименование также переименовывает папку (моды/сохранения/сборки
             // переезжают вместе), поэтому далее выбираем по новому id
             Optional<ModdedProfile> updated = buildRepository.updateProfile(
-                    profile.id(), profile.extraJvmArgs(), result.name(),
+                    profile.id(), result.jvmArgs(), result.name(),
                     result.memoryMb());
             if (updated.isPresent()) {
                 refreshModdedProfiles(updated.get().id());
@@ -2132,6 +3205,9 @@ public class MainView {
         }
         GameProfile account = getOrCreateProfile();
         GameDirectory storage = GameDirectory.defaultDirectory();
+        LOG.info(() -> "Launch requested: " + profile.name() + " ("
+                + profile.versionId() + ", account="
+                + account.name() + (account.isOnline() ? ", online)" : ", offline)"));
 
         // Попытка запуска сразу блокирует все кнопки «Играть»
         // (до обновления по терминальному колбэку)
@@ -2171,6 +3247,7 @@ public class MainView {
                             public void onCrashed(CrashReport report) {
                                 Platform.runLater(() -> {
                                     refreshLaunchButtons();
+                                    showServerCrashBar(profile, report);
                                     CrashWindow.show(owner, report);
                                 });
                             }

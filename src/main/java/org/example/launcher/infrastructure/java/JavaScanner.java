@@ -6,30 +6,30 @@ import java.util.List;
 import org.example.launcher.domain.model.JavaRuntime;
 
 /**
- * Обнаруживает установки Java, доступные в системе хоста.
+ * Сканирует систему в поисках установок Java, доступных в системе хоста.
  * <p>
  * Реализации сканируют переменные окружения, системные пути,
  * платформенные реестры и типовые каталоги установок, строя список
  * доступных рантаймов. Это «сенсорная» сторона разрешения Java
  * только для чтения; собственно логика подбора находится в
- * {@link JavaResolutionService}.
+ * {@link JavaFinder}.
  * <p>
  * Интерфейс спроектирован для тестируемости — реализации, которые
  * вызывают {@code java -version} или опрашивают реестр Windows, можно
  * заменять заглушками в тестах.
  */
-public interface JavaDetector {
+public interface JavaScanner {
 
     /**
      * Сканирует систему в поисках всех обнаруживаемых рантаймов Java.
      * <p>
      * Возвращаемый список не упорядочен по приоритету;
      * за выбор лучшего соответствия отвечает
-     * {@link JavaResolutionService}.
+     * {@link JavaFinder}.
      *
      * @return список обнаруженных рантаймов (может быть пустым, никогда {@code null})
      */
-    List<JavaRuntime> detectInstalledRuntimes();
+    List<JavaRuntime> scanInstalledRuntimes();
 
     /**
      * Проверяет один каталог, который предполагается корнем JDK/JRE

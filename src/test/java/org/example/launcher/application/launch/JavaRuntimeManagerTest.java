@@ -11,15 +11,15 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import org.example.launcher.application.java.JavaManager;
+import org.example.launcher.application.java.JavaEnvironmentManager;
 import org.example.launcher.domain.ErrorCode;
 import org.example.launcher.domain.JavaException;
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.JavaVersion;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.java.JavaFinder;
+import org.example.launcher.infrastructure.java.JavaInstaller;
 
 @DisplayName("JavaRuntimeManager")
 class JavaRuntimeManagerTest {
@@ -29,24 +29,24 @@ class JavaRuntimeManagerTest {
                 JavaRuntime.Source.CUSTOM);
     }
 
-    private static JavaResolutionService service(JavaRuntime found) {
-        return new JavaResolutionService() {
+    private static JavaFinder service(JavaRuntime found) {
+        return new JavaFinder() {
             @Override
-            public JavaResolutionResult resolve(VersionMetadata metadata) {
+            public JavaFindResult find(VersionMetadata metadata) {
                 return found == null
-                        ? JavaResolutionResult.notFound("stub: no java")
-                        : JavaResolutionResult.found(found);
+                        ? JavaFindResult.notFound("stub: no java")
+                        : JavaFindResult.found(found);
             }
 
             @Override
-            public JavaResolutionResult resolve(int requiredMajor) {
-                return resolve((VersionMetadata) null);
+            public JavaFindResult find(int requiredMajor) {
+                return find((VersionMetadata) null);
             }
         };
     }
 
-    private static JavaRuntimeInstaller failingInstaller() {
-        return new JavaRuntimeInstaller() {
+    private static JavaInstaller failingInstaller() {
+        return new JavaInstaller() {
             @Override
             public JavaRuntime install(String component, Path targetDir) {
                 throw new UnsupportedOperationException("stub");
@@ -70,7 +70,7 @@ class JavaRuntimeManagerTest {
     @DisplayName("getJavaFor returns the resolved runtime executable")
     void resolves() throws Exception {
         var manager = new JavaRuntimeManager(
-                new JavaManager(service(runtime(17)), failingInstaller()));
+                new JavaEnvironmentManager(service(runtime(17)), failingInstaller()));
 
         assertEquals(Path.of("/java/bin/java"),
                 manager.getJavaExecutableFor(meta(17)));
@@ -80,7 +80,7 @@ class JavaRuntimeManagerTest {
     @DisplayName("getJavaFor throws JAVA_NOT_FOUND when missing")
     void missing() {
         var manager = new JavaRuntimeManager(
-                new JavaManager(service(null), failingInstaller()));
+                new JavaEnvironmentManager(service(null), failingInstaller()));
 
         JavaException error = assertThrows(JavaException.class,
                 () -> manager.getJavaFor(meta(17)));
@@ -91,7 +91,7 @@ class JavaRuntimeManagerTest {
     @DisplayName("legacy versions need the exact major, modern accept newer")
     void compatibility() {
         var manager = new JavaRuntimeManager(
-                new JavaManager(service(null), failingInstaller()));
+                new JavaEnvironmentManager(service(null), failingInstaller()));
 
         assertTrue(manager.isCompatible(runtime(8), meta(8)));
         assertFalse(manager.isCompatible(runtime(17), meta(8)));

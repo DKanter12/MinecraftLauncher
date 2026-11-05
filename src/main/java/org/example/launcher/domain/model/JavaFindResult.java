@@ -3,14 +3,14 @@ package org.example.launcher.domain.model;
 import java.util.Optional;
 
 /**
- * Результат попытки подбора подходящей среды Java для
+ * Результат попытки подобрать подходящую среду Java для
  * версии Minecraft.
  * <p>
  * Статус показывает, найдена ли среда, отсутствует или
  * найдена, но несовместима. Если среда найдена, метод {@link #runtime()}
  * содержит её, иначе метод {@link #reason()} поясняет проблему.
  */
-public final class JavaResolutionResult {
+public final class JavaFindResult {
 
     public enum Status {
         /** Подходящая среда Java найдена. */
@@ -25,22 +25,22 @@ public final class JavaResolutionResult {
     private final JavaRuntime runtime;
     private final String reason;
 
-    private JavaResolutionResult(Status status, JavaRuntime runtime, String reason) {
+    private JavaFindResult(Status status, JavaRuntime runtime, String reason) {
         this.status = status;
         this.runtime = runtime;
         this.reason = reason;
     }
 
-    public static JavaResolutionResult found(JavaRuntime runtime) {
-        return new JavaResolutionResult(Status.FOUND, runtime, null);
+    public static JavaFindResult found(JavaRuntime runtime) {
+        return new JavaFindResult(Status.FOUND, runtime, null);
     }
 
-    public static JavaResolutionResult notFound(String reason) {
-        return new JavaResolutionResult(Status.NOT_FOUND, null, reason);
+    public static JavaFindResult notFound(String reason) {
+        return new JavaFindResult(Status.NOT_FOUND, null, reason);
     }
 
-    public static JavaResolutionResult incompatible(String reason) {
-        return new JavaResolutionResult(Status.INCOMPATIBLE, null, reason);
+    public static JavaFindResult incompatible(String reason) {
+        return new JavaFindResult(Status.INCOMPATIBLE, null, reason);
     }
 
     public Status status() {
@@ -61,7 +61,7 @@ public final class JavaResolutionResult {
 
     @Override
     public String toString() {
-        return "JavaResolutionResult{status=" + status
+        return "JavaFindResult{status=" + status
                 + (runtime != null ? ", runtime=" + runtime : "")
                 + (reason != null ? ", reason='" + reason + "'" : "") + '}';
     }

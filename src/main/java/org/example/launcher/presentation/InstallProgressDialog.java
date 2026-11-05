@@ -134,11 +134,11 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
             progressBar.setProgress(1.0);
             if (result.isSuccess()) {
                 statusLabel.setText(Lang.tr("install.complete"));
-                statusLabel.setStyle("-fx-text-fill: #a6e3a1;");
+                statusLabel.setStyle("-fx-text-fill: #10B981;");
             } else {
                 statusLabel.setText(
                         Lang.tr("install.errors", result.failed()));
-                statusLabel.setStyle("-fx-text-fill: #f38ba8;");
+                statusLabel.setStyle("-fx-text-fill: #FB7185;");
             }
             categoryLabel.setText(Lang.tr("install.summary",
                     result.downloaded(), result.skipped(), result.failed(),

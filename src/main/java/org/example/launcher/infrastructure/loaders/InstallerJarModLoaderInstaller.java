@@ -17,10 +17,10 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaFinder;
 
 /**
  * Реализация {@link ModLoaderInstaller} для загрузчиков, распространяемых как
@@ -50,16 +50,16 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
     private static final long INSTALLER_TIMEOUT_MINUTES = 15;
 
     private final FileDownloader fileDownloader;
-    private final JavaResolutionService javaResolutionService;
+    private final JavaFinder javaFinder;
     private final ModLoaderMetadataMerger merger;
     private final InstallationService installationService;
 
     public InstallerJarModLoaderInstaller(FileDownloader fileDownloader,
-                                          JavaResolutionService javaResolutionService,
+                                          JavaFinder javaFinder,
                                           ModLoaderMetadataMerger merger,
                                           InstallationService installationService) {
         this.fileDownloader = fileDownloader;
-        this.javaResolutionService = javaResolutionService;
+        this.javaFinder = javaFinder;
         this.merger = merger;
         this.installationService = installationService;
     }
@@ -83,7 +83,7 @@ public class InstallerJarModLoaderInstaller implements ModLoaderInstaller {
         }
 
         // 2. Подобрать рантайм Java для запуска установщика
-        JavaResolutionResult javaResult = javaResolutionService.resolve(vanillaMetadata);
+        JavaFindResult javaResult = javaFinder.find(vanillaMetadata);
         if (!javaResult.isFound() || javaResult.runtime().isEmpty()) {
             throw new IOException("No suitable Java runtime to run the "
                     + loader.loaderType().displayName() + " installer: "

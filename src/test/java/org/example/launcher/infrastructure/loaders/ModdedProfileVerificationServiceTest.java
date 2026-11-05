@@ -18,14 +18,14 @@ import org.junit.jupiter.api.io.TempDir;
 import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.Sha1ChecksumVerifier;
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.ModLoaderType;
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaFinder;
 import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
@@ -70,29 +70,29 @@ class ModdedProfileVerificationServiceTest {
         }
     }
 
-    private static final JavaResolutionService ALWAYS_JAVA = new JavaResolutionService() {
+    private static final JavaFinder ALWAYS_JAVA = new JavaFinder() {
         @Override
-        public JavaResolutionResult resolve(VersionMetadata metadata) {
-            return JavaResolutionResult.found(new JavaRuntime(
+        public JavaFindResult find(VersionMetadata metadata) {
+            return JavaFindResult.found(new JavaRuntime(
                     Path.of("java"), 21, JavaRuntime.Source.CUSTOM));
         }
 
         @Override
-        public JavaResolutionResult resolve(int requiredMajor) {
-            return JavaResolutionResult.found(new JavaRuntime(
+        public JavaFindResult find(int requiredMajor) {
+            return JavaFindResult.found(new JavaRuntime(
                     Path.of("java"), 21, JavaRuntime.Source.CUSTOM));
         }
     };
 
-    private static final JavaResolutionService NEVER_JAVA = new JavaResolutionService() {
+    private static final JavaFinder NEVER_JAVA = new JavaFinder() {
         @Override
-        public JavaResolutionResult resolve(VersionMetadata metadata) {
-            return JavaResolutionResult.notFound("stub: no java");
+        public JavaFindResult find(VersionMetadata metadata) {
+            return JavaFindResult.notFound("stub: no java");
         }
 
         @Override
-        public JavaResolutionResult resolve(int requiredMajor) {
-            return JavaResolutionResult.notFound("stub: no java");
+        public JavaFindResult find(int requiredMajor) {
+            return JavaFindResult.notFound("stub: no java");
         }
     };
 
@@ -173,12 +173,12 @@ class ModdedProfileVerificationServiceTest {
             """;
 
     private ModdedProfileVerificationService service(String vanillaJson,
-                                                     JavaResolutionService javaService) {
+                                                     JavaFinder javaService) {
         return service(vanillaJson, javaService, new RecordingInstaller());
     }
 
     private ModdedProfileVerificationService service(String vanillaJson,
-                                                     JavaResolutionService javaService,
+                                                     JavaFinder javaService,
                                                      RecordingInstaller installer) {
         StubVersionService versionService = new StubVersionService();
         StubMetadataService metadataService = new StubMetadataService(vanillaJson);

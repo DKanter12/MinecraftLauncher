@@ -18,7 +18,7 @@ import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.infrastructure.common.OsDetector;
 
 /**
- * {@link JavaRuntimeInstaller} на базе API Eclipse Adoptium (Temurin).
+ * {@link JavaInstaller} на базе API Eclipse Adoptium (Temurin).
  * <p>
  * Скачивает ZIP-архив JRE из
  * {@code https://api.adoptium.net/v3/assets/latest/<major>/hotspot}
@@ -27,7 +27,7 @@ import org.example.launcher.infrastructure.common.OsDetector;
  * {@code bin/java.exe}) и возвращает {@link JavaRuntime} с
  * корректной major-версией и {@link JavaRuntime.Source#MANAGED}.
  */
-public class AdoptiumJavaRuntimeInstaller implements JavaRuntimeInstaller {
+public class AdoptiumJavaInstaller implements JavaInstaller {
 
     private static final String API_BASE =
             "https://api.adoptium.net/v3/assets/latest/";
@@ -37,7 +37,7 @@ public class AdoptiumJavaRuntimeInstaller implements JavaRuntimeInstaller {
     private final FileDownloader fileDownloader;
     private final HttpClient httpClient;
 
-    public AdoptiumJavaRuntimeInstaller(FileDownloader fileDownloader) {
+    public AdoptiumJavaInstaller(FileDownloader fileDownloader) {
         this.fileDownloader = fileDownloader;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))

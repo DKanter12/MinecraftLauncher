@@ -9,8 +9,8 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("JavaResolutionResult")
-class JavaResolutionResultTest {
+@DisplayName("JavaFindResult")
+class JavaFindResultTest {
 
     private final JavaRuntime sampleRuntime = new JavaRuntime(
             Path.of("/usr/bin/java"), 17, JavaRuntime.Source.JAVA_HOME);
@@ -18,9 +18,9 @@ class JavaResolutionResultTest {
     @Test
     @DisplayName("found has FOUND status and runtime present")
     void foundResult() {
-        JavaResolutionResult result = JavaResolutionResult.found(sampleRuntime);
+        JavaFindResult result = JavaFindResult.found(sampleRuntime);
 
-        assertEquals(JavaResolutionResult.Status.FOUND, result.status());
+        assertEquals(JavaFindResult.Status.FOUND, result.status());
         assertTrue(result.runtime().isPresent());
         assertTrue(result.reason().isEmpty());
         assertTrue(result.isFound());
@@ -29,9 +29,9 @@ class JavaResolutionResultTest {
     @Test
     @DisplayName("notFound has NOT_FOUND status and reason")
     void notFoundResult() {
-        JavaResolutionResult result = JavaResolutionResult.notFound("No Java found");
+        JavaFindResult result = JavaFindResult.notFound("No Java found");
 
-        assertEquals(JavaResolutionResult.Status.NOT_FOUND, result.status());
+        assertEquals(JavaFindResult.Status.NOT_FOUND, result.status());
         assertTrue(result.runtime().isEmpty());
         assertEquals("No Java found", result.reason().orElseThrow());
         assertFalse(result.isFound());
@@ -40,9 +40,9 @@ class JavaResolutionResultTest {
     @Test
     @DisplayName("incompatible has INCOMPATIBLE status and reason")
     void incompatibleResult() {
-        JavaResolutionResult result = JavaResolutionResult.incompatible("Need 17, have 8");
+        JavaFindResult result = JavaFindResult.incompatible("Need 17, have 8");
 
-        assertEquals(JavaResolutionResult.Status.INCOMPATIBLE, result.status());
+        assertEquals(JavaFindResult.Status.INCOMPATIBLE, result.status());
         assertTrue(result.runtime().isEmpty());
         assertEquals("Need 17, have 8", result.reason().orElseThrow());
         assertFalse(result.isFound());

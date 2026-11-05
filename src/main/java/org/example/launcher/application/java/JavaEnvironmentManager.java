@@ -4,12 +4,12 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.DefaultJavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
-import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
+import org.example.launcher.infrastructure.java.DefaultJavaFinder;
+import org.example.launcher.infrastructure.java.JavaFinder;
+import org.example.launcher.infrastructure.java.JavaInstaller;
 
 /**
  * Верх подсистемы Java: найти → подобрать → поставить.
@@ -17,14 +17,14 @@ import org.example.launcher.infrastructure.java.JavaRuntimeInstaller;
  * ставит только если не нашла. Выбор пользователя (override пути)
  * применяется сам, а не молча переопределяется.
  */
-public class JavaManager {
+public class JavaEnvironmentManager {
 
-    private final JavaResolutionService resolutionService;
-    private final JavaRuntimeInstaller installer;
+    private final JavaFinder finder;
+    private final JavaInstaller installer;
 
-    public JavaManager(JavaResolutionService resolutionService,
-                       JavaRuntimeInstaller installer) {
-        this.resolutionService = Objects.requireNonNull(resolutionService, "resolutionService");
+    public JavaEnvironmentManager(JavaFinder finder,
+                                   JavaInstaller installer) {
+        this.finder = Objects.requireNonNull(finder, "finder");
         this.installer = Objects.requireNonNull(installer, "installer");
     }
 
@@ -33,8 +33,8 @@ public class JavaManager {
      *
      * @return найденный рантайм либо пусто
      */
-    public Optional<JavaRuntime> resolve(VersionMetadata metadata) {
-        JavaResolutionResult result = resolutionService.resolve(metadata);
+    public Optional<JavaRuntime> find(VersionMetadata metadata) {
+        JavaFindResult result = finder.find(metadata);
         return result.runtime();
     }
 
@@ -46,7 +46,7 @@ public class JavaManager {
      */
     public JavaRuntime ensureInstalled(int requiredMajor, Path targetDir)
             throws Exception {
-        JavaResolutionResult result = resolutionService.resolve(requiredMajor);
+        JavaFindResult result = finder.find(requiredMajor);
         if (result.isFound() && result.runtime().isPresent()) {
             return result.runtime().get();
         }
@@ -58,7 +58,7 @@ public class JavaManager {
      * Работает только с резолвером по умолчанию, чужой выбор не трогает.
      */
     public void adoptManaged(JavaRuntime runtime) {
-        if (resolutionService instanceof DefaultJavaResolutionService svc) {
+        if (finder instanceof DefaultJavaFinder svc) {
             svc.setCustomJavaPath(runtime.javaExecutable());
         }
     }

@@ -5,6 +5,9 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.example.launcher.application.launch.LauncherWindowManager;
 import org.example.launcher.core.LauncherContext;
 import org.example.launcher.i18n.Lang;
@@ -22,6 +25,18 @@ public class LauncherApplication extends Application {
 
     @Override
     public void start(Stage stage) {
+        LauncherLogger.init();
+        Logger.getGlobal().info("Launcher starting, log file: "
+                + LauncherLogger.logFile());
+
+        // Непойманные исключения (в т.ч. из FX-потока, мимо Task-обработчиков)
+        // уходят в тот же лог — иначе они терялись бы бесследно.
+        Thread.setDefaultUncaughtExceptionHandler((thread, thrown) ->
+                Logger.getLogger("org.example.launcher")
+                        .log(Level.SEVERE,
+                                "Uncaught exception on " + thread.getName(),
+                                thrown));
+
         Platform.setImplicitExit(false);
 
         LauncherWindowManager windows = new LauncherWindowManager() {

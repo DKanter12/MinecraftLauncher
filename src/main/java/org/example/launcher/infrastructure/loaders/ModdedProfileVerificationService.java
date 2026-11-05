@@ -15,12 +15,12 @@ import org.example.launcher.infrastructure.filesystem.GameDirectory;
 import org.example.launcher.infrastructure.download.InstallationProgress;
 import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.infrastructure.download.InstallationService;
-import org.example.launcher.domain.model.JavaResolutionResult;
+import org.example.launcher.domain.model.JavaFindResult;
 import org.example.launcher.domain.model.MinecraftVersion;
 import org.example.launcher.domain.model.ModLoaderVersion;
 import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.domain.model.VersionMetadata;
-import org.example.launcher.infrastructure.java.JavaResolutionService;
+import org.example.launcher.infrastructure.java.JavaFinder;
 import org.example.launcher.infrastructure.download.FileIntegrityChecker;
 import org.example.launcher.infrastructure.mojang.MojangVersionMetadataService;
 import org.example.launcher.infrastructure.mojang.MojangVersionService;
@@ -80,7 +80,7 @@ public class ModdedProfileVerificationService {
     private final MojangVersionMetadataService metadataService;
     private final ModLoaderRegistry registry;
     private final FileIntegrityChecker integrityChecker;
-    private final JavaResolutionService javaResolutionService;
+    private final JavaFinder javaFinder;
     private final InstallationService installationService;
 
     public ModdedProfileVerificationService(ModdedVersionService moddedVersionService,
@@ -88,14 +88,14 @@ public class ModdedProfileVerificationService {
                                             MojangVersionMetadataService metadataService,
                                             ModLoaderRegistry registry,
                                             FileIntegrityChecker integrityChecker,
-                                            JavaResolutionService javaResolutionService,
+                                            JavaFinder javaFinder,
                                             InstallationService installationService) {
         this.moddedVersionService = moddedVersionService;
         this.versionService = versionService;
         this.metadataService = metadataService;
         this.registry = registry;
         this.integrityChecker = integrityChecker;
-        this.javaResolutionService = javaResolutionService;
+        this.javaFinder = javaFinder;
         this.installationService = installationService;
     }
 
@@ -309,7 +309,7 @@ public class ModdedProfileVerificationService {
             errors.add("Cannot form a launch command: no game arguments in "
                     + "the metadata");
         }
-        JavaResolutionResult javaResult = javaResolutionService.resolve(metadata);
+        JavaFindResult javaResult = javaFinder.find(metadata);
         if (!javaResult.isFound()) {
             errors.add("No suitable Java runtime: "
                     + javaResult.reason().orElse("none found"));

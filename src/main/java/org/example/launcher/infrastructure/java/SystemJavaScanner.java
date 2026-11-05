@@ -18,7 +18,7 @@ import org.example.launcher.domain.model.JavaRuntime;
 import org.example.launcher.infrastructure.common.OsDetector;
 
 /**
- * Реализация {@link JavaDetector} по умолчанию, сканирующая систему хоста
+ * Реализация {@link JavaScanner} по умолчанию, сканирующая систему хоста
  * в поисках установленных рантаймов Java следующими способами (по порядку):
  * <ol>
  *   <li>переменная окружения <b>JAVA_HOME</b></li>
@@ -31,13 +31,13 @@ import org.example.launcher.infrastructure.common.OsDetector;
  * </ol>
  * Дублирующиеся рантаймы (один и тот же путь к исполняемому файлу) удаляются.
  */
-public class SystemJavaDetector implements JavaDetector {
+public class SystemJavaScanner implements JavaScanner {
 
     private static final Pattern JAVA_VERSION_PATTERN =
             Pattern.compile("version \"(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     @Override
-    public List<JavaRuntime> detectInstalledRuntimes() {
+    public List<JavaRuntime> scanInstalledRuntimes() {
         Map<Path, JavaRuntime> runtimes = new LinkedHashMap<>();
 
         // 1. JAVA_HOME
