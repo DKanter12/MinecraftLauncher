@@ -88,6 +88,7 @@ import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.infrastructure.filesystem.FileSystemBuildRepository;
 import org.example.launcher.infrastructure.filesystem.ProfileService;
 import org.example.launcher.infrastructure.skins.SkinService;
+import org.example.launcher.infrastructure.mojang.VersionManifestCache;
 import org.example.launcher.infrastructure.mojang.VersionService;
 import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
 import org.example.launcher.domain.model.ModLoaderType;
@@ -693,18 +694,34 @@ public class MainView {
         };
         task.setOnSucceeded(e -> {
             ModpackImporter.Result result = task.getValue();
+            LOG.info(() -> "Import finished: " + result.packName()
+                    + " — downloaded=" + result.downloaded()
+                    + ", unpacked=" + result.unpacked()
+                    + ", skipped=" + result.skipped()
+                    + ", failed=" + result.failed());
             importStatusLabel.setText(Lang.tr("import.done",
-                    result.packName(), result.downloaded(), result.failed()));
+                    result.packName(), result.downloaded(),
+                    result.unpacked(), result.failed()));
             statusLabel.setText(Lang.tr("import.done.status",
                     result.packName()));
             jumpToInstance(result.profile());
         });
         task.setOnFailed(e -> {
             Throwable cause = task.getException();
-            LOG.log(Level.WARNING, "Modpack import failed", cause);
-            importStatusLabel.setText(Lang.tr("import.failed",
-                    cause == null ? "" : cause.getMessage()));
-            statusLabel.setText(Lang.tr("import.failed.short"));
+            if (cause instanceof ModpackImporter.DuplicatePackException dup) {
+                LOG.info(() -> "Import rejected: duplicate pack "
+                        + dup.packName());
+                importStatusLabel.setText(Lang.tr("import.duplicate",
+                        dup.packName()));
+                statusLabel.setText(Lang.tr("import.duplicate.short"));
+            } else {
+                LOG.log(Level.WARNING, "Modpack import failed", cause);
+                importStatusLabel.setText(Lang.tr("import.failed",
+                        cause == null ? "" : cause.getMessage()));
+                statusLabel.setText(Lang.tr("import.failed.short"));
+            }
+            progressDialog.onComplete(new InstallationResult(
+                    0, 0, 0, 1, 0, List.of()));
         });
         FxTasks.run("import-pack", task);
     }
@@ -1008,13 +1025,55 @@ public class MainView {
      * вид инстансов и раскрывает карточку.
      */
     private void jumpToInstance(ModdedProfile profile) {
-        instanceLoaderFilter = profile.loaderType();
+        // После установки новой сборки показываем «Все»: карточка
+        // точно видна независимо от того, какие чипы фильтра стояли
+        instanceLoaderFilter = null;
         syncInstanceFilterChips();
         if (!instanceSearchField.getText().isEmpty()) {
             instanceSearchField.clear();
         }
         showView(View.INSTANCES);
         refreshModdedProfiles(profile.id());
+        scrollInstanceIntoView();
+    }
+
+    /**
+     * Прокручивает список инстансов к выделенной карточке, чтобы после
+     * установки/импорта новой сборки пользователь сразу видел её в
+     * окне (карточка «прыгает» в центр видимой области).
+     */
+    private void scrollInstanceIntoView() {
+        if (instancesScroll == null || selectedInstanceId == null) {
+            return;
+        }
+        Platform.runLater(() -> {
+            instanceCards.applyCss();
+            instanceCards.layout();
+            javafx.scene.Node target = null;
+            for (javafx.scene.Node node : instanceCards.getChildren()) {
+                if (selectedInstanceId.equals(node.getUserData())) {
+                    target = node;
+                    break;
+                }
+            }
+            if (target == null) return;
+            javafx.geometry.Bounds b = target.getBoundsInParent();
+            double content = instanceCards.getHeight();
+            double viewport = instancesScroll.getViewportBounds().getHeight();
+            if (content <= viewport || (b.getMinY() > 0
+                    && b.getMaxY() < viewport)) {
+                return;
+            }
+            double fraction = (b.getMinY() + b.getHeight() / 2
+                    - viewport / 2) / (content - viewport);
+            instancesScroll.setVvalue(Math.max(0,
+                    Math.min(1, fraction)));
+            if (target instanceof javafx.scene.Parent parent
+                    && !parent.getStyleClass()
+                            .contains("instance-card-selected")) {
+                parent.getStyleClass().add("instance-card-selected");
+            }
+        });
     }
 
     /** Отражает {@link #instanceLoaderFilter} в чипах фильтров. */
@@ -2491,6 +2550,7 @@ public class MainView {
             return;
         }
         // Версия Minecraft берётся из уже загруженного манифеста Mojang
+        String buildId = summary.id();
         MinecraftVersion mcVersion = null;
         for (MinecraftVersion candidate : manifestVersions) {
             if (candidate.id().equals(summary.minecraftVersion())) {
@@ -2499,15 +2559,44 @@ public class MainView {
             }
         }
         if (mcVersion == null) {
-            statusLabel.setText(manifestVersions.isEmpty()
-                    ? Lang.tr("versions.wait")
-                    : Lang.tr("server.builds.no.mc",
-                            summary.minecraftVersion()));
-            return;
+            if (manifestVersions.isEmpty()) {
+                // Классическая «тихая» блокировка установки: без
+                // манифеста Mojang кнопку считать неотзывчивой —
+                // повторная загрузка версий запускается сразу
+                statusLabel.setText(Lang.tr("versions.retry"));
+                LOG.warning("Server build install blocked: no version "
+                        + "manifest (" + buildId + "); reloading versions");
+                loadVersions();
+                return;
+            }
+            // Сборка без build.json не знает свою версию игры —
+            // спрашиваем пользователя, установка от этого не ломается
+            Stage chooserOwner = (Stage) root.getScene().getWindow();
+            mcVersion = ChooseMcVersionDialog.show(chooserOwner, summary,
+                    manifestVersions);
+            if (mcVersion == null) {
+                LOG.info(() -> "Server build install cancelled: no MC "
+                        + "version chosen (" + buildId + ")");
+                return;
+            }
+            final String chosenId = mcVersion.id();
+            LOG.info(() -> "MC version chosen for build " + buildId
+                    + ": " + chosenId);
+            // Показываем пользователю выбор вместо «unknown»
+            summary = new BuildSummary(summary.id(), summary.version(),
+                    summary.displayName(), summary.description(),
+                    summary.loaderType(), mcVersion.id(),
+                    summary.loaderVersion());
         }
+        // Показываем пользователю случайный выбор вместо «unknown»:
+        // effectiveSummary — effectively-final версия для Task ниже
+        BuildSummary effectiveSummary = summary;
+        LOG.info(() -> "Server build install requested: "
+                + effectiveSummary.id()
+                + " (" + effectiveSummary.minecraftVersion() + ")");
 
         statusLabel.setText(Lang.tr("server.builds.installing",
-                summary.summaryLine()));
+                effectiveSummary.summaryLine()));
         Stage owner = (Stage) root.getScene().getWindow();
         InstallProgressDialog progressDialog = new InstallProgressDialog(owner);
         progressDialog.setTitle(Lang.tr("server.builds.install.title"));
@@ -2517,8 +2606,9 @@ public class MainView {
         Task<ServerBuildInstaller.Outcome> task = new Task<>() {
             @Override
             protected ServerBuildInstaller.Outcome call() throws Exception {
-                return serverBuildInstaller.provision(serverSession, summary,
-                        summary.displayName(), finalMcVersion,
+                return serverBuildInstaller.provision(serverSession,
+                        effectiveSummary,
+                        effectiveSummary.displayName(), finalMcVersion,
                         progressDialog);
             }
         };
@@ -2537,6 +2627,8 @@ public class MainView {
         });
         task.setOnFailed(e -> {
             Throwable cause = task.getException();
+            LOG.log(Level.WARNING, "Server build install failed: "
+                    + effectiveSummary.id(), cause);
             progressDialog.onComplete(new InstallationResult(
                     0, 0, 0, 1, 0, List.of()));
             UiErrors.fail(statusLabel, owner,
@@ -2713,6 +2805,12 @@ public class MainView {
     private void onVersionsLoaded(List<MinecraftVersion> versions) {
         manifestVersions = versions;
         versionsLoadFailed = false;
+        // Файл версий: полный манифест с URL доступен интерфейсу на
+        // всех следующих запусках, даже когда сеть недоступна
+        if (VersionManifestCache.save(versions)) {
+            LOG.info(() -> "Version manifest saved: " + versions.size()
+                    + " versions -> " + VersionManifestCache.FILE_NAME);
+        }
         footerVersionsCount = manifestVersions.size();
         footerOffline = false;
         statusLabel.setText(
@@ -2760,6 +2858,23 @@ public class MainView {
     private boolean footerOffline = false;
 
     private List<MinecraftVersion> loadCachedManifestVersions() {
+        // Файл версий лаунчера (launcher/versions.json): полноценный
+        // манифест с URL метаданных — главный источник офлайн-версий.
+        List<MinecraftVersion> cached = new ArrayList<>(
+                VersionManifestCache.load());
+        if (cached.isEmpty()) {
+            cached.addAll(loadInstalledDiscoveryVersions());
+        }
+        return cached;
+    }
+
+    /**
+     * Царский одиночный источник первого запуска без интернета: версии,
+     * metadata которых уже скачана парой {@code versions/<id>/<id>.json}.
+     * Без URL — годятся только как известные id; полноценный путь
+     * обеспечивает кэш-файл {@link VersionManifestCache}.
+     */
+    private List<MinecraftVersion> loadInstalledDiscoveryVersions() {
         List<MinecraftVersion> cached = new ArrayList<>();
         Path versionsDir = GameDirectory.defaultDirectory().versionsDir();
         if (!Files.isDirectory(versionsDir)) return cached;
@@ -3245,6 +3360,10 @@ public class MainView {
 
                             @Override
                             public void onCrashed(CrashReport report) {
+                                LOG.warning(() -> "Game crashed: "
+                                        + profile.versionId() + " ("
+                                        + report.category() + ", exit "
+                                        + report.exitCode() + ")");
                                 Platform.runLater(() -> {
                                     refreshLaunchButtons();
                                     showServerCrashBar(profile, report);
@@ -3254,6 +3373,8 @@ public class MainView {
 
                             @Override
                             public void onFailed(String error) {
+                                LOG.warning(() -> "Launch failed: "
+                                        + profile.versionId() + " — " + error);
                                 Platform.runLater(() -> {
                                     refreshLaunchButtons();
                                     UiErrors.fail(statusLabel, owner, error,
@@ -3268,6 +3389,8 @@ public class MainView {
         launchTask.setOnFailed(e -> {
             refreshLaunchButtons();
             Throwable cause = launchTask.getException();
+            LOG.log(Level.WARNING, "Launch task failed: "
+                    + profile.versionId(), cause);
             UiErrors.fail(statusLabel, owner,
                     Lang.tr("launch.launch.error", cause.getMessage()),
                     Lang.tr("launch.launch.error.title"), cause);

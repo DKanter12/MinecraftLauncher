@@ -154,16 +154,24 @@ public class ServerBuildInstaller {
                                                 MinecraftVersion mcVersion)
             throws IOException {
         BuildSummary fetched = descriptor.summary();
-        if (!fetched.minecraftVersion().equals(summary.minecraftVersion())) {
+        // Версия игры сверяется только когда обе стороны её знают:
+        // сборки без build.json отдают «unknown», и в этом случае
+        // версию выбирает пользователь (ChooseMcVersionDialog) —
+        // его выбор приоритетен и сверяться не должен
+        boolean serverKnowsMc = !"unknown".equals(fetched.minecraftVersion());
+        boolean summaryKnowsMc = !"unknown".equals(summary.minecraftVersion());
+        if (serverKnowsMc && summaryKnowsMc
+                && !fetched.minecraftVersion().equals(summary.minecraftVersion())) {
             throw new IOException("Build metadata mismatch: server reports "
                     + fetched.minecraftVersion() + ", expected "
                     + summary.minecraftVersion());
         }
-        if (!mcVersion.id().equals(summary.minecraftVersion())) {
+        if (summaryKnowsMc
+                && !mcVersion.id().equals(summary.minecraftVersion())) {
             throw new IOException("Minecraft version " + mcVersion.id()
                     + " does not belong to build " + summary.displayName());
         }
-        if (fetched.loaderType() != summary.loaderType()) {
+        if (!fetched.loaderType().equals(summary.loaderType())) {
             throw new IOException("Build metadata mismatch: loader changed from "
                     + summary.loaderType() + " to " + fetched.loaderType());
         }

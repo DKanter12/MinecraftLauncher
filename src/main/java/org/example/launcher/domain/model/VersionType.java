@@ -32,4 +32,18 @@ public enum VersionType {
     public boolean isStable() {
         return this == RELEASE;
     }
+
+    /**
+     * Обратный маппинг в строку Mojang: файл версий и диагностика
+     * хранят официальный формат ({@code "release"}, {@code "snapshot"}...).
+     */
+    public String mojangId() {
+        return switch (this) {
+            case RELEASE -> "release";
+            case SNAPSHOT -> "snapshot";
+            case BETA -> "old_beta";
+            case ALPHA -> "old_alpha";
+            case UNKNOWN -> "unknown";
+        };
+    }
 }

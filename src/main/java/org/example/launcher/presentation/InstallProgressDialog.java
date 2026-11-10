@@ -29,9 +29,12 @@ import org.example.launcher.i18n.Lang;
 public class InstallProgressDialog extends Stage implements InstallationProgress {
 
     private final ProgressBar progressBar;
+    /** Байтовый прогресс (может не дойти до конца при ошибках скачивания). */
+    private final ProgressBar byteBar;
     private final Label fileLabel;
     private final Label categoryLabel;
     private final Label statsLabel;
+    private final Label bytesLabel;
     private final Label statusLabel;
     private final Button closeButton;
 
@@ -40,6 +43,8 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
     private int downloadedCount;
     private int skippedCount;
     private int failedCount;
+    private long totalBytes;
+    private long downloadedBytes;
 
     public InstallProgressDialog(Stage owner) {
         initStyle(StageStyle.UTILITY);
@@ -52,6 +57,11 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         progressBar.setPrefWidth(420);
         progressBar.setPrefHeight(22);
 
+        byteBar = new ProgressBar(0);
+        byteBar.setPrefWidth(420);
+        byteBar.setPrefHeight(10);
+        byteBar.setVisible(false);
+
         categoryLabel = new Label(Lang.tr("install.preparing"));
         categoryLabel.getStyleClass().add("install-category");
 
@@ -62,6 +72,10 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
 
         statsLabel = new Label("");
         statsLabel.getStyleClass().add("install-stats");
+
+        bytesLabel = new Label("");
+        bytesLabel.getStyleClass().add("install-stats");
+        bytesLabel.setVisible(false);
 
         statusLabel = new Label(Lang.tr("install.initializing"));
         statusLabel.getStyleClass().add("install-status");
@@ -77,12 +91,14 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         content.getChildren().addAll(
                 statusLabel,
                 progressBar,
+                byteBar,
                 categoryLabel,
                 fileLabel,
                 statsLabel,
+                bytesLabel,
                 closeButton);
 
-        Scene scene = new Scene(content, 480, 220);
+        Scene scene = new Scene(content, 480, 260);
         var css = getClass().getResource("/styles.css");
         if (css != null) {
             scene.getStylesheets().add(css.toExternalForm());
@@ -97,10 +113,15 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         this.downloadedCount = 0;
         this.skippedCount = 0;
         this.failedCount = 0;
+        this.totalBytes = totalBytes;
+        this.downloadedBytes = 0;
+        boolean withBytes = totalBytes > 0;
 
         Platform.runLater(() -> {
             statusLabel.setText(Lang.tr("install.files", totalTasks));
             progressBar.setProgress(0);
+            byteBar.setVisible(withBytes);
+            bytesLabel.setVisible(withBytes);
             updateStats();
         });
     }
@@ -117,14 +138,25 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
     @Override
     public void onFileComplete(int taskIndex, DownloadResult result) {
         completedTasks++;
-        if (result.isDownloaded()) downloadedCount++;
-        else if (result.isSkipped()) skippedCount++;
-        else if (result.isFailed()) failedCount++;
+        if (result.isDownloaded()) {
+            downloadedCount++;
+            downloadedBytes += Math.max(0, result.bytesDownloaded());
+        } else if (result.isSkipped()) {
+            skippedCount++;
+            // уже был на диске: учитываем его размер в байтовом прогрессе
+            downloadedBytes += Math.max(0, result.task().expectedSize());
+        } else {
+            failedCount++;
+        }
 
         Platform.runLater(() -> {
             double progress = (double) completedTasks / totalTasks;
             progressBar.setProgress(progress);
-            updateStats();
+            if (totalBytes > 0) {
+                byteBar.setProgress(Math.min(1.0,
+                        downloadedBytes / (double) totalBytes));
+                updateStats();
+            }
         });
     }
 
@@ -132,6 +164,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
     public void onComplete(InstallationResult result) {
         Platform.runLater(() -> {
             progressBar.setProgress(1.0);
+            byteBar.setProgress(1.0);
             if (result.isSuccess()) {
                 statusLabel.setText(Lang.tr("install.complete"));
                 statusLabel.setStyle("-fx-text-fill: #10B981;");
@@ -152,6 +185,11 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
     private void updateStats() {
         statsLabel.setText(Lang.tr("install.stats",
                 downloadedCount, skippedCount, failedCount));
+        if (totalBytes > 0) {
+            bytesLabel.setText(Lang.tr("install.bytes",
+                    formatBytes(Math.min(downloadedBytes, totalBytes)),
+                    formatBytes(totalBytes)));
+        }
     }
 
     private static final long BYTES_PER_KB = 1024L;

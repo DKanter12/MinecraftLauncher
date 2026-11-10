@@ -13,6 +13,8 @@ import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import java.util.logging.Logger;
+
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -45,12 +47,36 @@ import org.example.launcher.infrastructure.loaders.ModLoaderRegistry;
  */
 public class ModpackImporter {
 
+    private static final Logger LOG =
+            Logger.getLogger(ModpackImporter.class.getName());
+
     /** Итог импорта: созданный инстанс плюс сводка по файлам. */
     public record Result(ModdedProfile profile,
                          String packName,
                          int downloaded,
                          int skipped,
-                         int failed) {
+                         int failed,
+                         int unpacked) {
+    }
+
+    /**
+     * Повторный импорт сборки с именем, которое уже есть в библиотеке.
+     * Поднимается до любого скачивания — частично созданный инстанс
+     * не остаётся на диске.
+     */
+    public static final class DuplicatePackException extends IOException {
+
+        private final String packName;
+
+        public DuplicatePackException(String packName) {
+            super("Build already exists: " + packName);
+            this.packName = Objects.requireNonNull(packName, "packName");
+        }
+
+        /** Имя сборки, которое дублируется. */
+        public String packName() {
+            return packName;
+        }
     }
 
     private static final Duration DOWNLOAD_TIMEOUT = Duration.ofMinutes(5);
@@ -119,6 +145,7 @@ public class ModpackImporter {
                 resolveLoader(loaderRef);
 
         String packName = archiveDisplayName(pack);
+        checkNotDuplicate(packName);
         Build build = new Build(packName, loaderRef.minecraftVersion(),
                 loaderRef.type(), loaderRef.type() == ModLoaderType.VANILLA
                         ? "" : loaderRef.loaderVersion());
@@ -130,12 +157,29 @@ public class ModpackImporter {
         Path gameDir = builds.resolveGameDir(profile);
         FileSync sync = downloadFiles(zip, manifest, gameDir, sink);
         return new Result(profile, packName, sync.downloaded, sync.skipped,
-                sync.failed);
+                sync.failed, sync.unpacked);
     }
 
     // ------------------------------------------------------------------
     //  Манифест .mrpack
     // ------------------------------------------------------------------
+
+    /**
+     * Запрет повторного импорта: сборка с таким именем уже есть в
+     * библиотеке ({@code instances.json}, сравнение без учёта регистра).
+     */
+    private void checkNotDuplicate(String packName) throws IOException {
+        List<ModdedProfile> all = builds.loadProfiles();
+        List<String> matches = all.stream()
+                .filter(p -> packName.equalsIgnoreCase(p.name()))
+                .map(ModdedProfile::id)
+                .toList();
+        LOG.info(() -> "Duplicate check: pack='" + packName + "', library="
+                + all.size() + " profiles, matches=" + matches);
+        if (!matches.isEmpty()) {
+            throw new DuplicatePackException(packName);
+        }
+    }
 
     private record LoaderRef(ModLoaderType type, String minecraftVersion,
                              String loaderVersion) {
@@ -268,7 +312,7 @@ public class ModpackImporter {
     }
 
     private record FileSync(int downloaded, int skipped, int failed,
-                            List<String> errors) {
+                            List<String> errors, int unpacked) {
     }
 
     private FileSync downloadFiles(ZipFile zip,
@@ -276,34 +320,172 @@ public class ModpackImporter {
                                    Path gameDir,
                                    InstallationProgress sink)
             throws IOException {
-        List<FileRef> files = readFiles(manifest);
-        sink.onStart(files.size(), files.stream()
-                .mapToLong(FileRef::size).sum());
+        List<PackItem> items = new ArrayList<>();
+        for (FileRef ref : readFiles(manifest)) {
+            items.add(new DownloadItem(ref));
+        }
+        items.addAll(clientOverrideItems(zip));
+
+        sink.onStart(items.size(), items.stream()
+                .mapToLong(PackItem::size).sum());
         int downloaded = 0;
         int skipped = 0;
         int failed = 0;
+        int unpacked = 0;
         List<String> errors = new ArrayList<>();
         int index = 0;
-        for (FileRef ref : files) {
-            String category = categoryOf(ref.path());
-            DownloadTask task = new DownloadTask(
-                    ref.urls().get(0), safeTarget(gameDir, ref.path()),
-                    ref.sha1(), ref.size(), category, ref.path());
-            sink.onFileStart(index, task);
-            DownloadResult result = downloadOne(ref, task, gameDir);
+        for (PackItem item : items) {
+            sink.onFileStart(index, taskOf(item, gameDir));
+            DownloadResult result = processItem(zip, item, gameDir);
             sink.onFileComplete(index, result);
-            if (result.isDownloaded()) downloaded++;
-            else if (result.isSkipped()) skipped++;
-            else {
+            if (result.isDownloaded()) {
+                downloaded++;
+                if (item instanceof OverrideItem) {
+                    unpacked++;
+                }
+            } else if (result.isSkipped()) {
+                skipped++;
+            } else {
                 failed++;
-                errors.add(task.name());
+                errors.add(result.task().name());
             }
             index++;
         }
-        sink.onComplete(new InstallationResult(files.size(), downloaded,
-                skipped, failed, files.stream().mapToLong(FileRef::size).sum(),
-                List.of()));
-        return new FileSync(downloaded, skipped, failed, errors);
+        sink.onComplete(new InstallationResult(items.size(), downloaded,
+                skipped, failed, totalBytes(items), List.of()));
+        return new FileSync(downloaded, skipped, failed, errors, unpacked);
+    }
+
+    // ------------------------------------------------------------------
+    //  Элементы пакета: CDN-файлы и внутренние overrides-файлы архива
+    // ------------------------------------------------------------------
+
+    /** Элемент содержимого пакета с размером для общего прогресса. */
+    private sealed interface PackItem permits DownloadItem, OverrideItem {
+        /** Размер элемента (0, если неизвестен). */
+        long size();
+
+        /** Путь внутри каталога инстанса. */
+        String path();
+    }
+
+    /** Файл из манифеста, скачивается по внешним ссылкам с проверкой SHA-1. */
+    private record DownloadItem(FileRef ref) implements PackItem {
+        @Override
+        public long size() {
+            return ref.size();
+        }
+
+        @Override
+        public String path() {
+            return ref.path();
+        }
+    }
+
+    /** Файл напрямую из архива ({@code overrides/<путь>}). */
+    record OverrideItem(String relativePath, long bytes)
+            implements PackItem {
+        @Override
+        public long size() {
+            return bytes;
+        }
+
+        @Override
+        public String path() {
+            return relativePath;
+        }
+    }
+
+    /** Клиентский override: {@code overrides/<путь>}, но не server-overrides. */
+    private static boolean isClientOverride(String name) {
+        return name.startsWith("overrides/")
+                && !name.equals("overrides/");
+    }
+
+    /**
+     * Список клиентских override-элементов архива: содержимое
+     * {@code overrides/} целиком (моды, конфиги, kubejs — всё, что
+     * остаётся в паке без внешних ссылок). {@code server-overrides/}
+     * в список не попадает. Видимость на уровне пакета — для тестов.
+     */
+    static List<OverrideItem> clientOverrideItems(ZipFile zip) {
+        List<OverrideItem> items = new ArrayList<>();
+        for (var entries = zip.entries(); entries.hasMoreElements();) {
+            ZipEntry entry = entries.nextElement();
+            if (isClientOverride(entry.getName())) {
+                items.add(new OverrideItem(overrideRelative(entry.getName()),
+                        Math.max(0, entry.getSize())));
+            }
+        }
+        return items;
+    }
+
+    /** Путь элемента внутри инстанса: {@code overrides/<путь>} → {@code <путь>}. */
+    private static String overrideRelative(String entryName) {
+        return entryName.substring("overrides/".length());
+    }
+
+    private static long totalBytes(List<PackItem> items) {
+        return items.stream().mapToLong(PackItem::size).sum();
+    }
+
+    private DownloadTask taskOf(PackItem item, Path gameDir)
+            throws IOException {
+        String relative = item.path();
+        if (item instanceof DownloadItem download) {
+            return new DownloadTask(download.ref().urls().get(0),
+                    safeTarget(gameDir, relative), download.ref().sha1(),
+                    download.ref().size(), categoryOf(relative), relative);
+        }
+        return new DownloadTask("override:" + relative,
+                safeTarget(gameDir, relative), null, item.size(),
+                categoryOf(relative), relative);
+    }
+
+    /**
+     * Выполняет один элемент пакета: скачивание с проверкой SHA-1 для
+     * манифестных файлов, распаковка напрямую из архива для overrides.
+     * Отказ одного элемента не прерывает импорт.
+     */
+    private DownloadResult processItem(ZipFile zip, PackItem item,
+                                       Path gameDir) throws IOException {
+        if (item instanceof DownloadItem download) {
+            return downloadOne(download.ref(), taskOf(item, gameDir),
+                    gameDir);
+        }
+        return unpackOne(zip, (OverrideItem) item, taskOf(item, gameDir),
+                gameDir);
+    }
+
+    /**
+     * Распаковывает {@code overrides/<путь>} в каталог инстанса.
+     * Известный размер уже распакованного файла с тем же размером
+     * считается новомеханическим (переустановка того же пакета).
+     */
+    private DownloadResult unpackOne(ZipFile zip, OverrideItem item,
+                                     DownloadTask task, Path gameDir) {
+        ZipEntry entry = zip.getEntry("overrides/" + item.relativePath());
+        if (entry == null) {
+            return DownloadResult.failed(task,
+                    "Archive entry is missing: overrides/"
+                            + item.relativePath(), 1);
+        }
+        try {
+            Path target = safeTarget(gameDir, item.relativePath());
+            if (Files.isRegularFile(target)
+                    && item.bytes > 0
+                    && Files.size(target) == item.bytes) {
+                return DownloadResult.skipped(task);
+            }
+            try (InputStream in = zip.getInputStream(entry)) {
+                Files.copy(in, target,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return DownloadResult.downloaded(task,
+                    Files.size(target), 1);
+        } catch (IOException e) {
+            return DownloadResult.failed(task, e.getMessage(), 1);
+        }
     }
 
     /** Категория для прогресса: mods/config/other по верхнему каталогу. */
