@@ -63,6 +63,7 @@ public class ErrorDialog extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
     }
 
     public static void show(Stage owner, String title, String message) {

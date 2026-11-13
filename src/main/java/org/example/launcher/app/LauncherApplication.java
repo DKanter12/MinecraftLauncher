@@ -70,6 +70,7 @@ public class LauncherApplication extends Application {
         stage.setMinWidth(900);
         stage.setMinHeight(520);
         stage.setScene(scene);
+        org.example.launcher.presentation.AppIcon.apply(stage);
         stage.setOnCloseRequest(e -> Platform.exit());
         stage.show();
 

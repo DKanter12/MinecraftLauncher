@@ -105,6 +105,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
     }
 
     @Override

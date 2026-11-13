@@ -194,6 +194,7 @@ public class AddAccountDialog extends Stage {
         var css = getClass().getResource("/styles.css");
         if (css != null) scene.getStylesheets().add(css.toExternalForm());
         setScene(scene);
+        AppIcon.apply(this);
 
         // Окно центрируется над главным (после автоподбора размера)
         if (owner != null) {

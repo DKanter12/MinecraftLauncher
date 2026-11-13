@@ -85,6 +85,7 @@ public class CrashWindow extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
     }
 
     public static void show(Stage owner, CrashReport report) {

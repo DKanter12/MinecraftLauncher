@@ -64,6 +64,7 @@ public class ServerLoginDialog extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
     }
 
     private VBox signedInView() {

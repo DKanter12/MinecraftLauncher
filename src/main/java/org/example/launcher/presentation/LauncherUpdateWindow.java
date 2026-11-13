@@ -96,6 +96,7 @@ public class LauncherUpdateWindow extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
 
         refreshPrimary();
     }

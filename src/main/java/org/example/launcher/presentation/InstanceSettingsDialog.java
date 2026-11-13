@@ -150,6 +150,7 @@ public final class InstanceSettingsDialog extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
         validateSave(saveButton);
     }
 

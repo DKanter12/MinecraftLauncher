@@ -338,6 +338,7 @@ public class NewInstanceDialog extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
 
         // Предвыбор загрузчика (например, из «умного бандла») — строго
         // после сборки всех узлов: onLoaderChanged() управляет

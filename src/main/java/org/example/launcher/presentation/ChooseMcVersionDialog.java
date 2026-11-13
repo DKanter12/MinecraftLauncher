@@ -148,6 +148,7 @@ public class ChooseMcVersionDialog extends Stage {
             scene.getStylesheets().add(css.toExternalForm());
         }
         setScene(scene);
+        AppIcon.apply(this);
     }
 
     /** Выбранная в диалоге версия игры ({@code null} — отмена). */
