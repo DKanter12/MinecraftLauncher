@@ -153,12 +153,12 @@
     -fx-mouse-transparent: true;
 }
 
-/* Кольцо вокруг аватара скина */
+/* Подложка-кольцо вокруг аватара скина (скруглённый квадрат) */
 .avatar-ring {
     -fx-background-color: #222833;
-    -fx-background-radius: 999;
+    -fx-background-radius: 14;
     -fx-border-color: rgba(16, 197, 139, 0.35);
-    -fx-border-radius: 999;
+    -fx-border-radius: 14;
     -fx-border-width: 1;
     -fx-padding: 2;
 }
@@ -302,11 +302,11 @@
 /* Видимое название фильтра — Label внутри графики кнопки
    (GRAPHIC_ONLY), поэтому красим его отдельно */
 .nav-item .label {
-    -fx-text-fill: #F0F3F6;
+    -fx-text-fill: #C9D1DB;
 }
 
 .nav-item:hover .label {
-    -fx-text-fill: #FFFFFF;
+    -fx-text-fill: #F0F3F6;
 }
 
 .nav-item:selected .label {
@@ -2060,18 +2060,15 @@
     -fx-background-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Иконка Ely.by: буква E на приглушённом зелёном градиенте */
+/* Иконка Ely.by: толстая буква E на том же фоне,
+   что и иконка офлайн-аккаунта */
 .account-card-icon-ely {
-    -fx-text-fill: #06251A;
-    -fx-font-size: 17px;
+    -fx-text-fill: #F0F3F6;
+    -fx-font-size: 19px;
     -fx-font-weight: 900;
-    -fx-background-color: linear-gradient(to bottom right,
-            #3EDFAF 0%,
-            #10C58B 45%,
-            #0A6B4D 80%,
-            #12B57F 100%);
-    -fx-border-color: rgba(16, 197, 139, 0.55);
-    -fx-border-width: 1;
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-border-radius: 999;
 }
 

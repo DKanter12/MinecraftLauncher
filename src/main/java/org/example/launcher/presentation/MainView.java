@@ -61,7 +61,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.scene.input.DragEvent;
@@ -392,7 +392,12 @@ public class MainView {
         avatarView.setFitWidth(38);
         avatarView.setFitHeight(38);
         avatarView.setPreserveRatio(true);
-        avatarView.setClip(new Circle(19, 19, 19));
+        // Аватар квадратный со скруглёнными углами: круглая маска
+        // обрезала лица скинов Ely.by по краям
+        javafx.scene.shape.Rectangle avatarMask = new javafx.scene.shape.Rectangle(38, 38);
+        avatarMask.setArcWidth(12);
+        avatarMask.setArcHeight(12);
+        avatarView.setClip(avatarMask);
         avatarView.setVisible(false);
 
         // Выпадающая стрелка аккаунт-капсулы (декоративная)
