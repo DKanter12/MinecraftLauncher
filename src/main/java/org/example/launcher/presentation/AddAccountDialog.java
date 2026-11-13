@@ -45,18 +45,12 @@ public class AddAccountDialog extends Stage {
     private Type selectedType = Type.OFFLINE;
 
     public AddAccountDialog(Stage owner) {
-        // Прозрачный stage: окно рисуется само (overlay + карточка),
-        // «backdrop-filter» эмулируется размытым снапшотом главного окна
+        // Компактное модальное окно по центру главного: карточка сама
+        // задаёт размер, без прозрачной подложки на весь экран
         initStyle(StageStyle.TRANSPARENT);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
         setResizable(false);
-        if (owner != null) {
-            setWidth(owner.getWidth());
-            setHeight(owner.getHeight());
-            setX(owner.getX());
-            setY(owner.getY());
-        }
 
         // --- Шапка модального окна: заголовок + круглый крестик ---
         Label headerTitle = new Label(Lang.tr("account.title"));
@@ -79,6 +73,12 @@ public class AddAccountDialog extends Stage {
         ToggleButton elyToggle = typeCard(typeGroup, "\uD83E\uDD8A",
                 Lang.tr("account.card.ely.title"),
                 Lang.tr("account.card.ely.sub"));
+        // Две карточки по половине ширины формы: длинные подписи
+        // переносятся, окно остаётся компактным
+        for (ToggleButton card : new ToggleButton[]{offlineToggle, elyToggle}) {
+            card.setPrefWidth(206);
+            card.setMaxWidth(206);
+        }
         HBox typeRow = new HBox(8, offlineToggle, elyToggle);
         typeRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -178,23 +178,32 @@ public class AddAccountDialog extends Stage {
 
         VBox card = new VBox(content);
         card.getStyleClass().add("modal-card");
-        card.setMinHeight(340);
-        card.setMaxWidth(420);
+        card.setPrefWidth(436);
+        card.setMaxWidth(436);
 
-        // -- Glassmorphism backdrop (общий с NewInstanceDialog);
-        // карточка центрируется и сохраняет собственный размер --
-        StackPane overlay = new StackPane();
-        NewInstanceDialog.addBlurBackdrop(overlay, owner);
-        HBox centered = new HBox(card);
-        centered.setAlignment(Pos.CENTER);
-        overlay.getChildren().add(centered);
+        // Карточка — всё содержимое окна; тень (из CSS) рисуется поверх
+        // прозрачного фона
+        StackPane overlay = new StackPane(card);
+        overlay.getStyleClass().add("modal-overlay");
+        overlay.setPadding(new Insets(20));
 
-        Scene scene = new Scene(overlay, owner != null ? owner.getWidth()
-                : 480, owner != null ? owner.getHeight() : 420);
+        Scene scene = new Scene(overlay);
         scene.setFill(Color.TRANSPARENT);
         var css = getClass().getResource("/styles.css");
         if (css != null) scene.getStylesheets().add(css.toExternalForm());
         setScene(scene);
+
+        // Окно центрируется над главным (после автоподбора размера)
+        if (owner != null) {
+            scene.widthProperty().addListener((obs, o, v) -> {
+                setX(Math.round(owner.getX()
+                        + (owner.getWidth() - v.doubleValue()) / 2));
+            });
+            scene.heightProperty().addListener((obs, o, v) -> {
+                setY(Math.round(owner.getY()
+                        + (owner.getHeight() - v.doubleValue()) / 2));
+            });
+        }
 
         updateActionButton();
     }

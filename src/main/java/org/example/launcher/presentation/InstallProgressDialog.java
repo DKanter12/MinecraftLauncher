@@ -86,6 +86,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
         closeButton.setOnAction(e -> close());
 
         VBox content = new VBox(12);
+        content.getStyleClass().add("window-dark");
         content.setAlignment(Pos.CENTER_LEFT);
         content.setPadding(new Insets(24));
         content.getChildren().addAll(

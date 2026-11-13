@@ -22,7 +22,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import javafx.animation.Animation;
+import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -34,6 +36,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.MenuItem;
@@ -183,6 +186,10 @@ public class MainView {
     private String selectedInstanceId;
     private String instanceSearchText = "";
     private ModLoaderType instanceLoaderFilter;
+    /** Сортировка библиотеки: послед. запуск / имя / создание / версия. */
+    private ComboBox<String> instanceSortCombo;
+    /** Сборка, у которой последний запуск упал: красное состояние карточки. */
+    private String lastFailedProfileId;
 
     // Остальные виды
     private VBox instancesView;
@@ -357,8 +364,8 @@ public class MainView {
 
     /** Собирает Header: бренд, глобальные вкладки, профиль игрока. */
     private HBox buildHeader() {
-        // Бренд-блок: фиолетовая иконка + название лаунчера
-        Label brandIcon = new Label("\u25C6");
+        // Бренд-блок: зелёный градиентный брикет с литерой P + название
+        Label brandIcon = new Label("P");
         brandIcon.getStyleClass().add("brand-icon");
         Label brandName = new Label("PACKCRAFT");
         brandName.getStyleClass().add("brand-name");
@@ -369,13 +376,13 @@ public class MainView {
         brandRow.setAlignment(Pos.CENTER_LEFT);
         brandRow.getStyleClass().add("brand-row");
 
-        // Глобальные вкладки навигации
+        // Глобальные вкладки навигации: иконка + подпись
         HBox tabs = new HBox(8);
         tabs.getStyleClass().add("header-tabs");
-        addHeaderTab(tabs, Lang.tr("nav.library"), View.INSTANCES);
-        addHeaderTab(tabs, Lang.tr("nav.catalog"), View.SERVER);
-        addHeaderTab(tabs, Lang.tr("nav.import"), View.IMPORT);
-        addHeaderTab(tabs, Lang.tr("nav.create"), View.CREATE);
+        addHeaderTab(tabs, "\u2630  ", Lang.tr("nav.library"), View.INSTANCES);
+        addHeaderTab(tabs, "\u2302  ", Lang.tr("nav.catalog"), View.SERVER);
+        addHeaderTab(tabs, "\u2B07  ", Lang.tr("nav.import"), View.IMPORT);
+        addHeaderTab(tabs, "\u271A  ", Lang.tr("nav.create"), View.CREATE);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -491,13 +498,16 @@ public class MainView {
             }
         });
 
-        addAccountButton = new Button(Lang.tr("account.add"));
-        addAccountButton.getStyleClass().add("quick-select-button");
-        addAccountButton.setStyle("-fx-font-size: 12px;");
+        addAccountButton = new Button("\uFF0B");
+        addAccountButton.getStyleClass().add("header-icon-button");
         addAccountButton.setOnAction(e -> onAddAccount());
         addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
 
-        HBox accountBox = new HBox(8, avatarView, accountCombo,
+        // Аватар в кольце-подложке (скругление и рамка — через CSS)
+        StackPane avatarRing = new StackPane(avatarView);
+        avatarRing.getStyleClass().add("avatar-ring");
+
+        HBox accountBox = new HBox(8, avatarRing, accountCombo,
                 addAccountButton, accountArrow);
         accountBox.setAlignment(Pos.CENTER);
         accountBox.getStyleClass().add("account-pill");
@@ -516,9 +526,9 @@ public class MainView {
         return header;
     }
 
-    /** Текстовый таб Header; активное состояние подсвечивается в {@code showView}. */
-    private void addHeaderTab(HBox tabs, String text, View view) {
-        Button tab = new Button(text);
+    /** Текстовый таб Header (с иконкой-глифом); подсветка в {@code showView}. */
+    private void addHeaderTab(HBox tabs, String icon, String text, View view) {
+        Button tab = new Button(icon + text);
         tab.getStyleClass().add("header-tab");
         tab.setUserData(view);
         tab.setOnAction(e -> showView(view));
@@ -692,6 +702,9 @@ public class MainView {
                         progressDialog);
             }
         };
+        // Прогресс-окно видно сразу: скачивание и распаковка
+        // отображаются полосой, файлом и статистикой — не мелкой строкой
+        progressDialog.show();
         task.setOnSucceeded(e -> {
             ModpackImporter.Result result = task.getValue();
             LOG.info(() -> "Import finished: " + result.packName()
@@ -808,6 +821,7 @@ public class MainView {
         card.setPadding(new Insets(16));
         card.setMaxWidth(Double.MAX_VALUE);
         card.setCursor(javafx.scene.Cursor.HAND);
+        hoverLift(card, -2);
         card.setOnMouseClicked(e -> onNewInstance(loader));
         return card;
     }
@@ -832,11 +846,11 @@ public class MainView {
     // --- Вид инстансов: двухколоночный (фильтры слева + сетка справа) ---
 
     private VBox buildInstancesView() {
-        // Поиск инстансов: лупа слева поверх поля (StackPane-оверлей)
+        // Поиск инстансов: лупа слева и кнопка очистки справа
         instanceSearchField = new TextField();
         instanceSearchField.setPromptText(Lang.tr("search.instances"));
         instanceSearchField.getStyleClass().add("search-field");
-        instanceSearchField.setPadding(new Insets(8, 12, 8, 34));
+        instanceSearchField.setPadding(new Insets(8, 30, 8, 34));
         instanceSearchField.setMaxWidth(Double.MAX_VALUE);
         instanceSearchField.textProperty().addListener((obs, old, val) -> {
             instanceSearchText = val == null ? "" : val.trim().toLowerCase();
@@ -847,12 +861,51 @@ public class MainView {
         searchIcon.getStyleClass().add("search-icon");
         StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 11));
         StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
-        StackPane searchWrap = new StackPane(instanceSearchField, searchIcon);
+        Button searchClear = new Button("\u2715");
+        searchClear.getStyleClass().add("search-clear");
+        searchClear.setTooltip(new Tooltip(Lang.tr("search.clear")));
+        searchClear.setVisible(false);
+        searchClear.setManaged(false);
+        StackPane.setMargin(searchClear, new Insets(0, 8, 0, 0));
+        StackPane.setAlignment(searchClear, Pos.CENTER_RIGHT);
+        searchClear.setOnAction(e -> instanceSearchField.clear());
+        instanceSearchField.textProperty().addListener((obs, old, val) -> {
+            boolean has = val != null && !val.isEmpty();
+            searchClear.setVisible(has);
+            searchClear.setManaged(has);
+        });
+        StackPane searchWrap = new StackPane(instanceSearchField, searchIcon,
+                searchClear);
         searchWrap.getStyleClass().add("search-wrap");
         searchWrap.setPrefWidth(320);
         searchWrap.setMinWidth(220);
 
-        instanceFilterChips = new VBox(6);
+        // --- Заголовок страницы: «Библиотека» + счётчик сборок ---
+        Label libraryTitle = new Label(Lang.tr("nav.library"));
+        libraryTitle.getStyleClass().add("title-label");
+        instanceCountLabel = new Label();
+        instanceCountLabel.getStyleClass().add("store-count");
+        instanceCountLabel.setTooltip(new Tooltip(Lang.tr("instances.count.tip")));
+        HBox titleRow = new HBox(12, libraryTitle, instanceCountLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+
+        Button createBuildButton = new Button(
+                "\u271A  " + Lang.tr("instances.create"));
+        createBuildButton.getStyleClass().add("pack-install");
+        createBuildButton.setTooltip(new Tooltip(Lang.tr("instances.create.tip")));
+        createBuildButton.setOnAction(e -> onNewInstance());
+
+        Region topSpacer = new Region();
+        HBox.setHgrow(topSpacer, Priority.ALWAYS);
+        HBox topRow = new HBox(14, titleRow, topSpacer, searchWrap,
+                createBuildButton);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+
+        // --- Боковая навигация: фильтры + сортировка ---
+        Label filtersTitle = new Label(Lang.tr("filter.title").toUpperCase());
+        filtersTitle.getStyleClass().add("side-nav-title");
+
+        instanceFilterChips = new VBox(2);
         instanceFilterChips.getStyleClass().add("filter-row");
         instanceFilterChips.setAlignment(Pos.TOP_LEFT);
         instanceFilterGroup = new ToggleGroup();
@@ -861,28 +914,27 @@ public class MainView {
             addInstanceFilterChip(loader.displayName(), loader);
         }
 
-        Label filtersTitle = new Label(Lang.tr("filter.title"));
-        filtersTitle.getStyleClass().add("filter-title");
+        Label sortTitle = new Label(Lang.tr("sort.title").toUpperCase());
+        sortTitle.getStyleClass().add("side-nav-title");
+        instanceSortCombo = new ComboBox<>();
+        instanceSortCombo.getItems().addAll(
+                Lang.tr("sort.lastplayed"),
+                Lang.tr("sort.name"),
+                Lang.tr("sort.created"),
+                Lang.tr("sort.version"));
+        instanceSortCombo.getSelectionModel().select(0);
+        instanceSortCombo.setMaxWidth(Double.MAX_VALUE);
+        instanceSortCombo.valueProperty().addListener(
+                (obs, old, val) -> refreshInstanceCards());
 
-        VBox filters = new VBox(10, filtersTitle, instanceFilterChips);
-        filters.getStyleClass().add("store-filters");
-        filters.setPrefWidth(220);
-        filters.setPadding(new Insets(14));
-
-        Label libraryTitle = new Label(Lang.tr("nav.library"));
-        libraryTitle.getStyleClass().add("title-label");
-        instanceCountLabel = new Label();
-        instanceCountLabel.getStyleClass().add("store-count");
-        Region topSpacer = new Region();
-        HBox.setHgrow(topSpacer, Priority.ALWAYS);
-        Button createBuildButton = new Button(Lang.tr("instances.create"));
-        createBuildButton.getStyleClass().add("pack-install");
-        createBuildButton.setTooltip(new Tooltip(Lang.tr("instances.create.tip")));
-        createBuildButton.setOnAction(e -> onNewInstance());
-
-        HBox topRow = new HBox(10, libraryTitle, instanceCountLabel, topSpacer,
-                searchWrap, createBuildButton);;
-        topRow.setAlignment(Pos.CENTER_LEFT);
+        Region navSpacer = new Region();
+        VBox.setVgrow(navSpacer, Priority.ALWAYS);
+        VBox filters = new VBox(2, filtersTitle, instanceFilterChips,
+                navSpacer, sortTitle, instanceSortCombo);
+        filters.getStyleClass().add("side-nav");
+        filters.setPrefWidth(216);
+        filters.setMinWidth(216);
+        filters.setPadding(new Insets(6, 4, 10, 4));
 
         instanceCards = new FlowPane();
         instanceCards.setHgap(16);
@@ -899,7 +951,7 @@ public class MainView {
         VBox content = new VBox(16, topRow, instancesScroll);
         HBox.setHgrow(content, Priority.ALWAYS);
 
-        HBox layout = new HBox(18, filters, content);
+        HBox layout = new HBox(20, filters, content);
         HBox.setHgrow(content, Priority.ALWAYS);
 
         VBox view = new VBox(0, layout);
@@ -908,23 +960,54 @@ public class MainView {
         return view;
     }
 
-    /** Чип фильтра в левом сайдбаре: иконка загрузчика + счётчик инстансов. */
+    /**
+     * Строка фильтра в боковой навигации: иконка загрузчика (или глиф
+     * «все»), название и счётчик сборок на правом краю.
+     */
     private ToggleButton makeInstanceFilterChip(String text,
-                                                  ModLoaderType loader) {
+                                                 ModLoaderType loader) {
         long count = loader == null ? moddedProfiles.size()
                 : moddedProfiles.stream().filter(
                         p -> p.loaderType() == loader).count();
-        String label = text + "  ·  " + count;
-        ToggleButton chip = new ToggleButton(label);
-        if (loader != null) {
-            ImageView icon = loaderImage(loader);
-            if (icon != null) {
-                icon.setFitWidth(16);
-                icon.setFitHeight(16);
-                chip.setGraphic(icon);
+
+        Label icon = null;
+        ImageView loaderIcon = null;
+        if (loader == null) {
+            icon = new Label("\u2261");
+            icon.getStyleClass().add("nav-icon");
+        } else {
+            loaderIcon = loaderImage(loader);
+            if (loaderIcon == null) {
+                icon = new Label(iconText(loader));
+                icon.getStyleClass().add("nav-icon");
             }
         }
-        chip.getStyleClass().add("filter-button");
+
+        Label nameLabel = new Label(text);
+        nameLabel.setMouseTransparent(true);
+
+        Label countBadge = new Label(String.valueOf(count));
+        countBadge.getStyleClass().add("count-badge");
+        countBadge.setMouseTransparent(true);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox content = new HBox(9);
+        content.setAlignment(Pos.CENTER_LEFT);
+        if (icon != null) {
+            content.getChildren().add(icon);
+        } else if (loaderIcon != null) {
+            loaderIcon.setFitWidth(15);
+            loaderIcon.setFitHeight(15);
+            content.getChildren().add(loaderIcon);
+        }
+        content.getChildren().addAll(nameLabel, spacer, countBadge);
+
+        ToggleButton chip = new ToggleButton();
+        chip.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+        chip.setGraphic(content);
+        chip.getStyleClass().add("nav-item");
         chip.setToggleGroup(instanceFilterGroup);
         chip.setUserData(loader);
         chip.setSelected(loader == null);
@@ -994,6 +1077,15 @@ public class MainView {
                 tab.getStyleClass().remove("header-tab-active");
             }
         }
+        // Плавное появление страницы (быстрый fade, не мешает работе)
+        animateViewIn(switch (view) {
+            case INSTANCES -> instancesView;
+            case PROFILES -> profilesView;
+            case SERVER -> serverView;
+            case IMPORT -> importView;
+            case CREATE -> createView;
+            case SETTINGS -> settingsView;
+        });
         if (view == View.INSTANCES) {
             refreshInstanceCards();
         } else if (view == View.PROFILES) {
@@ -1004,6 +1096,39 @@ public class MainView {
             refreshSettingsView();
         }
         // IMPORT/CREATE — статичные виды без фоновых обновлений
+    }
+
+    /** Быстрое затухание вида: opacity 0 → 1 за 130 мс. */
+    private void animateViewIn(javafx.scene.Node view) {
+        view.setOpacity(0);
+        FadeTransition fade = new FadeTransition(
+                javafx.util.Duration.millis(130), view);
+        fade.setFromValue(0);
+        fade.setToValue(1);
+        fade.setCycleCount(1);
+        fade.play();
+    }
+
+    /**
+     * Плавный hover-lift: карточка мягко приподнимается при наведении
+     * и опускается при уходе курсора (короткие Timelines, ~100 мс).
+     */
+    private static void hoverLift(javafx.scene.layout.Region node,
+                                  double lift) {
+        node.setOnMouseEntered(e -> {
+            Timeline liftIn = new Timeline(new KeyFrame(
+                    javafx.util.Duration.millis(90),
+                    new KeyValue(node.translateYProperty(), lift)));
+            liftIn.setCycleCount(1);
+            liftIn.play();
+        });
+        node.setOnMouseExited(e -> {
+            Timeline liftOut = new Timeline(new KeyFrame(
+                    javafx.util.Duration.millis(120),
+                    new KeyValue(node.translateYProperty(), 0)));
+            liftOut.setCycleCount(1);
+            liftOut.play();
+        });
     }
 
     private static final DateTimeFormatter DATE_FORMATTER =
@@ -1156,11 +1281,7 @@ public class MainView {
             }
             shown.add(p);
         }
-        shown.sort(Comparator
-                .comparing((ModdedProfile p) -> p.lastPlayedTime().orElse(null),
-                        Comparator.nullsFirst(Comparator.naturalOrder()))
-                .reversed()
-                .thenComparing(p -> p.name().toLowerCase()));
+        sortShown(shown);
         for (ModdedProfile p : shown) {
             instanceCards.getChildren().add(buildInstanceCard(p));
         }
@@ -1171,20 +1292,56 @@ public class MainView {
         }
     }
 
+    /**
+     * Сортировка библиотеки по выбору пользователя: последний запуск
+     * (умолчание), имя, дата создания, версия Minecraft.
+     */
+    private void sortShown(List<ModdedProfile> shown) {
+        int mode = instanceSortCombo == null
+                || instanceSortCombo.getValue() == null
+                ? 0 : instanceSortCombo.getSelectionModel().getSelectedIndex();
+        switch (mode) {
+            case 1 -> shown.sort(Comparator.comparing(
+                    p -> p.name().toLowerCase()));
+            case 2 -> shown.sort(Comparator.comparing(
+                    (ModdedProfile p) -> p.createdTime().orElse(null),
+                    Comparator.nullsLast(Comparator.naturalOrder())));
+            case 3 -> shown.sort(Comparator.comparing(
+                    (ModdedProfile p) -> p.minecraftVersion().toLowerCase(),
+                    new MinecraftVersionComparator()));
+            default -> shown.sort(Comparator
+                    .comparing((ModdedProfile p) -> p.lastPlayedTime()
+                            .orElse(null),
+                            Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .reversed()
+                    .thenComparing(p -> p.name().toLowerCase()));
+        }
+    }
+
     private VBox buildInstanceCard(ModdedProfile profile) {
         boolean selected = profile.id().equals(selectedInstanceId);
+        boolean launching = profile.id().equals(launchingProfileId);
+        boolean failed = profile.id().equals(lastFailedProfileId);
+        boolean neverPlayed = profile.lastPlayedTime().isEmpty();
+
         VBox card = new VBox(10);
-        card.setPrefWidth(248);
+        card.setPrefWidth(252);
         card.setUserData(profile.id());
         card.getStyleClass().addAll("instance-card",
                 accentClass(profile.loaderType()));
         if (selected) {
             card.getStyleClass().add("instance-card-selected");
         }
-        boolean launching = profile.id().equals(launchingProfileId);
         if (launching) {
             card.getStyleClass().add("instance-card-launching");
         }
+        if (failed && !launching) {
+            card.getStyleClass().add("instance-card-error");
+        }
+        if (neverPlayed) {
+            card.getStyleClass().add("instance-card-never");
+        }
+        hoverLift(card, -2);
 
         // Обложка: кастомная картинка 16:9 или тёмный градиент
         // с логотипом загрузчика; в углу — папка и настройки (hover)
@@ -1199,21 +1356,28 @@ public class MainView {
         name.setMaxWidth(Double.MAX_VALUE);
         name.setTooltip(new Tooltip(profile.name()));
 
-        // Бейдж версии и модов: [Fabric 1.21.4 • 12 модов]
+        // Строка метаданных: версия Minecraft + загрузчик + моды
         Label badge = new Label(cardSubLine(profile));
         badge.getStyleClass().add("instance-badge");
 
         // Дата последнего запуска — мелкий серый текст
         Label played = new Label(cardPlayedLine(profile));
-        played.getStyleClass().add("instance-card-sub");
+        played.getStyleClass().add("instance-card-played");
+        played.setTextOverrun(OverrunStyle.ELLIPSIS);
+        played.setMaxWidth(Double.MAX_VALUE);
 
-        VBox titles = new VBox(5, name, badge, played);
+        VBox titles = new VBox(6, name, badge, played);
         card.getChildren().add(titles);
 
-        Button play = new Button(
-                launching ? launchingStatusText
-                        : Lang.tr("button.play").toUpperCase());
+        boolean retry = failed && !launching;
+        String playText = launching ? launchingStatusText
+                : retry ? Lang.tr("card.retry").toUpperCase()
+                : "\u25B6  " + Lang.tr("button.play").toUpperCase();
+        Button play = new Button(playText);
         play.getStyleClass().add("card-play");
+        if (retry) {
+            play.getStyleClass().add("card-play-retry");
+        }
         play.setMaxWidth(Double.MAX_VALUE);
         play.setDisable(versionPlayInFlight || launching);
         play.setOnAction(e -> {
@@ -1235,7 +1399,38 @@ public class MainView {
                 selectInstance(profile.id());
             }
         });
+        // Контекстное меню правым кликом: Node не имеет setContextMenu
+        // (свойство объявлено на Control), поэтому показываем вручную
+        ContextMenu contextMenu = buildInstanceContextMenu(profile);
+        card.setOnContextMenuRequested(e -> {
+            contextMenu.show(card, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
         return card;
+    }
+
+    /**
+     * Контекстное меню карточки сборки (правый клик): настройки,
+     * папка игры, смена иконки и удаление.
+     */
+    private ContextMenu buildInstanceContextMenu(ModdedProfile profile) {
+        MenuItem edit = new MenuItem("\u2699  " + Lang.tr("context.edit"));
+        edit.setOnAction(e -> onEditProfile(profile));
+
+        MenuItem folder = new MenuItem("\u2750  " + Lang.tr("button.folder"));
+        folder.setOnAction(e -> onOpenProfileFolder(profile));
+
+        MenuItem icon = new MenuItem("\uD83D\uDDBC  "
+                + Lang.tr("instance.icon.change"));
+        icon.setOnAction(e -> changeInstanceIcon(profile));
+
+        MenuItem delete = new MenuItem("\u2716  " + Lang.tr("context.delete"));
+        delete.getStyleClass().add("menu-item-danger");
+        delete.setOnAction(e -> onDeleteProfile(profile));
+
+        ContextMenu menu = new ContextMenu(edit, folder, icon,
+                new SeparatorMenuItem(), delete);
+        return menu;
     }
 
     /**
@@ -1246,8 +1441,8 @@ public class MainView {
      */
     private javafx.scene.Node buildInstanceBanner(ModdedProfile profile) {
         StackPane banner = new StackPane();
-        banner.setPrefHeight(126);
-        banner.setMaxHeight(126);
+        banner.setPrefHeight(148);
+        banner.setMaxHeight(148);
         banner.getStyleClass().addAll("instance-banner",
                 accentClass(profile.loaderType()));
 
@@ -1412,10 +1607,11 @@ public class MainView {
         text.getStyleClass().add("add-instance-text");
         VBox card = new VBox(6, plus, text);
         card.setAlignment(Pos.CENTER);
-        card.setPrefWidth(248);
+        card.setPrefWidth(252);
         card.setMinHeight(190);
         card.getStyleClass().add("add-instance-card");
         card.setCursor(javafx.scene.Cursor.HAND);
+        hoverLift(card, -2);
         card.setOnMouseClicked(e -> onNewInstance());
         return card;
     }
@@ -2085,16 +2281,21 @@ public class MainView {
     /** Вид «Сборки от Админа»: фильтры слева, карточки, поиск и краш-плашка. */
     private VBox buildServerView() {
         serverModeLabel = new Label();
-        serverModeLabel.getStyleClass().add("settings-value");
+        serverModeLabel.getStyleClass().add("page-subtitle");
 
-        // Заголовочная строка: источник, счётчик, поиск, кнопка обновления
+        // --- Заголовок страницы: «Каталог» + источник + счётчик ---
+        Label title = new Label(Lang.tr("nav.catalog"));
+        title.getStyleClass().add("title-label");
         serverCountLabel = new Label();
         serverCountLabel.getStyleClass().add("store-count");
+        HBox titleRow = new HBox(12, title, serverModeLabel, serverCountLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
 
+        // Поиск + кнопка обновления
         serverSearchField = new TextField();
         serverSearchField.setPromptText(Lang.tr("server.builds.search.prompt"));
         serverSearchField.getStyleClass().add("search-field");
-        serverSearchField.setPrefWidth(280);
+        serverSearchField.setPrefWidth(320);
         serverSearchField.textProperty().addListener((obs, old, val) -> {
             serverSearchText = val == null ? "" : val.trim().toLowerCase();
             renderServerBuilds();
@@ -2108,13 +2309,13 @@ public class MainView {
             refreshServerBuildsView();
         });
 
-        Region headerSpacer = new Region();
-        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        HBox header = new HBox(12, serverModeLabel, serverCountLabel,
-                headerSpacer, serverSearchField, refresh);
-        header.setAlignment(Pos.CENTER_LEFT);
+        Region topSpacer = new Region();
+        HBox.setHgrow(topSpacer, Priority.ALWAYS);
+        HBox topRow = new HBox(14, titleRow, topSpacer, serverSearchField,
+                refresh);
+        topRow.setAlignment(Pos.CENTER_LEFT);
 
-        // --- Левая колонка фильтров ---
+        // --- Боковая навигация: сортировка + фильтры ---
         serverSortCombo = new ComboBox<>();
         serverSortCombo.getItems().addAll(
                 Lang.tr("server.builds.sort.recommended"),
@@ -2125,20 +2326,30 @@ public class MainView {
         serverSortCombo.valueProperty().addListener(
                 (obs, old, val) -> renderServerBuilds());
 
-        Label mcTitle = filterTitle("server.builds.filters.mc");
+        Label sortTitle = new Label(
+                Lang.tr("server.builds.filters.sort").toUpperCase());
+        sortTitle.getStyleClass().add("side-nav-title");
+
+        Label mcTitle = new Label(
+                Lang.tr("server.builds.filters.mc").toUpperCase());
+        mcTitle.getStyleClass().add("side-nav-title");
         serverMcChips = new HBox(6);
         serverMcChips.getStyleClass().add("filter-row");
         serverMcChipGroup = new ToggleGroup();
 
-        Label loaderTitle = filterTitle("server.builds.filters.loader");
-        serverLoaderBox = new VBox(6);
+        Label loaderTitle = new Label(
+                Lang.tr("server.builds.filters.loader").toUpperCase());
+        loaderTitle.getStyleClass().add("side-nav-title");
+        serverLoaderBox = new VBox(4);
 
-        VBox filters = new VBox(10, filterTitle("server.builds.filters.sort"),
-                serverSortCombo, mcTitle, serverMcChips, loaderTitle,
-                serverLoaderBox);
-        filters.getStyleClass().add("store-filters");
-        filters.setPrefWidth(232);
-        filters.setPadding(new Insets(4, 12, 12, 4));
+        Region navSpacer = new Region();
+        VBox.setVgrow(navSpacer, Priority.ALWAYS);
+        VBox filters = new VBox(2, sortTitle, serverSortCombo, mcTitle,
+                serverMcChips, loaderTitle, serverLoaderBox, navSpacer);
+        filters.getStyleClass().add("side-nav");
+        filters.setPrefWidth(216);
+        filters.setMinWidth(216);
+        filters.setPadding(new Insets(6, 4, 10, 4));
         VBox.setVgrow(filters, Priority.NEVER);
 
         // --- Сетка карточек ---
@@ -2161,19 +2372,13 @@ public class MainView {
         serverCrashBar.setVisible(false);
         serverCrashBar.setManaged(false);
 
-        HBox content = new HBox(14, filters, scroll);
+        HBox content = new HBox(20, filters, scroll);
         HBox.setHgrow(scroll, Priority.ALWAYS);
 
-        VBox view = new VBox(10, header, content, serverCrashBar);
-        view.setPadding(new Insets(16));
+        VBox view = new VBox(16, topRow, content, serverCrashBar);
+        view.setPadding(new Insets(18, 24, 18, 24));
         VBox.setVgrow(view, Priority.ALWAYS);
         return view;
-    }
-
-    private Label filterTitle(String key) {
-        Label title = new Label(Lang.tr(key));
-        title.getStyleClass().add("filter-title");
-        return title;
     }
 
     private void updateServerModeLabel() {
@@ -2429,6 +2634,7 @@ public class MainView {
         VBox card = new VBox(8);
         card.getStyleClass().add("pack-card");
         card.setPrefWidth(300);
+        hoverLift(card, -2);
 
         // Баннер: пер-загрузочный градиент + крупное имя + бейдж версии
         Label bannerTitle = new Label(summary.displayName());
@@ -2453,10 +2659,7 @@ public class MainView {
         mcChip.getStyleClass().add("type-badge-snapshot");
         chips.getChildren().addAll(loaderChip, mcChip);
 
-        Label name = new Label(summary.displayName());
-        name.getStyleClass().add("pack-name");
-
-        VBox body = new VBox(6, chips, name);
+        VBox body = new VBox(6, chips);
         if (summary.description() != null && !summary.description().isBlank()) {
             Label description = new Label(summary.description());
             description.getStyleClass().add("pack-desc");
@@ -3327,6 +3530,7 @@ public class MainView {
         // Попытка запуска сразу блокирует все кнопки «Играть»
         // (до обновления по терминальному колбэку)
         versionPlayInFlight = true;
+        lastFailedProfileId = null;
         setLaunchStatus(profile.id(), Lang.tr("launch.verifying"));
         statusLabel.setText(Lang.tr("launch.verify.status", profile.name()));
         if (account.isElyBy()) {
@@ -3365,6 +3569,7 @@ public class MainView {
                                         + report.category() + ", exit "
                                         + report.exitCode() + ")");
                                 Platform.runLater(() -> {
+                                    lastFailedProfileId = profile.id();
                                     refreshLaunchButtons();
                                     showServerCrashBar(profile, report);
                                     CrashWindow.show(owner, report);
@@ -3376,6 +3581,7 @@ public class MainView {
                                 LOG.warning(() -> "Launch failed: "
                                         + profile.versionId() + " — " + error);
                                 Platform.runLater(() -> {
+                                    lastFailedProfileId = profile.id();
                                     refreshLaunchButtons();
                                     UiErrors.fail(statusLabel, owner, error,
                                             Lang.tr("launch.launch.failed.title"),
@@ -3387,6 +3593,7 @@ public class MainView {
             }
         };
         launchTask.setOnFailed(e -> {
+            lastFailedProfileId = profile.id();
             refreshLaunchButtons();
             Throwable cause = launchTask.getException();
             LOG.log(Level.WARNING, "Launch task failed: "
@@ -3424,9 +3631,12 @@ public class MainView {
                 statusLabel.setText(
                         Lang.tr("launch.starting", profile.name()));
             }
-            case RUNNING ->
+            case RUNNING -> {
+                // Игра успешно стартовала — ошибка прошлой попытки снята
+                lastFailedProfileId = null;
                 statusLabel.setText(Lang.tr("launch.running",
                         profile.versionId(), profile.name()));
+            }
         }
     }
 

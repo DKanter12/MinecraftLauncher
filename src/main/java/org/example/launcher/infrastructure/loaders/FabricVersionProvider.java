@@ -69,20 +69,8 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
                 .GET()
                 .build();
 
-        String body;
-        try {
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new IOException("Fabric meta returned HTTP "
-                        + response.statusCode() + " for MC " + minecraftVersion);
-            }
-            body = response.body();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while fetching Fabric versions", e);
-        }
-
+        String body = sendWithRetry(request,
+                "Fabric versions for MC " + minecraftVersion);
         List<ModLoaderVersion> versions = parseVersions(body, minecraftVersion);
         if (versions.isEmpty()) {
             throw new IOException("No Fabric Loader versions found for MC "
@@ -98,20 +86,45 @@ public class FabricVersionProvider implements ModLoaderVersionProvider {
                 .GET()
                 .build();
 
-        String body;
-        try {
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new IOException("Fabric meta returned HTTP "
-                        + response.statusCode() + " for the game version list");
-            }
-            body = response.body();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while fetching Fabric game versions", e);
-        }
+        String body = sendWithRetry(request, "Fabric game version list");
         return parseGameVersions(body);
+    }
+
+    /**
+     * Отправляет запрос с одной повторной попыткой при transient-сбоях
+     * сети (таймаут, обрыв соединения): Fabric meta иногда отвечает
+     * дольше обычного — без ретрая импорт падал целиком.
+     */
+    private String sendWithRetry(HttpRequest request, String action)
+            throws IOException {
+        IOException last = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            if (attempt > 1) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(
+                            "Interrupted while fetching " + action, e);
+                }
+            }
+            try {
+                HttpResponse<String> response = httpClient.send(request,
+                        HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() != 200) {
+                    throw new IOException("Fabric meta returned HTTP "
+                            + response.statusCode() + " for " + action);
+                }
+                return response.body();
+            } catch (java.net.ConnectException
+                    | java.net.http.HttpTimeoutException e) {
+                last = e;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while fetching " + action, e);
+            }
+        }
+        throw new IOException("Failed to fetch " + action, last);
     }
 
     /**

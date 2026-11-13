@@ -140,6 +140,7 @@ public final class InstanceSettingsDialog extends Stage {
                 (obs, old, val) -> validateSave(saveButton));
 
         VBox content = new VBox(10, tabRow, tabContent, bottom);
+        content.getStyleClass().add("window-dark");
         content.setPadding(new Insets(16));
         content.setPrefWidth(480);
 
