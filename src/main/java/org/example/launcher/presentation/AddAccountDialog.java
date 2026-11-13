@@ -65,22 +65,23 @@ public class AddAccountDialog extends Stage {
         headerRow.setAlignment(Pos.CENTER_RIGHT);
 
         // --- Карточки-выбора типа (Radio Cards) ---
+        // Компактные чипы «иконка + название»; длинная подпись выбранного
+        // типа показывается мелкой строкой под ними
         ToggleGroup typeGroup = new ToggleGroup();
+        String offlineSub = Lang.tr("account.card.offline.sub");
+        String elySub = Lang.tr("account.card.ely.sub");
         ToggleButton offlineToggle = typeCard(typeGroup, "\uD83D\uDC64",
-                Lang.tr("account.card.offline.title"),
-                Lang.tr("account.card.offline.sub"));
+                Lang.tr("account.card.offline.title"), null);
         offlineToggle.setSelected(true);
-        ToggleButton elyToggle = typeCard(typeGroup, "\uD83E\uDD8A",
+        ToggleButton elyToggle = typeCard(typeGroup, "E",
                 Lang.tr("account.card.ely.title"),
-                Lang.tr("account.card.ely.sub"));
-        // Две карточки по половине ширины формы: длинные подписи
-        // переносятся, окно остаётся компактным
-        for (ToggleButton card : new ToggleButton[]{offlineToggle, elyToggle}) {
-            card.setPrefWidth(206);
-            card.setMaxWidth(206);
-        }
+                "account-card-icon-ely");
         HBox typeRow = new HBox(8, offlineToggle, elyToggle);
         typeRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label typeHint = new Label(offlineSub);
+        typeHint.getStyleClass().add("account-card-subtitle");
+        typeHint.setWrapText(true);
 
         // --- Панель Offline ---
         Label offlineNameTitle = new Label(Lang.tr("account.name"));
@@ -121,6 +122,7 @@ public class AddAccountDialog extends Stage {
                 return;
             }
             selectedType = isOffline ? Type.OFFLINE : Type.ELY_BY;
+            typeHint.setText(isOffline ? offlineSub : elySub);
             offlineBox.setVisible(isOffline);
             offlineBox.setManaged(isOffline);
             elyBox.setVisible(!isOffline);
@@ -172,14 +174,14 @@ public class AddAccountDialog extends Stage {
         buttons.setAlignment(Pos.CENTER_RIGHT);
         buttons.setPadding(new Insets(16, 0, 0, 0));
 
-        VBox content = new VBox(12, headerRow, typeRow, offlineBox,
-                elyBox, errorLabel, buttons);
-        content.setPrefWidth(420);
+        VBox content = new VBox(12, headerRow, typeRow, typeHint,
+                offlineBox, elyBox, errorLabel, buttons);
+        content.setPrefWidth(340);
 
         VBox card = new VBox(content);
         card.getStyleClass().add("modal-card");
-        card.setPrefWidth(436);
-        card.setMaxWidth(436);
+        card.setPrefWidth(368);
+        card.setMaxWidth(368);
 
         // Карточка — всё содержимое окна; тень (из CSS) рисуется поверх
         // прозрачного фона
@@ -208,29 +210,24 @@ public class AddAccountDialog extends Stage {
         updateActionButton();
     }
 
-    /** Карточка-выбор (Radio Card): иконка-бейдж + название + подсказка. */
+    /** Карточка-выбор (Radio Card): компактный чип «иконка + название». */
     private static ToggleButton typeCard(ToggleGroup group, String glyph,
-                                         String title, String subtitle) {
+                                         String title, String iconStyleClass) {
         Label icon = new Label(glyph);
         icon.getStyleClass().add("account-card-icon");
+        if (iconStyleClass != null) {
+            icon.getStyleClass().add(iconStyleClass);
+        }
 
         Label titleLbl = new Label(title);
         titleLbl.getStyleClass().add("account-card-title");
 
-        Label subLbl = new Label(subtitle);
-        subLbl.getStyleClass().add("account-card-subtitle");
-        subLbl.setWrapText(true);
-
-        VBox text = new VBox(2, titleLbl, subLbl);
-        text.setAlignment(Pos.CENTER_LEFT);
-
-        HBox row = new HBox(10, icon, text);
+        HBox row = new HBox(8, icon, titleLbl);
         row.setAlignment(Pos.CENTER_LEFT);
 
         ToggleButton card = new ToggleButton();
         card.setGraphic(row);
         card.setText("");
-        card.setMaxWidth(Double.MAX_VALUE);
         card.getStyleClass().add("account-card");
         card.setToggleGroup(group);
         return card;

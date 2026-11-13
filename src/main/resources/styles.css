@@ -282,7 +282,7 @@
    активная — зелёная подсветка с рамкой */
 .nav-item {
     -fx-background-color: #1B2028;
-    -fx-text-fill: #C2CAD5;
+    -fx-text-fill: #F0F3F6;
     -fx-font-size: 13px;
     -fx-font-weight: 600;
     -fx-background-radius: 10;
@@ -296,7 +296,21 @@
 .nav-item:hover {
     -fx-background-color: #222833;
     -fx-border-color: #475263;
+    -fx-text-fill: #FFFFFF;
+}
+
+/* Видимое название фильтра — Label внутри графики кнопки
+   (GRAPHIC_ONLY), поэтому красим его отдельно */
+.nav-item .label {
     -fx-text-fill: #F0F3F6;
+}
+
+.nav-item:hover .label {
+    -fx-text-fill: #FFFFFF;
+}
+
+.nav-item:selected .label {
+    -fx-text-fill: #10C58B;
 }
 
 .nav-item:selected,
@@ -353,7 +367,7 @@
 
 .filter-button {
     -fx-background-color: #1B2028;
-    -fx-text-fill: #929BAA;
+    -fx-text-fill: #F0F3F6;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 999;
@@ -409,7 +423,7 @@
 }
 
 .store-loader-check {
-    -fx-text-fill: #929BAA;
+    -fx-text-fill: #F0F3F6;
 }
 
 /* ============================ Instance cards ============================ */
@@ -1044,7 +1058,7 @@
 /* ============================ Check box ============================ */
 
 .check-box {
-    -fx-text-fill: #929BAA;
+    -fx-text-fill: #F0F3F6;
     -fx-font-size: 12px;
     -fx-cursor: hand;
 }
@@ -2044,6 +2058,21 @@
     -fx-background-radius: 999;
     -fx-text-alignment: center;
     -fx-background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Иконка Ely.by: буква E на приглушённом зелёном градиенте */
+.account-card-icon-ely {
+    -fx-text-fill: #06251A;
+    -fx-font-size: 17px;
+    -fx-font-weight: 900;
+    -fx-background-color: linear-gradient(to bottom right,
+            #3EDFAF 0%,
+            #10C58B 45%,
+            #0A6B4D 80%,
+            #12B57F 100%);
+    -fx-border-color: rgba(16, 197, 139, 0.55);
+    -fx-border-width: 1;
+    -fx-border-radius: 999;
 }
 
 .account-card-title {
