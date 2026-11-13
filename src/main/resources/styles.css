@@ -1693,6 +1693,28 @@
     -fx-padding: 2 8 2 8;
 }
 
+/* Метка «Скоро»: нейтральная пилюля; бандл не кликается */
+.bundle-badge-soon {
+    -fx-text-fill: #929BAA;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-color: rgba(43, 50, 61, 0.60);
+    -fx-background-radius: 999;
+    -fx-border-color: #2B323D;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 2 8 2 8;
+}
+
+.bundle-card-soon {
+    -fx-cursor: default;
+}
+
+.bundle-card-soon:hover {
+    -fx-border-color: #2B323D;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.30), 10, 0, 0, 4);
+}
+
 /* ============================ Game version badges ============================ */
 
 .loader-badge-vanilla {

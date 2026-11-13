@@ -808,12 +808,17 @@ public class MainView {
         Label loaderBadge = new Label(loader.displayName());
         loaderBadge.getStyleClass().add("bundle-badge");
 
+        // Бандл ещё в разработке: нейтральная метка «Скоро»,
+        // карточка не кликается
+        Label soonBadge = new Label(Lang.tr("create.bundle.soon"));
+        soonBadge.getStyleClass().add("bundle-badge-soon");
+
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 
-        // Шапка карточки: иконка + название + бейдж загрузчика справа
+        // Шапка карточки: иконка + название + бейдж загрузчика + «Скоро»
         HBox header = new HBox(10, iconLabel, name, headerSpacer,
-                loaderBadge);
+                loaderBadge, soonBadge);
         header.setAlignment(Pos.CENTER_LEFT);
 
         Label description = new Label(Lang.tr(descKey));
@@ -821,13 +826,10 @@ public class MainView {
         description.setWrapText(true);
 
         VBox card = new VBox(10, header, description);
-        card.getStyleClass().add("bundle-card");
+        card.getStyleClass().addAll("bundle-card", "bundle-card-soon");
         card.setPrefWidth(300);
         card.setPadding(new Insets(16));
         card.setMaxWidth(Double.MAX_VALUE);
-        card.setCursor(javafx.scene.Cursor.HAND);
-        hoverLift(card, -2);
-        card.setOnMouseClicked(e -> onNewInstance(loader));
         return card;
     }
 

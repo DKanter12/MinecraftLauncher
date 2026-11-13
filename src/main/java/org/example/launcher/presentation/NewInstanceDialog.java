@@ -25,6 +25,7 @@ import javafx.scene.SnapshotParameters;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -84,9 +85,11 @@ public class NewInstanceDialog extends Stage {
     private final List<MinecraftVersion> manifestVersions;
 
     private final ToggleGroup loaderGroup = new ToggleGroup();
-    private final HBox loaderChips = new HBox(6);
+    // Чипы в FlowPane: при нехватке ширины переносятся на следующую
+    // строку, а не обрезаются до «F...»
+    private final FlowPane loaderChips = new FlowPane(6, 6);
     private final ToggleGroup categoryGroup = new ToggleGroup();
-    private final HBox categoryChips = new HBox(6);
+    private final FlowPane categoryChips = new FlowPane(6, 6);
     private final ListView<MinecraftVersion> versionList = new ListView<>();
     private final ComboBox<ModLoaderVersion> loaderCombo = new ComboBox<>();
     private final TextField nameField = new TextField();
@@ -631,7 +634,7 @@ public class NewInstanceDialog extends Stage {
                 && mc != null && mc.id().equals(value.minecraftVersion());
     }
 
-    private static void updateChipStyles(HBox chips) {
+    private static void updateChipStyles(javafx.scene.layout.Pane chips) {
         for (var node : chips.getChildren()) {
             if (node instanceof ToggleButton btn) {
                 if (btn.isSelected()) {

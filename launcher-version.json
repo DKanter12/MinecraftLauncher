@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "notes": "Первый публичный релиз PACKCRAFT Launcher: библиотека сборок, каталог, импорт .mrpack, аккаунты Ely.by и офлайн.",
+  "package": {
+    "url": "https://github.com/DKanter12/MinecraftLauncher/releases/download/v1.0.0/launcher-win64.zip",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "size": 0
+  }
+}
