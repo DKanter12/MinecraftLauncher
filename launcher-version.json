@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "notes": "Первый публичный релиз MDD Launcher: библиотека сборок, каталог, импорт .mrpack, аккаунты Ely.by и офлайн.",
+  "version": "1.1",
+  "notes": "Улучшение визуала лаунчера и добавление функционала",
   "package": {
     "url": "https://github.com/DKanter12/MinecraftLauncher/releases/download/v1.0.0/launcher-win64.zip",
     "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
