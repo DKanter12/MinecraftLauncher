@@ -1,0 +1,212 @@
+package org.example.launcher.presentation;
+
+import java.util.Locale;
+
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+
+import org.example.launcher.infrastructure.download.DownloadResult;
+import org.example.launcher.infrastructure.download.DownloadTask;
+import org.example.launcher.infrastructure.download.InstallationProgress;
+import org.example.launcher.infrastructure.download.InstallationResult;
+import org.example.launcher.i18n.Lang;
+
+/**
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі РїСЂРѕРіСЂРµСЃСЃР° СѓСЃС‚Р°РЅРѕРІРєРё РІРµСЂСЃРёРё Minecraft.
+ * <p>
+ * Р РµР°Р»РёР·СѓРµС‚ {@link InstallationProgress} РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ РѕР±РЅРѕРІР»РµРЅРёР№ РѕС‚
+ * СѓСЃС‚Р°РЅРѕРІС‰РёРєР° Рё РїРѕРєР°Р·С‹РІР°РµС‚ РїРѕР»РѕСЃСѓ РїСЂРѕРіСЂРµСЃСЃР°, С‚РµРєСѓС‰РёР№ С„Р°Р№Р» Рё СЃС‚Р°С‚РёСЃС‚РёРєСѓ.
+ */
+public class InstallProgressDialog extends Stage implements InstallationProgress {
+
+    private final ProgressBar progressBar;
+    /** Р‘Р°Р№С‚РѕРІС‹Р№ РїСЂРѕРіСЂРµСЃСЃ (РјРѕР¶РµС‚ РЅРµ РґРѕР№С‚Рё РґРѕ РєРѕРЅС†Р° РїСЂРё РѕС€РёР±РєР°С… СЃРєР°С‡РёРІР°РЅРёСЏ). */
+    private final ProgressBar byteBar;
+    private final Label fileLabel;
+    private final Label categoryLabel;
+    private final Label statsLabel;
+    private final Label bytesLabel;
+    private final Label statusLabel;
+    private final Button closeButton;
+
+    private int totalTasks;
+    private int completedTasks;
+    private int downloadedCount;
+    private int skippedCount;
+    private int failedCount;
+    private long totalBytes;
+    private long downloadedBytes;
+
+    public InstallProgressDialog(Stage owner) {
+        initStyle(StageStyle.UTILITY);
+        initModality(Modality.APPLICATION_MODAL);
+        initOwner(owner);
+        setResizable(false);
+        setTitle(Lang.tr("install.title"));
+
+        progressBar = new ProgressBar(0);
+        progressBar.setPrefWidth(420);
+        progressBar.setPrefHeight(22);
+
+        byteBar = new ProgressBar(0);
+        byteBar.setPrefWidth(420);
+        byteBar.setPrefHeight(10);
+        byteBar.setVisible(false);
+
+        categoryLabel = new Label(Lang.tr("install.preparing"));
+        categoryLabel.getStyleClass().add("install-category");
+
+        fileLabel = new Label("");
+        fileLabel.getStyleClass().add("install-file");
+        fileLabel.setWrapText(true);
+        fileLabel.setMaxWidth(420);
+
+        statsLabel = new Label("");
+        statsLabel.getStyleClass().add("install-stats");
+
+        bytesLabel = new Label("");
+        bytesLabel.getStyleClass().add("install-stats");
+        bytesLabel.setVisible(false);
+
+        statusLabel = new Label(Lang.tr("install.initializing"));
+        statusLabel.getStyleClass().add("install-status");
+
+        closeButton = new Button(Lang.tr("button.close"));
+        closeButton.getStyleClass().add("install-close-button");
+        closeButton.setDisable(true);
+        closeButton.setOnAction(e -> close());
+
+        VBox content = new VBox(12);
+        content.getStyleClass().add("window-dark");
+        content.setAlignment(Pos.CENTER_LEFT);
+        content.setPadding(new Insets(24));
+        content.getChildren().addAll(
+                statusLabel,
+                progressBar,
+                byteBar,
+                categoryLabel,
+                fileLabel,
+                statsLabel,
+                bytesLabel,
+                closeButton);
+
+        Scene scene = new Scene(content, 480, 260);
+        ThemeManager.apply(scene);
+        setScene(scene);
+        AppIcon.apply(this);
+    }
+
+    @Override
+    public void onStart(int totalTasks, long totalBytes) {
+        this.totalTasks = totalTasks;
+        this.completedTasks = 0;
+        this.downloadedCount = 0;
+        this.skippedCount = 0;
+        this.failedCount = 0;
+        this.totalBytes = totalBytes;
+        this.downloadedBytes = 0;
+        boolean withBytes = totalBytes > 0;
+
+        Platform.runLater(() -> {
+            statusLabel.setText(Lang.tr("install.files", totalTasks));
+            progressBar.setProgress(0);
+            byteBar.setVisible(withBytes);
+            bytesLabel.setVisible(withBytes);
+            updateStats();
+        });
+    }
+
+    @Override
+    public void onFileStart(int taskIndex, DownloadTask task) {
+        Platform.runLater(() -> {
+            categoryLabel.setText(Lang.tr("install.row",
+                    task.category(), taskIndex + 1, totalTasks));
+            fileLabel.setText(task.name());
+        });
+    }
+
+    @Override
+    public void onFileComplete(int taskIndex, DownloadResult result) {
+        completedTasks++;
+        if (result.isDownloaded()) {
+            downloadedCount++;
+            downloadedBytes += Math.max(0, result.bytesDownloaded());
+        } else if (result.isSkipped()) {
+            skippedCount++;
+            // СѓР¶Рµ Р±С‹Р» РЅР° РґРёСЃРєРµ: СѓС‡РёС‚С‹РІР°РµРј РµРіРѕ СЂР°Р·РјРµСЂ РІ Р±Р°Р№С‚РѕРІРѕРј РїСЂРѕРіСЂРµСЃСЃРµ
+            downloadedBytes += Math.max(0, result.task().expectedSize());
+        } else {
+            failedCount++;
+        }
+
+        Platform.runLater(() -> {
+            double progress = (double) completedTasks / totalTasks;
+            progressBar.setProgress(progress);
+            if (totalBytes > 0) {
+                byteBar.setProgress(Math.min(1.0,
+                        downloadedBytes / (double) totalBytes));
+                updateStats();
+            }
+        });
+    }
+
+    @Override
+    public void onComplete(InstallationResult result) {
+        Platform.runLater(() -> {
+            progressBar.setProgress(1.0);
+            byteBar.setProgress(1.0);
+            if (result.isSuccess()) {
+                statusLabel.setText(Lang.tr("install.complete"));
+                statusLabel.setStyle("-fx-text-fill: #10B981;");
+            } else {
+                statusLabel.setText(
+                        Lang.tr("install.errors", result.failed()));
+                statusLabel.setStyle("-fx-text-fill: #FB7185;");
+            }
+            categoryLabel.setText(Lang.tr("install.summary",
+                    result.downloaded(), result.skipped(), result.failed(),
+                    result.totalTasks(),
+                    formatBytes(result.totalBytesDownloaded())));
+            fileLabel.setText("");
+            closeButton.setDisable(false);
+        });
+    }
+
+    private void updateStats() {
+        statsLabel.setText(Lang.tr("install.stats",
+                downloadedCount, skippedCount, failedCount));
+        if (totalBytes > 0) {
+            bytesLabel.setText(Lang.tr("install.bytes",
+                    formatBytes(Math.min(downloadedBytes, totalBytes)),
+                    formatBytes(totalBytes)));
+        }
+    }
+
+    private static final long BYTES_PER_KB = 1024L;
+    private static final long BYTES_PER_MB = BYTES_PER_KB * 1024L;
+    private static final long BYTES_PER_GB = BYTES_PER_MB * 1024L;
+
+    private static String formatBytes(long bytes) {
+        if (bytes < BYTES_PER_KB) {
+            return bytes + " B";
+        }
+        if (bytes < BYTES_PER_MB) {
+            return (bytes / BYTES_PER_KB) + " " + Lang.tr("unit.kb");
+        }
+        if (bytes < BYTES_PER_GB) {
+            return String.format(Locale.ROOT, "%.1f %s",
+                    bytes / (double) BYTES_PER_MB, Lang.tr("unit.mb"));
+        }
+        return String.format(Locale.ROOT, "%.2f %s",
+                bytes / (double) BYTES_PER_GB, Lang.tr("unit.gb"));
+    }
+}

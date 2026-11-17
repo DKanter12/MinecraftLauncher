@@ -1,0 +1,70 @@
+package org.example.launcher.presentation;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+
+import org.example.launcher.i18n.Lang;
+
+/**
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі СЃ С‚РµРєСЃС‚РѕРј РѕС€РёР±РєРё Р·Р°РїСѓСЃРєР° Рё РєРЅРѕРїРєРѕР№ РєРѕРїРёСЂРѕРІР°РЅРёСЏ.
+ */
+public class ErrorDialog extends Stage {
+
+    public ErrorDialog(Stage owner, String title, String message) {
+        initStyle(StageStyle.UTILITY);
+        initModality(Modality.APPLICATION_MODAL);
+        initOwner(owner);
+        setResizable(false);
+        setTitle(title);
+
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("error-title");
+
+        TextArea textArea = new TextArea(message);
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefWidth(560);
+        textArea.setPrefHeight(200);
+        textArea.getStyleClass().add("error-text");
+
+        Button copyButton = new Button(Lang.tr("button.copy"));
+        copyButton.getStyleClass().add("install-close-button");
+        copyButton.setOnAction(e -> {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(message);
+            Clipboard.getSystemClipboard().setContent(content);
+            copyButton.setText(Lang.tr("button.copied"));
+        });
+
+        Button closeButton = new Button(Lang.tr("button.close"));
+        closeButton.getStyleClass().add("install-close-button");
+        closeButton.setOnAction(e -> close());
+
+        VBox content = new VBox(12);
+        content.setAlignment(Pos.CENTER_LEFT);
+        content.setPadding(new Insets(24));
+        content.getChildren().addAll(titleLabel, textArea, copyButton, closeButton);
+        VBox.setVgrow(textArea, Priority.ALWAYS);
+
+        Scene scene = new Scene(content, 620, 340);
+        ThemeManager.apply(scene);
+        setScene(scene);
+        AppIcon.apply(this);
+    }
+
+    public static void show(Stage owner, String title, String message) {
+        ErrorDialog dialog = new ErrorDialog(owner, title, message);
+        dialog.showAndWait();
+    }
+}

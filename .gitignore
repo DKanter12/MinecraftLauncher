@@ -40,3 +40,5 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### Runtime session logs ###
+run_log*.txt

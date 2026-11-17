@@ -5,7 +5,8 @@ import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
-import org.example.launcher.service.LauncherPreferences;
+import org.example.launcher.domain.model.LauncherPreferences;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 
 /**
  * Язык интерфейса лаунчера: английский и русский. Все видимые пользователю
@@ -111,22 +112,29 @@ public final class Lang {
     }
 
     /** Восстанавливает сохранённый язык (или системный по умолчанию). */
-    public static void load(LauncherPreferences preferences) {
+    public static void load(FileSettingsRepository preferences) {
         if (preferences == null) {
             setLanguage(systemDefault());
             return;
         }
         try {
-            setLanguage(preferences.getLanguage()
-                    .map(Language::fromCode)
-                    .orElseGet(Lang::systemDefault));
+            String code = preferences.loadPreferences().language();
+            setLanguage(code != null && !code.isBlank()
+                    ? Language.fromCode(code)
+                    : systemDefault());
         } catch (IOException e) {
             setLanguage(systemDefault());
         }
     }
 
-    /** Сохраняет текущий язык. */
-    public static void save(LauncherPreferences preferences) throws IOException {
-        preferences.setLanguage(current.code());
+    /** Сохраняет текущий язык, не трогая остальные настройки. */
+    public static void save(FileSettingsRepository preferences) throws IOException {
+        var saved = preferences.loadPreferences();
+        preferences.savePreferences(new LauncherPreferences(
+                saved.lastSelectedVersion(), saved.lastSelectedAccount(),
+                saved.buildsGitUrl(), saved.buildsSourceMode(),
+                saved.yandexDiskLink(), saved.buildsToken(),
+                current.code(), saved.theme(),
+                saved.customThemeBg(), saved.customThemeAccent()));
     }
 }
