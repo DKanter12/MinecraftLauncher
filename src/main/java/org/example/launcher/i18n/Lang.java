@@ -134,6 +134,7 @@ public final class Lang {
                 saved.lastSelectedVersion(), saved.lastSelectedAccount(),
                 saved.buildsGitUrl(), saved.buildsSourceMode(),
                 saved.yandexDiskLink(), saved.buildsToken(),
-                current.code()));
+                current.code(), saved.theme(),
+                saved.customThemeBg(), saved.customThemeAccent()));
     }
 }

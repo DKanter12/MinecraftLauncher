@@ -13,11 +13,14 @@ public record LauncherPreferences(
         String buildsSourceMode,
         String yandexDiskLink,
         String buildsToken,
-        String language) {
+        String language,
+        String theme,
+        String customThemeBg,
+        String customThemeAccent) {
 
     /** Пустые настройки (первый запуск). */
     public static LauncherPreferences empty() {
         return new LauncherPreferences(null, null, null, null, null, null,
-                null);
+                null, null, null, null);
     }
 }

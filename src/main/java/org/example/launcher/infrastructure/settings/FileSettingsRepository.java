@@ -63,7 +63,10 @@ public class FileSettingsRepository {
                 str(root, "buildsSourceMode"),
                 str(root, "yandexDiskLink"),
                 str(root, "buildsToken"),
-                str(root, "language"));
+                str(root, "language"),
+                str(root, "theme"),
+                str(root, "customThemeBg"),
+                str(root, "customThemeAccent"));
     }
 
     /**
@@ -80,6 +83,10 @@ public class FileSettingsRepository {
         root.addProperty("yandexDiskLink", orEmpty(prefs.yandexDiskLink()));
         root.addProperty("buildsToken", orEmpty(prefs.buildsToken()));
         root.addProperty("language", orEmpty(prefs.language()));
+        root.addProperty("theme", orEmpty(prefs.theme()));
+        root.addProperty("customThemeBg", orEmpty(prefs.customThemeBg()));
+        root.addProperty("customThemeAccent",
+                orEmpty(prefs.customThemeAccent()));
         writeRoot(root);
     }
 

@@ -19,6 +19,8 @@ import org.example.launcher.domain.model.ModLoaderType;
  * @param loaderType      загрузчик, под который предназначена сборка
  * @param minecraftVersion версия Minecraft сборки
  * @param loaderVersion   версия загрузчика сборки
+ * @param iconUrl         прямая ссылка на icon.png сборки либо null,
+ *                        если источнику про иконку ничего не известно
  */
 public record BuildSummary(
         String id,
@@ -27,7 +29,8 @@ public record BuildSummary(
         String description,
         ModLoaderType loaderType,
         String minecraftVersion,
-        String loaderVersion) {
+        String loaderVersion,
+        String iconUrl) {
 
     public BuildSummary {
         if (id == null || id.isBlank()) {
@@ -45,6 +48,14 @@ public record BuildSummary(
         if (minecraftVersion == null || minecraftVersion.isBlank()) {
             throw new IllegalArgumentException("minecraftVersion must not be blank");
         }
+    }
+
+    /** Компактная форма без иконки (iconUrl = null). */
+    public BuildSummary(String id, String version, String displayName,
+                        String description, ModLoaderType loaderType,
+                        String minecraftVersion, String loaderVersion) {
+        this(id, version, displayName, description, loaderType,
+                minecraftVersion, loaderVersion, null);
     }
 
     /** @return краткая строка для строк списка, напр. {@code Better Survival 1.1.0 · Fabric 1.21.4}. */

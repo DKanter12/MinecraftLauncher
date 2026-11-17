@@ -10,8 +10,12 @@ import java.util.logging.Logger;
 
 import org.example.launcher.application.launch.LauncherWindowManager;
 import org.example.launcher.core.LauncherContext;
+import org.example.launcher.domain.model.LauncherPreferences;
 import org.example.launcher.i18n.Lang;
+import org.example.launcher.infrastructure.filesystem.GameDirectory;
+import org.example.launcher.infrastructure.settings.FileSettingsRepository;
 import org.example.launcher.presentation.MainView;
+import org.example.launcher.presentation.ThemeManager;
 
 /**
  * Точка входа JavaFX-приложения Minecraft Launcher.
@@ -58,15 +62,16 @@ public class LauncherApplication extends Application {
         LauncherContext context = LauncherCompositionRoot.createContext(windows);
         Lang.load(context.preferences());
 
+        // Тема: до создания первой сцены, чтобы окно открылось уже в ней.
+        ThemeManager.initialize(GameDirectory.defaultDirectory().root());
+        applySavedTheme(context.preferences());
+
         MainView view = new MainView(context);
 
         Scene scene = new Scene(view.getView(), 1180, 680);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
 
-        stage.setTitle("Minecraft Launcher");
+        stage.setTitle("MDD Launcher");
         stage.setMinWidth(900);
         stage.setMinHeight(520);
         stage.setScene(scene);
@@ -74,10 +79,36 @@ public class LauncherApplication extends Application {
         stage.setOnCloseRequest(e -> Platform.exit());
         stage.show();
 
+        // Отладочная вёрстка-проверка: -Dmdd.snapshot=<файл> снимет
+        // интерфейс в PNG и закроет приложение (см. DebugSnapshot).
+        String snapshotPath = System.getProperty("mdd.snapshot");
+        if (snapshotPath != null) {
+            org.example.launcher.presentation.DebugSnapshot.schedule(
+                    scene.getRoot(), snapshotPath, 12000);
+        }
+
         view.loadVersions();
     }
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    /** Восстанавливает сохранённую тему до открытия окна. */
+    private static void applySavedTheme(FileSettingsRepository prefs) {
+        try {
+            LauncherPreferences saved = prefs.loadPreferences();
+            boolean custom = "CUSTOM".equalsIgnoreCase(saved.theme())
+                    && saved.customThemeBg() != null
+                    && saved.customThemeAccent() != null;
+            if (custom) {
+                ThemeManager.setCustom(saved.customThemeBg(),
+                        saved.customThemeAccent());
+            } else {
+                ThemeManager.setStandard();
+            }
+        } catch (Exception e) {
+            ThemeManager.setStandard();
+        }
     }
 }

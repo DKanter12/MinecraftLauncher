@@ -191,8 +191,7 @@ public class AddAccountDialog extends Stage {
 
         Scene scene = new Scene(overlay);
         scene.setFill(Color.TRANSPARENT);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) scene.getStylesheets().add(css.toExternalForm());
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
 

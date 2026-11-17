@@ -25,13 +25,13 @@ import org.example.launcher.i18n.Lang;
 import org.example.launcher.infrastructure.server.BuildSummary;
 
 /**
- * Выбор версии Minecraft для сборки, в которой он не указан.
+ * Р’С‹Р±РѕСЂ РІРµСЂСЃРёРё Minecraft РґР»СЏ СЃР±РѕСЂРєРё, РІ РєРѕС‚РѕСЂРѕР№ РѕРЅ РЅРµ СѓРєР°Р·Р°РЅ.
  *
- * <p>Случай «сборка с администратором опубликовала на Яндекс Диске
- * папку с модами без {@code build.json}»: из имени и содержимого
- * версию игры надёжно вычислить нельзя, а установка и запуск без неё
- * невозможны. Диалог предлагает все известные версии из файла версий
- * лаунчера (релизы первыми) и подставляет выбор в установку.</p>
+ * <p>РЎР»СѓС‡Р°Р№ В«СЃР±РѕСЂРєР° СЃ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј РѕРїСѓР±Р»РёРєРѕРІР°Р»Р° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ
+ * РїР°РїРєСѓ СЃ РјРѕРґР°РјРё Р±РµР· {@code build.json}В»: РёР· РёРјРµРЅРё Рё СЃРѕРґРµСЂР¶РёРјРѕРіРѕ
+ * РІРµСЂСЃРёСЋ РёРіСЂС‹ РЅР°РґС‘Р¶РЅРѕ РІС‹С‡РёСЃР»РёС‚СЊ РЅРµР»СЊР·СЏ, Р° СѓСЃС‚Р°РЅРѕРІРєР° Рё Р·Р°РїСѓСЃРє Р±РµР· РЅРµС‘
+ * РЅРµРІРѕР·РјРѕР¶РЅС‹. Р”РёР°Р»РѕРі РїСЂРµРґР»Р°РіР°РµС‚ РІСЃРµ РёР·РІРµСЃС‚РЅС‹Рµ РІРµСЂСЃРёРё РёР· С„Р°Р№Р»Р° РІРµСЂСЃРёР№
+ * Р»Р°СѓРЅС‡РµСЂР° (СЂРµР»РёР·С‹ РїРµСЂРІС‹РјРё) Рё РїРѕРґСЃС‚Р°РІР»СЏРµС‚ РІС‹Р±РѕСЂ РІ СѓСЃС‚Р°РЅРѕРІРєСѓ.</p>
  */
 public class ChooseMcVersionDialog extends Stage {
 
@@ -50,7 +50,7 @@ public class ChooseMcVersionDialog extends Stage {
             setY(owner.getY());
         }
 
-        // --- Шапка: заголовок + круглый крестик ---
+        // --- РЁР°РїРєР°: Р·Р°РіРѕР»РѕРІРѕРє + РєСЂСѓРіР»С‹Р№ РєСЂРµСЃС‚РёРє ---
         Label headerTitle = new Label(Lang.tr("install.pickmc.title"));
         headerTitle.getStyleClass().add("modal-title");
         Button closeButton = new Button("\u2715");
@@ -67,7 +67,7 @@ public class ChooseMcVersionDialog extends Stage {
         description.getStyleClass().add("import-text");
         description.setWrapText(true);
 
-        // Комбобокс версий: «1.21.11 — релиз», релиз выбран по умолчанию
+        // РљРѕРјР±РѕР±РѕРєСЃ РІРµСЂСЃРёР№: В«1.21.11 вЂ” СЂРµР»РёР·В», СЂРµР»РёР· РІС‹Р±СЂР°РЅ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
         combo.getStyleClass().add("search-field");
         combo.setMaxWidth(Double.MAX_VALUE);
         combo.setConverter(new javafx.util.StringConverter<>() {
@@ -85,8 +85,8 @@ public class ChooseMcVersionDialog extends Stage {
             }
         });
 
-        // Релизы первыми — это выбор 90% пользователей; внутри групп
-        // сохраняется порядок манифеста (от новых к старым)
+        // Р РµР»РёР·С‹ РїРµСЂРІС‹РјРё вЂ” СЌС‚Рѕ РІС‹Р±РѕСЂ 90% РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№; РІРЅСѓС‚СЂРё РіСЂСѓРїРї
+        // СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ РїРѕСЂСЏРґРѕРє РјР°РЅРёС„РµСЃС‚Р° (РѕС‚ РЅРѕРІС‹С… Рє СЃС‚Р°СЂС‹Рј)
         List<MinecraftVersion> releases = versions.stream()
                 .filter(v -> v.type() == VersionType.RELEASE)
                 .toList();
@@ -133,7 +133,7 @@ public class ChooseMcVersionDialog extends Stage {
         card.getStyleClass().add("modal-card");
         card.setMaxWidth(420);
 
-        // Glassmorphism backdrop: общий каркас с NewInstanceDialog
+        // Glassmorphism backdrop: РѕР±С‰РёР№ РєР°СЂРєР°СЃ СЃ NewInstanceDialog
         StackPane overlay = new StackPane();
         NewInstanceDialog.addBlurBackdrop(overlay, owner);
         HBox centered = new HBox(card);
@@ -143,18 +143,15 @@ public class ChooseMcVersionDialog extends Stage {
         Scene scene = new Scene(overlay, owner != null ? owner.getWidth()
                 : 480, owner != null ? owner.getHeight() : 420);
         scene.setFill(Color.TRANSPARENT);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
     }
 
-    /** Выбранная в диалоге версия игры ({@code null} — отмена). */
+    /** Р’С‹Р±СЂР°РЅРЅР°СЏ РІ РґРёР°Р»РѕРіРµ РІРµСЂСЃРёСЏ РёРіСЂС‹ ({@code null} вЂ” РѕС‚РјРµРЅР°). */
     private MinecraftVersion chosen;
 
-    /** Локализованный тип версии для подписи комбо-пункта. */
+    /** Р›РѕРєР°Р»РёР·РѕРІР°РЅРЅС‹Р№ С‚РёРї РІРµСЂСЃРёРё РґР»СЏ РїРѕРґРїРёСЃРё РєРѕРјР±Рѕ-РїСѓРЅРєС‚Р°. */
     private static String typeLabel(VersionType type) {
         if (type == VersionType.RELEASE) {
             return Lang.tr("new.type.release");
@@ -172,9 +169,9 @@ public class ChooseMcVersionDialog extends Stage {
     }
 
     /**
-     * Показывает диалог.
+     * РџРѕРєР°Р·С‹РІР°РµС‚ РґРёР°Р»РѕРі.
      *
-     * @return выбранная версия игры, либо {@code null} при отмене
+     * @return РІС‹Р±СЂР°РЅРЅР°СЏ РІРµСЂСЃРёСЏ РёРіСЂС‹, Р»РёР±Рѕ {@code null} РїСЂРё РѕС‚РјРµРЅРµ
      */
     public static MinecraftVersion show(Stage owner, BuildSummary summary,
                                         List<MinecraftVersion> versions) {

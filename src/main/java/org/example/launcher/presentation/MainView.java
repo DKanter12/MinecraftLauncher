@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -33,6 +34,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContextMenu;
@@ -44,6 +46,7 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -195,8 +198,11 @@ public class MainView {
     private VBox instancesView;
     private VBox profilesView;
     private VBox profilesBox;
-    private VBox settingsView;
+    private ScrollPane settingsView;
     private ComboBox<Lang.Language> languageCombo;
+    private ColorPicker themeBgPicker;
+    private ColorPicker themeAccentPicker;
+    private HBox themePreview;
     private TextField javaPathField;
     private Label serverSessionLabel;
     private Label footerVersionLabel;
@@ -246,6 +252,10 @@ public class MainView {
     private final List<CheckBox> serverLoaderChecks = new ArrayList<>();
     private FlowPane serverCardsFlow;
 
+    // Секция «Рекомендуем»: рисуется только когда источник даёт
+    // рекомендованные сборки (метаданные рекомендаций — будущая функция)
+    private VBox serverRecommendedBox;
+
     // Плашка Crash Analyzer: последний краш запуска (живёт до закрытия)
     private VBox serverCrashBar;
     private Label serverCrashTextLabel;
@@ -258,6 +268,9 @@ public class MainView {
     private ComboBox<GameProfile> accountCombo;
     private Button addAccountButton;
     private ImageView avatarView;
+    private Label avatarPlaceholder;
+    private Label offlineAccountBadge;
+    private StackPane avatarRing;
     private GameProfile selectedProfile;
     private boolean suppressSelectionListener = false;
     private Timer elyRefreshTimer;
@@ -357,17 +370,35 @@ public class MainView {
         root.setTop(buildHeader());
         root.setCenter(viewStack);
         root.setBottom(buildFooter());
-        showView(View.INSTANCES);
+        showView(initialView());
+    }
+
+    /**
+     * Стартовая вкладка: «Библиотека», либо вкладка из системного
+     * свойства mdd.openView (для проверки интерфейса, напр.
+     * -Dmdd.openView=SERVER). Некорректное значение игнорируется.
+     */
+    private static View initialView() {
+        String flag = System.getProperty("mdd.openView");
+        if (flag != null) {
+            try {
+                return View.valueOf(flag.trim().toUpperCase(
+                        java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                // неизвестная вкладка — открываем библиотеку
+            }
+        }
+        return View.INSTANCES;
     }
 
     // --- Верхний Header: бренд, вкладки, профиль игрока ---
 
     /** Собирает Header: бренд, глобальные вкладки, профиль игрока. */
     private HBox buildHeader() {
-        // Бренд-блок: зелёный градиентный брикет с литерой P + название
-        Label brandIcon = new Label("P");
+        // Бренд-блок: зелёный градиентный брикет с литерой M + название
+        Label brandIcon = new Label("M");
         brandIcon.getStyleClass().add("brand-icon");
-        Label brandName = new Label("PACKCRAFT");
+        Label brandName = new Label("MDD");
         brandName.getStyleClass().add("brand-name");
         Label brandSub = new Label("LAUNCHER");
         brandSub.getStyleClass().add("brand-sub");
@@ -427,8 +458,8 @@ public class MainView {
                     if (val != null) {
                         selectedProfile = val;
                         saveLastSelectedAccount(val.name());
-                        updateAvatar(val);
                     }
+                    updateAvatar(val);
                 });
         accountCombo.setTooltip(new Tooltip(Lang.tr("account.tip")));
         // Строки списка: правый клик показывает «Использовать / Удалить», как в большинстве лаунчеров
@@ -509,8 +540,21 @@ public class MainView {
         addAccountButton.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
 
         // Аватар в кольце-подложке (скругление и рамка — через CSS)
-        StackPane avatarRing = new StackPane(avatarView);
+        // Под кольцом — силуэт-заглушка (когда у аккаунта нет скина),
+        // в углу — значок офлайн-аккаунта
+        avatarPlaceholder = new Label("\uD83D\uDC64");
+        avatarPlaceholder.getStyleClass().add("avatar-placeholder");
+        offlineAccountBadge = new Label("\uD83C\uDFE0");
+        offlineAccountBadge.getStyleClass().add("avatar-offline-badge");
+        offlineAccountBadge.setTooltip(new Tooltip(
+                Lang.tr("account.offline.tip")));
+        StackPane.setAlignment(offlineAccountBadge, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(offlineAccountBadge, new Insets(0, -4, -4, 0));
+        avatarRing = new StackPane(avatarPlaceholder, avatarView,
+                offlineAccountBadge);
         avatarRing.getStyleClass().add("avatar-ring");
+        offlineAccountBadge.setVisible(false);
+        offlineAccountBadge.setManaged(false);
 
         HBox accountBox = new HBox(8, avatarRing, accountCombo,
                 addAccountButton, accountArrow);
@@ -1714,16 +1758,9 @@ public class MainView {
         addAccount.getStyleClass().add("quick-select-button");
         addAccount.setTooltip(new Tooltip(Lang.tr("account.add.tip")));
         addAccount.setOnAction(e -> onAddAccount());
-        Button server = new Button(Lang.tr("server.button"));
-        server.getStyleClass().add("quick-select-button");
-        server.setTooltip(new Tooltip(Lang.tr("profiles.server.tip")));
-        server.setOnAction(e -> {
-            onServerLogin();
-            refreshProfilesView();
-        });
         Label manageHint = new Label(Lang.tr("profiles.hint.top"));
         manageHint.getStyleClass().add("quick-select-label");
-        HBox buttons = new HBox(8, addAccount, server, manageHint);
+        HBox buttons = new HBox(8, addAccount, manageHint);
         buttons.setAlignment(Pos.CENTER_LEFT);
 
         profilesBox = new VBox(10);
@@ -1860,7 +1897,7 @@ public class MainView {
     //  Вид настроек: папки, переопределение Java, сессия сервера
     // ------------------------------------------------------------------
 
-    private VBox buildSettingsView() {
+    private ScrollPane buildSettingsView() {
         Label languageTitle = new Label(Lang.tr("settings.language"));
         languageTitle.getStyleClass().add("section-title");
         languageCombo = new ComboBox<>();
@@ -1874,6 +1911,46 @@ public class MainView {
         VBox languageBox = new VBox(6, languageTitle, languageCombo,
                 languageHint);
         languageBox.getStyleClass().add("settings-group");
+
+        Label themeTitle = new Label(Lang.tr("settings.theme"));
+        themeTitle.getStyleClass().add("section-title");
+
+        Label bgCaption = new Label(Lang.tr("settings.theme.bg"));
+        bgCaption.getStyleClass().add("quick-select-label");
+        themeBgPicker = new ColorPicker(javafx.scene.paint.Color
+                .web(pickValue(ThemeManager.customBg(),
+                        ThemeManager.DEFAULT_BG)));
+        Label accentCaption = new Label(Lang.tr("settings.theme.accent"));
+        accentCaption.getStyleClass().add("quick-select-label");
+        themeAccentPicker = new ColorPicker(javafx.scene.paint.Color
+                .web(pickValue(ThemeManager.customAccent(),
+                        ThemeManager.DEFAULT_ACCENT)));
+
+        VBox bgPickBox = new VBox(4, bgCaption, themeBgPicker);
+        bgPickBox.setPrefWidth(220);
+        VBox accentPickBox = new VBox(4, accentCaption, themeAccentPicker);
+        accentPickBox.setPrefWidth(220);
+        HBox pickersRow = new HBox(16, bgPickBox, accentPickBox);
+        pickersRow.getStyleClass().add("theme-pickers");
+
+        themePreview = new HBox(6);
+        themePreview.getStyleClass().add("theme-preview");
+        refreshThemePreview();
+
+        Button applyTheme = new Button(Lang.tr("settings.theme.apply"));
+        applyTheme.getStyleClass().add("quick-select-button");
+        applyTheme.setOnAction(e -> onApplyCustomTheme());
+        Button resetTheme = new Button(Lang.tr("settings.theme.standard"));
+        resetTheme.getStyleClass().add("quick-select-button");
+        resetTheme.setOnAction(e -> onResetTheme());
+        HBox themeButtons = new HBox(8, applyTheme, resetTheme);
+
+        Label themeHint = new Label(Lang.tr("settings.theme.hint"));
+        themeHint.getStyleClass().add("quick-select-label");
+        themeHint.setWrapText(true);
+        VBox themeBox = new VBox(8, themeTitle, pickersRow, themePreview,
+                themeButtons, themeHint);
+        themeBox.getStyleClass().add("settings-group");
 
         Label dirTitle = new Label(Lang.tr("settings.dir"));
         dirTitle.getStyleClass().add("section-title");
@@ -2014,9 +2091,15 @@ public class MainView {
         VBox aboutBox = new VBox(6, aboutTitle, about);
         aboutBox.getStyleClass().add("settings-group");
 
-        VBox view = new VBox(12, languageBox, dirBox, javaBox, serverBox,
-                updatesBox, buildsBox, aboutBox);
-        view.setPadding(new Insets(16));
+        VBox content = new VBox(12, languageBox, themeBox, dirBox, javaBox,
+                serverBox, updatesBox, buildsBox, aboutBox);
+        content.setPadding(new Insets(16));
+
+        // Настройки не помещаются на низких окнах — даём прокрутку
+        ScrollPane view = new ScrollPane(content);
+        view.setFitToWidth(true);
+        view.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        view.getStyleClass().add("cards-scroll");
         VBox.setVgrow(view, Priority.ALWAYS);
         return view;
     }
@@ -2027,6 +2110,9 @@ public class MainView {
                 && languageCombo.getSelectionModel().getSelectedItem()
                         != Lang.getLanguage()) {
             languageCombo.getSelectionModel().select(Lang.getLanguage());
+        }
+        if (themePreview != null) {
+            refreshThemePreview();
         }
         serverSessionLabel.setText(serverSession == null
                 ? Lang.tr("settings.server.offline")
@@ -2162,6 +2248,91 @@ public class MainView {
                 Lang.tr("settings.language.done", selected.displayName()));
     }
 
+    /** Красиво превращает Color в hex-строку #RRGGBB. */
+    private static String toHexColor(javafx.scene.paint.Color c) {
+        if (c == null) {
+            return null;
+        }
+        return String.format("#%02X%02X%02X",
+                (int) Math.round(c.getRed() * 255),
+                (int) Math.round(c.getGreen() * 255),
+                (int) Math.round(c.getBlue() * 255));
+    }
+
+    private static String pickValue(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
+    }
+
+    /** Перестраивает полоску превью из текущих цветов пикеров. */
+    private void refreshThemePreview() {
+        if (themePreview == null || themeBgPicker == null
+                || themeAccentPicker == null) {
+            return;
+        }
+        themePreview.getChildren().clear();
+        List<String> swatches = ThemeManager.previewSwatches(
+                toHexColor(themeBgPicker.getValue()),
+                toHexColor(themeAccentPicker.getValue()));
+        for (int i = 0; i < swatches.size(); i++) {
+            javafx.scene.layout.Region swatch =
+                    new javafx.scene.layout.Region();
+            swatch.getStyleClass().add("theme-swatch");
+            swatch.setStyle("-fx-background-color: " + swatches.get(i)
+                    + "; -fx-background-radius: 8;");
+            if (i == swatches.size() - 1) {
+                // Акцентный образец — чуть шире, это «главный» цвет
+                swatch.getStyleClass().add("theme-swatch-accent");
+            }
+            themePreview.getChildren().add(swatch);
+        }
+    }
+
+    /** Применяет тему из выбранных цветов и сохраняет её. */
+    private void onApplyCustomTheme() {
+        String bg = toHexColor(themeBgPicker.getValue());
+        String accent = toHexColor(themeAccentPicker.getValue());
+        ThemeManager.setCustom(bg, accent);
+        refreshThemePreview();
+        try {
+            LauncherPreferences saved = preferences.loadPreferences();
+            preferences.savePreferences(new LauncherPreferences(
+                    saved.lastSelectedVersion(),
+                    saved.lastSelectedAccount(),
+                    saved.buildsGitUrl(), saved.buildsSourceMode(),
+                    saved.yandexDiskLink(), saved.buildsToken(),
+                    saved.language(), "CUSTOM", bg, accent));
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("settings.save.failed", e.getMessage()));
+            return;
+        }
+        statusLabel.setText(Lang.tr("settings.theme.done"));
+    }
+
+    /** Возвращает стандартную тему и очищает пользовательские цвета. */
+    private void onResetTheme() {
+        ThemeManager.setStandard();
+        themeBgPicker.setValue(javafx.scene.paint.Color
+                .web(ThemeManager.DEFAULT_BG));
+        themeAccentPicker.setValue(javafx.scene.paint.Color
+                .web(ThemeManager.DEFAULT_ACCENT));
+        refreshThemePreview();
+        try {
+            LauncherPreferences saved = preferences.loadPreferences();
+            preferences.savePreferences(new LauncherPreferences(
+                    saved.lastSelectedVersion(),
+                    saved.lastSelectedAccount(),
+                    saved.buildsGitUrl(), saved.buildsSourceMode(),
+                    saved.yandexDiskLink(), saved.buildsToken(),
+                    saved.language(), "STANDARD", null, null));
+        } catch (IOException e) {
+            statusLabel.setText(
+                    Lang.tr("settings.save.failed", e.getMessage()));
+            return;
+        }
+        statusLabel.setText(Lang.tr("settings.theme.standard.done"));
+    }
+
     private void onBrowseJava() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(Lang.tr("settings.browse.title"));
@@ -2225,7 +2396,8 @@ public class MainView {
                     saved.lastSelectedVersion(),
                     saved.lastSelectedAccount(),
                     gitUrl, mode.name(), yandexLink, token,
-                    saved.language()));
+                    saved.language(), saved.theme(),
+                    saved.customThemeBg(), saved.customThemeAccent()));
             applyDistributionSettings();
             updateBuildsStatus();
             statusLabel.setText(Lang.tr("settings.builds.relogin",
@@ -2288,41 +2460,51 @@ public class MainView {
     /** Вид «Сборки от Админа»: фильтры слева, карточки, поиск и краш-плашка. */
     private VBox buildServerView() {
         serverModeLabel = new Label();
-        serverModeLabel.getStyleClass().add("page-subtitle");
+        serverModeLabel.getStyleClass().add("catalog-source-line");
 
-        // --- Заголовок страницы: «Каталог» + источник + счётчик ---
-        Label title = new Label(Lang.tr("nav.catalog"));
-        title.getStyleClass().add("title-label");
-        serverCountLabel = new Label();
-        serverCountLabel.getStyleClass().add("store-count");
-        HBox titleRow = new HBox(12, title, serverModeLabel, serverCountLabel);
-        titleRow.setAlignment(Pos.CENTER_LEFT);
+        // --- Hero-заголовок: «Открой новые миры» + поиск + обновление ---
+        Label title = new Label(Lang.tr("catalog.hero.title"));
+        title.getStyleClass().add("catalog-hero-title");
+        Label subtitle = new Label(Lang.tr("catalog.hero.subtitle"));
+        subtitle.getStyleClass().add("catalog-hero-subtitle");
+        subtitle.setWrapText(true);
+        VBox heroText = new VBox(4, title, subtitle);
+        HBox.setHgrow(heroText, Priority.ALWAYS);
+        heroText.setMaxWidth(Double.MAX_VALUE);
 
-        // Поиск + кнопка обновления
         serverSearchField = new TextField();
         serverSearchField.setPromptText(Lang.tr("server.builds.search.prompt"));
         serverSearchField.getStyleClass().add("search-field");
-        serverSearchField.setPrefWidth(320);
+        serverSearchField.setPrefWidth(300);
         serverSearchField.textProperty().addListener((obs, old, val) -> {
             serverSearchText = val == null ? "" : val.trim().toLowerCase();
             renderServerBuilds();
         });
 
-        Button refresh = new Button(Lang.tr("server.builds.refresh"));
-        refresh.getStyleClass().add("quick-select-button");
+        Button refresh = new Button("\u21BB  "
+                + Lang.tr("server.builds.refresh"));
+        refresh.getStyleClass().add("catalog-refresh-button");
         refresh.setTooltip(new Tooltip(Lang.tr("server.builds.refresh.tip")));
         refresh.setOnAction(e -> {
             serverMcFilter = null;
             refreshServerBuildsView();
         });
 
-        Region topSpacer = new Region();
-        HBox.setHgrow(topSpacer, Priority.ALWAYS);
-        HBox topRow = new HBox(14, titleRow, topSpacer, serverSearchField,
-                refresh);
-        topRow.setAlignment(Pos.CENTER_LEFT);
+        Region heroSpacer = new Region();
+        HBox.setHgrow(heroSpacer, Priority.ALWAYS);
+        HBox heroRow = new HBox(16, heroText, serverSearchField, refresh);
+        heroRow.setAlignment(Pos.CENTER_LEFT);
 
-        // --- Боковая навигация: сортировка + фильтры ---
+        // Мета-строка: количество сборок + источник (компактные пилюли)
+        serverCountLabel = new Label();
+        serverCountLabel.getStyleClass().add("store-count");
+        HBox metaRow = new HBox(8, serverCountLabel, serverModeLabel);
+        metaRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox hero = new VBox(10, heroRow, metaRow);
+        hero.getStyleClass().add("catalog-hero");
+
+        // --- Боковая панель фильтров ---
         serverSortCombo = new ComboBox<>();
         serverSortCombo.getItems().addAll(
                 Lang.tr("server.builds.sort.recommended"),
@@ -2342,22 +2524,33 @@ public class MainView {
         mcTitle.getStyleClass().add("side-nav-title");
         serverMcChips = new HBox(6);
         serverMcChips.getStyleClass().add("filter-row");
-        serverMcChipGroup = new ToggleGroup();
 
         Label loaderTitle = new Label(
                 Lang.tr("server.builds.filters.loader").toUpperCase());
         loaderTitle.getStyleClass().add("side-nav-title");
         serverLoaderBox = new VBox(4);
 
+        Button resetFilters = new Button(Lang.tr("catalog.filters.reset"));
+        resetFilters.getStyleClass().add("catalog-reset-button");
+        resetFilters.setMaxWidth(Double.MAX_VALUE);
+        resetFilters.setOnAction(e -> resetServerFilters());
+
         Region navSpacer = new Region();
         VBox.setVgrow(navSpacer, Priority.ALWAYS);
         VBox filters = new VBox(2, sortTitle, serverSortCombo, mcTitle,
-                serverMcChips, loaderTitle, serverLoaderBox, navSpacer);
+                serverMcChips, loaderTitle, serverLoaderBox, navSpacer,
+                resetFilters);
         filters.getStyleClass().add("side-nav");
-        filters.setPrefWidth(216);
-        filters.setMinWidth(216);
-        filters.setPadding(new Insets(6, 4, 10, 4));
+        filters.setPrefWidth(224);
+        filters.setMinWidth(224);
+        filters.setPadding(new Insets(6, 6, 12, 6));
         VBox.setVgrow(filters, Priority.NEVER);
+
+        // --- Секция «Рекомендуем» (появится, когда появятся данные) ---
+        serverRecommendedBox = new VBox(12);
+        serverRecommendedBox.getStyleClass().add("catalog-recommended");
+        serverRecommendedBox.setVisible(false);
+        serverRecommendedBox.setManaged(false);
 
         // --- Сетка карточек ---
         serverBuildsList = new VBox(0);
@@ -2368,7 +2561,8 @@ public class MainView {
         serverCardsFlow.getStyleClass().add("cards-flow");
         serverCardsFlow.getChildren().add(serverBuildsList);
 
-        ScrollPane scroll = new ScrollPane(serverCardsFlow);
+        ScrollPane scroll = new ScrollPane(
+                new VBox(12, serverRecommendedBox, serverCardsFlow));
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.getStyleClass().add("cards-scroll");
@@ -2382,8 +2576,8 @@ public class MainView {
         HBox content = new HBox(20, filters, scroll);
         HBox.setHgrow(scroll, Priority.ALWAYS);
 
-        VBox view = new VBox(16, topRow, content, serverCrashBar);
-        view.setPadding(new Insets(18, 24, 18, 24));
+        VBox view = new VBox(14, hero, content, serverCrashBar);
+        view.setPadding(new Insets(16, 24, 18, 24));
         VBox.setVgrow(view, Priority.ALWAYS);
         return view;
     }
@@ -2399,6 +2593,21 @@ public class MainView {
             case YANDEX -> Lang.tr("settings.builds.yandex");
         };
         serverModeLabel.setText(Lang.tr("server.builds.source", source));
+    }
+
+    /** Название активного источника сборок — для карточек каталога. */
+    private String buildsSourceName() {
+        if (buildsModeCombo == null) {
+            return Lang.tr("settings.builds.local");
+        }
+        DistributionSources.BuildsSource mode = buildsModeCombo
+                .getSelectionModel().getSelectedItem();
+        return switch (mode == null
+                ? DistributionSources.BuildsSource.LOCAL : mode) {
+            case LOCAL -> Lang.tr("settings.builds.local");
+            case GITHUB -> Lang.tr("settings.builds.github");
+            case YANDEX -> Lang.tr("settings.builds.yandex");
+        };
     }
 
     /** Загружает список сборок администратора в фоне и рисует карточки. */
@@ -2417,9 +2626,7 @@ public class MainView {
         LOG.info(() -> "Server builds refresh via "
                 + buildsBackend.getClass().getSimpleName()
                 + ", session present: " + (serverSession != null));
-        showServerBuildsPlaceholder(
-                serverModeLabel == null ? "" : Lang.tr("server.builds.loading"),
-                null);
+        showServerBuildsLoading();
         Task<List<BuildSummary>> task = new Task<>() {
             @Override
             protected List<BuildSummary> call() throws Exception {
@@ -2431,29 +2638,38 @@ public class MainView {
             serverBuilds = task.getValue() == null ? List.of() : task.getValue();
             LOG.info(() -> "Server builds loaded: " + serverBuilds.size());
             refreshServerLoaderChecks();
-            renderServerBuilds();
+            renderServerBuilds(true);
         });
         task.setOnFailed(e -> {
             serverBuildsLoading = false;
             serverBuilds = List.of();
             refreshServerLoaderChecks();
             Throwable cause = task.getException();
-            showServerBuildsPlaceholder(
+            LOG.log(Level.WARNING, "Server builds list failed", cause);
+            showServerBuildsState("\u26A0",
+                    Lang.tr("catalog.state.error.title"),
                     Lang.tr("server.builds.load.failed",
                             cause == null ? "" : cause.getMessage()),
-                    cause);
+                    Lang.tr("catalog.state.error.retry"),
+                    this::refreshServerBuildsView);
         });
         FxTasks.run("server-builds-list", task);
     }
 
-    private void showServerBuildsPlaceholder(String text, Throwable cause) {
-        if (cause != null) {
-            LOG.log(Level.WARNING, "Server builds list failed", cause);
-        }
-        Label label = new Label(text);
-        label.getStyleClass().add("server-builds-placeholder");
-        label.setWrapText(true);
-        serverCardsFlow.getChildren().setAll(label);
+    /** Состояние загрузки каталога: мягкий спиннер по центру. */
+    private void showServerBuildsLoading() {
+        VBox pane = new VBox(12);
+        pane.getStyleClass().add("state-pane");
+        pane.setAlignment(Pos.CENTER);
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.getStyleClass().add("state-spinner");
+        Label text = new Label(Lang.tr("catalog.state.loading"));
+        text.getStyleClass().add("state-title");
+        pane.getChildren().addAll(spinner, text);
+        StackPane state = new StackPane(pane);
+        state.getStyleClass().add("state-wrap");
+        animateViewIn(state);
+        serverCardsFlow.getChildren().setAll(state);
     }
 
     /**
@@ -2512,7 +2728,11 @@ public class MainView {
         List<ToggleButton> chips = new ArrayList<>();
         chips.add(makeServerMcChip(Lang.tr("server.builds.mc.all"), null));
         for (String version : versions) {
-            chips.add(makeServerMcChip(version, version));
+            // Источник не сообщил версию игры — подпись «Не указана»,
+            // без «unknown» в интерфейсе
+            String text = "unknown".equals(version)
+                    ? Lang.tr("catalog.mc.unknown") : version;
+            chips.add(makeServerMcChip(text, version));
         }
         serverMcChips.getChildren().setAll(chips);
         if (serverMcFilter == null) {
@@ -2542,6 +2762,143 @@ public class MainView {
             renderServerBuilds();
         });
         return chip;
+    }
+
+    // ------------------------------------------------------------------
+    //  Каталог: сброс фильтров, состояния, рекомендации
+    // ------------------------------------------------------------------
+
+    /** Полный сброс фильтров каталога к состоянию «показать всё». */
+    private void resetServerFilters() {
+        serverSearchField.clear();
+        serverSearchText = "";
+        serverMcFilter = null;
+        for (CheckBox cb : serverLoaderChecks) {
+            cb.setSelected(false);
+        }
+        if (serverSortCombo != null) {
+            serverSortCombo.getSelectionModel().select(0);
+        }
+        renderServerBuilds();
+    }
+
+    /**
+     * Единая вёрстка состояний каталога: загрузка, ошибка, пусто,
+     * нет совпадений. Кнопка действия — реальный обработчик.
+     */
+    private void showServerBuildsState(String icon, String title,
+            String subtitle, String actionText, Runnable action) {
+        VBox pane = new VBox(10);
+        pane.getStyleClass().add("state-pane");
+        pane.setAlignment(Pos.CENTER);
+
+        Label iconLabel = new Label(icon);
+        iconLabel.getStyleClass().add("state-icon");
+
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("state-title");
+        titleLabel.setWrapText(true);
+        titleLabel.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+
+        VBox text = new VBox(6, titleLabel);
+        if (subtitle != null && !subtitle.isBlank()) {
+            Label sub = new Label(subtitle);
+            sub.getStyleClass().add("state-subtitle");
+            sub.setWrapText(true);
+            sub.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+            sub.setMaxWidth(460);
+            text.getChildren().add(sub);
+        }
+
+        pane.getChildren().addAll(iconLabel, text);
+        if (actionText != null && action != null) {
+            Button actionButton = new Button(actionText);
+            actionButton.getStyleClass().add("state-button");
+            actionButton.setOnAction(e -> action.run());
+            pane.getChildren().add(actionButton);
+        }
+
+        StackPane state = new StackPane(pane);
+        state.getStyleClass().add("state-wrap");
+        animateViewIn(state);
+        serverCardsFlow.getChildren().setAll(state);
+    }
+
+    /**
+     * Сборки для секции «Рекомендуем». Механизма рекомендаций в
+     * источнике данных пока нет, поэтому список пуст и секция не
+     * рисуется: никаких выдуманных сборок. Когда сервер начнёт
+     * отдавать метаданные рекомендаций, верните сюда реальные
+     * сборки — крупные карточки появятся автоматически.
+     */
+    private List<BuildSummary> recommendedServerBuilds() {
+        return List.of();
+    }
+
+    /** Рисует секцию «Рекомендуем», если есть рекомендованные сборки. */
+    private void renderRecommended() {
+        if (serverRecommendedBox == null) {
+            return;
+        }
+        List<BuildSummary> recommended = serverBuilds.isEmpty()
+                ? List.of() : recommendedServerBuilds();
+        if (recommended.isEmpty()) {
+            serverRecommendedBox.setVisible(false);
+            serverRecommendedBox.setManaged(false);
+            serverRecommendedBox.getChildren().clear();
+            return;
+        }
+        Label title = new Label(Lang.tr("catalog.recommended"));
+        title.getStyleClass().add("section-title");
+        HBox cards = new HBox(14);
+        for (BuildSummary summary : recommended) {
+            cards.getChildren().add(buildRecommendedCard(summary));
+        }
+        serverRecommendedBox.getChildren().setAll(title, cards);
+        serverRecommendedBox.setVisible(true);
+        serverRecommendedBox.setManaged(true);
+    }
+
+    /**
+     * Крупная карточка рекомендации: обложка 16:9 с наложением,
+     * название, описание, чипы и кнопка установки.
+     */
+    private VBox buildRecommendedCard(BuildSummary summary) {
+        VBox card = new VBox(0);
+        card.getStyleClass().add("pack-card");
+        card.setPrefWidth(520);
+        hoverLift(card, -2);
+
+        StackPane cover = buildBuildCover(summary, true);
+
+        VBox body = new VBox(8);
+        body.getStyleClass().add("pack-card-body");
+        Label name = new Label(summary.displayName());
+        name.getStyleClass().add("pack-name-title");
+        HBox chips = new HBox(6, loaderChip(summary));
+        Label mcBadge = mcChip(summary);
+        if (mcBadge != null) {
+            chips.getChildren().add(mcBadge);
+        }
+        VBox text = new VBox(6, name, chips);
+        if (summary.description() != null
+                && !summary.description().isBlank()) {
+            Label description = new Label(summary.description());
+            description.getStyleClass().add("pack-desc");
+            description.setWrapText(true);
+            text.getChildren().add(description);
+        }
+        HBox.setHgrow(text, Priority.ALWAYS);
+
+        Button install = new Button(Lang.tr("server.builds.install"));
+        install.getStyleClass().add("pack-install");
+        install.setOnAction(e -> installServerBuild(summary));
+        VBox bottom = new VBox(install);
+        bottom.getStyleClass().add("pack-card-footer");
+
+        body.getChildren().addAll(text, bottom);
+        card.getChildren().addAll(cover, body);
+        return card;
     }
 
     /** Сортировка версий по убыванию (наибольшая первой). */
@@ -2576,20 +2933,37 @@ public class MainView {
     /**
      * Фильтрует и сортирует сборки по текущим настройкам и рисует карточки.
      * Фильтры: поиск по имени/описанию, чип версии Minecraft, чекбоксы
-     * загрузчиков; сортировка: рекомендованные/новые/по имени.
+     * загрузчиков, категории; сортировка: рекомендованные/новые/по имени.
      */
     private void renderServerBuilds() {
+        renderServerBuilds(false);
+    }
+
+    private void renderServerBuilds(boolean animateCards) {
         if (serverCountLabel != null) {
             serverCountLabel.setText(!serverBuilds.isEmpty()
                     ? Lang.tr("server.builds.count", serverBuilds.size())
                     : "");
         }
         rebuildServerMcChips();
+        renderRecommended();
         List<BuildSummary> visible = filteredServerBuilds();
         if (visible.isEmpty()) {
-            showServerBuildsPlaceholder(serverBuilds.isEmpty()
-                    ? Lang.tr("server.builds.empty")
-                    : Lang.tr("server.builds.no.matches"), null);
+            if (serverBuilds.isEmpty()) {
+                // Каталог пуст: источник не настроен или без сборок
+                showServerBuildsState("\u2708",
+                        Lang.tr("catalog.state.empty.title"),
+                        Lang.tr("server.builds.empty"),
+                        Lang.tr("server.builds.refresh"),
+                        this::refreshServerBuildsView);
+            } else {
+                // Есть сборки, но фильтры/поиск ничего не дали
+                showServerBuildsState("\u2315",
+                        Lang.tr("catalog.state.noresults.title"),
+                        Lang.tr("catalog.state.noresults.hint"),
+                        Lang.tr("catalog.filters.reset"),
+                        this::resetServerFilters);
+            }
             return;
         }
         List<VBox> cards = new ArrayList<>();
@@ -2597,6 +2971,25 @@ public class MainView {
             cards.add(buildServerBuildCard(summary));
         }
         serverCardsFlow.getChildren().setAll(cards);
+        if (animateCards) {
+            staggerCardsIn(cards);
+        }
+    }
+
+    /** Плавное каскадное появление карточек (лёгкое, без сдвигов). */
+    private void staggerCardsIn(List<VBox> cards) {
+        int maxStagger = 12;
+        for (int i = 0; i < cards.size() && i < maxStagger; i++) {
+            VBox card = cards.get(i);
+            card.setOpacity(0);
+            FadeTransition fade = new FadeTransition(
+                    javafx.util.Duration.millis(140), card);
+            fade.setFromValue(0);
+            fade.setToValue(1);
+            fade.setDelay(javafx.util.Duration.millis(i * 35));
+            fade.setCycleCount(1);
+            fade.play();
+        }
     }
 
     private List<BuildSummary> filteredServerBuilds() {
@@ -2634,59 +3027,265 @@ public class MainView {
     }
 
     /**
-     * Карточка сборки в стиле магазина: цветной баннер, бейдж версии,
-     * чипы загрузчика и Minecraft, описание и кнопка «Установить».
+     * Карточка сборки: обложка (icon.png из источника, иначе
+     * градиент с названием), чипы загрузчика и Minecraft, название,
+     * описание, источник и версия сборки, кнопка «Установить».
+     * Компактная вертикальная компоновка: все строки по одной,
+     * длинный текст обрезается многоточием.
      */
     private VBox buildServerBuildCard(BuildSummary summary) {
-        VBox card = new VBox(8);
+        VBox card = new VBox(0);
         card.getStyleClass().add("pack-card");
-        card.setPrefWidth(300);
-        hoverLift(card, -2);
+        card.setPrefWidth(288);
+        hoverLift(card, -3);
 
-        // Баннер: пер-загрузочный градиент + крупное имя + бейдж версии
-        Label bannerTitle = new Label(summary.displayName());
-        bannerTitle.getStyleClass().add("pack-banner-title");
-        bannerTitle.setWrapText(true);
-        Label versionBadge = new Label("v" + summary.version());
-        versionBadge.getStyleClass().add("pack-version-badge");
-        StackPane banner = new StackPane(bannerTitle, versionBadge);
-        banner.getStyleClass().addAll("pack-banner", "accent-"
-                + summary.loaderType().name().toLowerCase(
-                        java.util.Locale.ROOT));
-        StackPane.setAlignment(bannerTitle, Pos.CENTER);
-        StackPane.setAlignment(versionBadge, Pos.TOP_RIGHT);
-        banner.setPrefHeight(110);
+        StackPane cover = buildBuildCover(summary, false);
 
-        // Чипы: загрузчик + версия Minecraft
-        HBox chips = new HBox(6);
-        Label loaderChip = new Label(summary.loaderType().displayName());
-        loaderChip.getStyleClass().add("loader-badge-"
-                + summary.loaderType().name().toLowerCase(java.util.Locale.ROOT));
-        Label mcChip = new Label(summary.minecraftVersion());
-        mcChip.getStyleClass().add("type-badge-snapshot");
-        chips.getChildren().addAll(loaderChip, mcChip);
+        VBox body = new VBox(6);
+        body.getStyleClass().add("pack-card-body");
 
-        VBox body = new VBox(6, chips);
-        if (summary.description() != null && !summary.description().isBlank()) {
-            Label description = new Label(summary.description());
+        HBox chips = new HBox(6, loaderChip(summary));
+        Label mcBadge = mcChip(summary);
+        if (mcBadge != null) {
+            chips.getChildren().add(mcBadge);
+        }
+
+        // Название сборки в тексте карточки — независимо от того,
+        // что на обложке (icon.png или название)
+        Label name = new Label(summary.displayName());
+        name.getStyleClass().add("pack-name-title");
+
+        Label description = null;
+        if (summary.description() != null
+                && !summary.description().isBlank()) {
+            description = new Label(summary.description());
             description.getStyleClass().add("pack-desc");
-            description.setWrapText(true);
-            body.getChildren().add(description);
         }
-        if (summary.loaderType() != ModLoaderType.VANILLA) {
-            Label loaderVersion = new Label(Lang.tr(
-                    "server.builds.loader.line", summary.loaderVersion()));
-            loaderVersion.getStyleClass().add("pack-desc");
-            body.getChildren().add(loaderVersion);
-        }
+
+        HBox meta = new HBox(6);
+        Label source = new Label(Lang.tr("catalog.card.source",
+                buildsSourceName()));
+        source.getStyleClass().add("pack-card-source");
+        Region metaSpacer = new Region();
+        HBox.setHgrow(metaSpacer, Priority.ALWAYS);
+        Label buildVersion = new Label("v" + shortVersion(summary.version()));
+        buildVersion.getStyleClass().add("pack-card-version");
+        meta.getChildren().addAll(source, metaSpacer, buildVersion);
 
         Button install = new Button(Lang.tr("server.builds.install"));
         install.getStyleClass().add("pack-install");
         install.setMaxWidth(Double.MAX_VALUE);
         install.setOnAction(e -> installServerBuild(summary));
 
-        card.getChildren().addAll(banner, body, install);
+        body.getChildren().addAll(chips, name);
+        if (description != null) {
+            body.getChildren().add(description);
+        }
+        body.getChildren().addAll(meta, install);
+        card.getChildren().addAll(cover, body);
         return card;
+    }
+
+    /** Чип загрузчика модов (цвет по типу, как на карточках инстансов). */
+    private Label loaderChip(BuildSummary summary) {
+        Label chip = new Label(summary.loaderType().displayName());
+        chip.getStyleClass().add("loader-badge-"
+                + summary.loaderType().name().toLowerCase(
+                        java.util.Locale.ROOT));
+        return chip;
+    }
+
+    /**
+     * Чип версии Minecraft. Для сборок, у которых источник не сообщил
+     * версию игры, чип не рисуется — надписей «unknown» в каталоге нет.
+     */
+    private Label mcChip(BuildSummary summary) {
+        if ("unknown".equals(summary.minecraftVersion())) {
+            return null;
+        }
+        Label chip = new Label("MC " + summary.minecraftVersion());
+        chip.getStyleClass().add("type-badge-snapshot");
+        return chip;
+    }
+
+    /** Кэш обложек сборок: одна загрузка icon.png на ссылку. */
+    private static final java.util.concurrent.ConcurrentHashMap<
+            String, Image> COVER_ICONS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Обложка сборки. Если источник отдал ссылку на icon.png
+     * ({@code BuildSummary#iconUrl}) — рисуем её поверх градиента,
+     * по центру-кропу; ссылка читается в фоне. Пока картинка грузится
+     * или если её нет/не удалось скачать — на градиенте (оттенок
+     * выводится из id сборки, у каждой свой) написано название сборки.
+     */
+    private StackPane buildBuildCover(BuildSummary summary, boolean large) {
+        int hash = Math.abs(summary.id().hashCode());
+        // Гамма 130..219 — изумрудно-бирюзово-синий фирменный диапазон
+        double hue = 130 + (hash % 90);
+        double sat = 0.32 + (hash % 4) * 0.07;
+        javafx.scene.paint.Color top =
+                javafx.scene.paint.Color.hsb(hue, sat, 0.32);
+        javafx.scene.paint.Color bottom =
+                javafx.scene.paint.Color.hsb(hue, sat + 0.08, 0.11);
+        String gradient = String.format(java.util.Locale.ROOT,
+                "-fx-background-color: linear-gradient(to bottom right, "
+                        + "#%02X%02X%02X 0%%, #%02X%02X%02X 100%%);",
+                (int) (top.getRed() * 255),
+                (int) (top.getGreen() * 255),
+                (int) (top.getBlue() * 255),
+                (int) (bottom.getRed() * 255),
+                (int) (bottom.getGreen() * 255),
+                (int) (bottom.getBlue() * 255));
+
+        double height = large ? 170 : 136;
+        double width = (large ? 520 : 288) - 2; // минус граница карточки
+
+        StackPane cover = new StackPane();
+        cover.getStyleClass().add("pack-cover");
+        cover.setPrefHeight(height);
+        cover.setMinHeight(height);
+        cover.setMaxHeight(height);
+        cover.setStyle(gradient);
+        clipTopRounded(cover, 13);
+
+        // Название на обложке: по центру; размер шрифта подбирается
+        // по фактической ширине текста — название всегда заполняет
+        // обложку крупными буквами (до разумного максимума), для
+        // очень длинных имён шрифт плавно ужимается и текст
+        // переносится на вторую строку
+        Label nameOnCover = new Label(summary.displayName());
+        nameOnCover.getStyleClass().add("pack-cover-name");
+        nameOnCover.setAlignment(Pos.CENTER);
+        nameOnCover.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+        nameOnCover.setWrapText(true);
+        nameOnCover.maxWidthProperty().bind(
+                cover.widthProperty().subtract(20));
+        StackPane.setAlignment(nameOnCover, Pos.CENTER);
+        double maxFont = large ? 44 : 32;
+        Runnable fitCoverFont = () -> {
+            double available = cover.getWidth() - 20;
+            if (available <= 0) {
+                return;
+            }
+            String text = summary.displayName();
+            javafx.scene.text.Font probe = javafx.scene.text.Font.font(
+                    nameOnCover.getFont().getFamily(),
+                    javafx.scene.text.FontWeight.EXTRA_BOLD, maxFont);
+            double measured = measureTextWidth(text, probe);
+            double size = measured <= available
+                    ? maxFont
+                    : Math.max(13, maxFont * available / measured);
+            nameOnCover.setFont(javafx.scene.text.Font.font(
+                    probe.getFamily(),
+                    javafx.scene.text.FontWeight.EXTRA_BOLD, size));
+        };
+        cover.widthProperty().addListener((obs, was, now) -> fitCoverFont.run());
+        fitCoverFont.run();
+
+        Label versionBadge = new Label(
+                "v" + shortVersion(summary.version()));
+        versionBadge.getStyleClass().add("pack-version-badge");
+        StackPane.setAlignment(versionBadge, Pos.TOP_RIGHT);
+        StackPane.setMargin(versionBadge, new Insets(8));
+
+        cover.getChildren().addAll(nameOnCover, versionBadge);
+
+        // Реальная обложка из источника: грузится в фоне поверх названия
+        String iconUrl = summary.iconUrl();
+        if (iconUrl != null && !iconUrl.isBlank()) {
+            Image image = COVER_ICONS.computeIfAbsent(iconUrl,
+                    url -> new Image(url, 288, height, false, true, true));
+            if (!image.isError()) {
+                ImageView view = new ImageView(image);
+                view.setFitWidth(width);
+                view.setFitHeight(height);
+                view.setPreserveRatio(false);
+                view.setSmooth(true);
+                Runnable apply = () -> {
+                    if (image.isError()) {
+                        view.setVisible(false);
+                        return;
+                    }
+                    // Кроп по центру под пропорции обложки
+                    double iw = image.getWidth();
+                    double ih = image.getHeight();
+                    if (iw <= 0 || ih <= 0) {
+                        return;
+                    }
+                    double targetRatio = width / height;
+                    double srcRatio = iw / ih;
+                    double vw = srcRatio > targetRatio
+                            ? ih * targetRatio : iw;
+                    double vh = srcRatio > targetRatio
+                            ? ih : iw / targetRatio;
+                    view.setViewport(new javafx.geometry.Rectangle2D(
+                            (iw - vw) / 2, (ih - vh) / 2, vw, vh));
+                    nameOnCover.setVisible(false);
+                };
+                image.progressProperty().addListener((obs, was, progress) -> {
+                    if (progress.doubleValue() >= 1.0) {
+                        apply.run();
+                    }
+                });
+                image.errorProperty().addListener((obs, was, failed) -> {
+                    if (failed) {
+                        apply.run();
+                    }
+                });
+                apply.run();
+                cover.getChildren().add(view);
+            }
+        }
+        return cover;
+    }
+
+    /** Ширина строки в заданном шрифте (для подбора размера текста). */
+    private static double measureTextWidth(String text,
+            javafx.scene.text.Font font) {
+        javafx.scene.text.Text measure = new javafx.scene.text.Text(text);
+        measure.setFont(font);
+        return measure.getLayoutBounds().getWidth();
+    }
+
+    /**
+     * Скругляет верхние углы контейнера обложки (клип по фактическим
+     * размерам), чтобы картинка не выходила за скругление карточки.
+     */
+    private static void clipTopRounded(StackPane cover, double radius) {        javafx.scene.shape.SVGPath clip = new javafx.scene.shape.SVGPath();
+        Runnable reshape = () -> {
+            double width = cover.getWidth();
+            double height = cover.getHeight();
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            clip.setContent("M0 " + radius + " Q0 0 " + radius + " 0 H"
+                    + (width - radius) + " Q" + width + " 0 " + width
+                    + " " + radius + " V" + height + " H0 Z");
+        };
+        cover.widthProperty().addListener((obs, was, now) -> reshape.run());
+        cover.heightProperty().addListener((obs, was, now) -> reshape.run());
+        cover.setClip(clip);
+    }
+
+    /**
+     * Короткая форма версии для компактных мест: у timestamp-версий
+     * вроде 2026.10.04.17.43.40 остаются первые три сегмента; обычные
+     * версии (1.0.0) показываются как есть. Без выдумывания данных —
+     * только аккуратное усечение с многоточием.
+     */
+    private static String shortVersion(String version) {
+        if (version == null) {
+            return "";
+        }
+        String trimmed = version.trim();
+        String[] segments = trimmed.split("\\.");
+        if (segments.length > 3) {
+            return String.join(".",
+                    segments[0], segments[1], segments[2]) + "\u2026";
+        }
+        return trimmed;
     }
 
     /**
@@ -2796,7 +3395,7 @@ public class MainView {
             summary = new BuildSummary(summary.id(), summary.version(),
                     summary.displayName(), summary.description(),
                     summary.loaderType(), mcVersion.id(),
-                    summary.loaderVersion());
+                    summary.loaderVersion(), summary.iconUrl());
         }
         // Показываем пользователю случайный выбор вместо «unknown»:
         // effectiveSummary — effectively-final версия для Task ниже
@@ -3118,7 +3717,8 @@ public class MainView {
                     saved.lastSelectedVersion(), accountName,
                     saved.buildsGitUrl(), saved.buildsSourceMode(),
                     saved.yandexDiskLink(), saved.buildsToken(),
-                    saved.language()));
+                    saved.language(), saved.theme(),
+                    saved.customThemeBg(), saved.customThemeAccent()));
         } catch (IOException e) {
             // Некритично
         }
@@ -3128,10 +3728,23 @@ public class MainView {
 
     private void updateAvatar(GameProfile profile) {
         long requestId = avatarRequestId.incrementAndGet();
-        if (profile == null || profile.skinUrl().isEmpty()) {
+        if (profile == null) {
             avatarView.setVisible(false);
+            avatarPlaceholder.setVisible(false);
+            offlineAccountBadge.setVisible(false);
+            offlineAccountBadge.setManaged(false);
             return;
         }
+        // Значок офлайн-аккаунта (🏠): игра без сервера и авторизации
+        boolean offline = !profile.isElyBy();
+        offlineAccountBadge.setVisible(offline);
+        offlineAccountBadge.setManaged(offline);
+        if (profile.skinUrl().isEmpty()) {
+            avatarView.setVisible(false);
+            avatarPlaceholder.setVisible(true);
+            return;
+        }
+        avatarPlaceholder.setVisible(false);
         skinService.loadAvatarAsync(profile, 64)
                 .thenAccept(optImg -> Platform.runLater(() -> {
                     if (requestId != avatarRequestId.get()) {
@@ -3140,8 +3753,10 @@ public class MainView {
                     if (optImg.isPresent()) {
                         avatarView.setImage(optImg.get());
                         avatarView.setVisible(true);
+                        avatarPlaceholder.setVisible(false);
                     } else if (avatarView.getImage() == null) {
                         avatarView.setVisible(false);
+                        avatarPlaceholder.setVisible(true);
                     }
                 }));
     }

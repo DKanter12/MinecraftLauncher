@@ -23,7 +23,8 @@ class LauncherPreferencesTest {
     private LauncherPreferences full() {
         return new LauncherPreferences("b1.8.1", "Steve",
                 "https://raw.githubusercontent.com/o/r/main/", "YANDEX",
-                "https://disk.yandex.ru/d/abc", "tok", "ru");
+                "https://disk.yandex.ru/d/abc", "tok", "ru", "CUSTOM",
+                "#101216", "#10C58B");
     }
 
     @Test
@@ -51,7 +52,7 @@ class LauncherPreferencesTest {
         FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.savePreferences(new LauncherPreferences("", null, "  ",
-                null, null, null, null));
+                null, null, null, null, null, null, null));
 
         LauncherPreferences loaded = prefs.loadPreferences();
         assertNull(loaded.lastSelectedVersion());
@@ -76,7 +77,7 @@ class LauncherPreferencesTest {
         FileSettingsRepository prefs = new FileSettingsRepository(file);
 
         prefs.savePreferences(new LauncherPreferences("1.21", null, null,
-                null, null, null, null));
+                null, null, null, null, null, null, null));
 
         assertTrue(Files.isRegularFile(file));
         assertEquals("1.21", prefs.loadPreferences().lastSelectedVersion());
@@ -93,7 +94,8 @@ class LauncherPreferencesTest {
         prefs.savePreferences(new LauncherPreferences(
                 saved.lastSelectedVersion(), "Alex", saved.buildsGitUrl(),
                 saved.buildsSourceMode(), saved.yandexDiskLink(),
-                saved.buildsToken(), saved.language()));
+                saved.buildsToken(), saved.language(), saved.theme(),
+                saved.customThemeBg(), saved.customThemeAccent()));
 
         LauncherPreferences loaded = prefs.loadPreferences();
         assertEquals("Alex", loaded.lastSelectedAccount());

@@ -22,12 +22,12 @@ import org.example.launcher.infrastructure.server.UserRole;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальный диалог входа на сервер лаунчера (и выхода из него).
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі РІС…РѕРґР° РЅР° СЃРµСЂРІРµСЂ Р»Р°СѓРЅС‡РµСЂР° (Рё РІС‹С…РѕРґР° РёР· РЅРµРіРѕ).
  *
- * <p>Вход отправляет логин и пароль на сервер один раз — сервер
- * отвечает bearer-токеном и ролью аккаунта; далее используется
- * и хранится только токен. Если сессия уже активна,
- * диалог показывает её и предлагает выйти.</p>
+ * <p>Р’С…РѕРґ РѕС‚РїСЂР°РІР»СЏРµС‚ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ РЅР° СЃРµСЂРІРµСЂ РѕРґРёРЅ СЂР°Р· вЂ” СЃРµСЂРІРµСЂ
+ * РѕС‚РІРµС‡Р°РµС‚ bearer-С‚РѕРєРµРЅРѕРј Рё СЂРѕР»СЊСЋ Р°РєРєР°СѓРЅС‚Р°; РґР°Р»РµРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ
+ * Рё С…СЂР°РЅРёС‚СЃСЏ С‚РѕР»СЊРєРѕ С‚РѕРєРµРЅ. Р•СЃР»Рё СЃРµСЃСЃРёСЏ СѓР¶Рµ Р°РєС‚РёРІРЅР°,
+ * РґРёР°Р»РѕРі РїРѕРєР°Р·С‹РІР°РµС‚ РµС‘ Рё РїСЂРµРґР»Р°РіР°РµС‚ РІС‹Р№С‚Рё.</p>
  */
 public class ServerLoginDialog extends Stage {
 
@@ -59,10 +59,7 @@ public class ServerLoginDialog extends Stage {
         VBox content = current != null ? signedInView() : signedOutView();
 
         Scene scene = new Scene(content);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
     }
@@ -73,7 +70,7 @@ public class ServerLoginDialog extends Stage {
 
         String role = current.isAdmin() ? Lang.tr("server.role.admin")
                 : Lang.tr("server.role.user");
-        Label accountLabel = new Label(current.accountName() + " · " + role);
+        Label accountLabel = new Label(current.accountName() + " В· " + role);
         accountLabel.getStyleClass().add("details-version");
 
         Label hint = new Label(Lang.tr("server.hint"));
@@ -171,9 +168,9 @@ public class ServerLoginDialog extends Stage {
     }
 
     /**
-     * Показывает диалог и возвращает активную после него сессию
-     * — свежесозданную, неизменённую текущую
-     * или {@code null} после выхода либо отмены без входа.
+     * РџРѕРєР°Р·С‹РІР°РµС‚ РґРёР°Р»РѕРі Рё РІРѕР·РІСЂР°С‰Р°РµС‚ Р°РєС‚РёРІРЅСѓСЋ РїРѕСЃР»Рµ РЅРµРіРѕ СЃРµСЃСЃРёСЋ
+     * вЂ” СЃРІРµР¶РµСЃРѕР·РґР°РЅРЅСѓСЋ, РЅРµРёР·РјРµРЅС‘РЅРЅСѓСЋ С‚РµРєСѓС‰СѓСЋ
+     * РёР»Рё {@code null} РїРѕСЃР»Рµ РІС‹С…РѕРґР° Р»РёР±Рѕ РѕС‚РјРµРЅС‹ Р±РµР· РІС…РѕРґР°.
      */
     public static ServerSession show(Stage owner, ServerAuthService authService,
                                      ServerSession current) {

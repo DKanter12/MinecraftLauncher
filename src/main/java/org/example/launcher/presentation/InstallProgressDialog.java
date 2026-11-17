@@ -21,15 +21,15 @@ import org.example.launcher.infrastructure.download.InstallationResult;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальный диалог прогресса установки версии Minecraft.
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі РїСЂРѕРіСЂРµСЃСЃР° СѓСЃС‚Р°РЅРѕРІРєРё РІРµСЂСЃРёРё Minecraft.
  * <p>
- * Реализует {@link InstallationProgress} для получения обновлений от
- * установщика и показывает полосу прогресса, текущий файл и статистику.
+ * Р РµР°Р»РёР·СѓРµС‚ {@link InstallationProgress} РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ РѕР±РЅРѕРІР»РµРЅРёР№ РѕС‚
+ * СѓСЃС‚Р°РЅРѕРІС‰РёРєР° Рё РїРѕРєР°Р·С‹РІР°РµС‚ РїРѕР»РѕСЃСѓ РїСЂРѕРіСЂРµСЃСЃР°, С‚РµРєСѓС‰РёР№ С„Р°Р№Р» Рё СЃС‚Р°С‚РёСЃС‚РёРєСѓ.
  */
 public class InstallProgressDialog extends Stage implements InstallationProgress {
 
     private final ProgressBar progressBar;
-    /** Байтовый прогресс (может не дойти до конца при ошибках скачивания). */
+    /** Р‘Р°Р№С‚РѕРІС‹Р№ РїСЂРѕРіСЂРµСЃСЃ (РјРѕР¶РµС‚ РЅРµ РґРѕР№С‚Рё РґРѕ РєРѕРЅС†Р° РїСЂРё РѕС€РёР±РєР°С… СЃРєР°С‡РёРІР°РЅРёСЏ). */
     private final ProgressBar byteBar;
     private final Label fileLabel;
     private final Label categoryLabel;
@@ -100,10 +100,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
                 closeButton);
 
         Scene scene = new Scene(content, 480, 260);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
     }
@@ -145,7 +142,7 @@ public class InstallProgressDialog extends Stage implements InstallationProgress
             downloadedBytes += Math.max(0, result.bytesDownloaded());
         } else if (result.isSkipped()) {
             skippedCount++;
-            // уже был на диске: учитываем его размер в байтовом прогрессе
+            // СѓР¶Рµ Р±С‹Р» РЅР° РґРёСЃРєРµ: СѓС‡РёС‚С‹РІР°РµРј РµРіРѕ СЂР°Р·РјРµСЂ РІ Р±Р°Р№С‚РѕРІРѕРј РїСЂРѕРіСЂРµСЃСЃРµ
             downloadedBytes += Math.max(0, result.task().expectedSize());
         } else {
             failedCount++;

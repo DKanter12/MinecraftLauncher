@@ -56,6 +56,10 @@ import org.example.launcher.domain.model.ModLoaderType;
  */
 public class YandexDiskBuildApi implements LauncherServerApi {
 
+    private static final java.util.logging.Logger LOG =
+            java.util.logging.Logger.getLogger(
+                    YandexDiskBuildApi.class.getName());
+
     /** Корень REST API Диска; в тестах подменяется локальной заглушкой. */
     public static final String DEFAULT_API_BASE =
             "https://cloud-api.yandex.net";
@@ -209,7 +213,7 @@ public class YandexDiskBuildApi implements LauncherServerApi {
             }
         }
         BuildSummary summary = readManifest(session, folderLogical,
-                buildId, modifiedVersion(folderModified));
+                buildId, modifiedVersion(folderModified), null);
         List<BuildFileEntry> entries = new ArrayList<>();
         for (DiskFile file : files) {
             entries.add(new BuildFileEntry(file.relativePath, file.category,
@@ -239,6 +243,7 @@ public class YandexDiskBuildApi implements LauncherServerApi {
         List<DiskItem> children = listPath(session, folderLogical);
         boolean hasMods = false;
         boolean hasConfigs = false;
+        String iconPath = null;
         for (DiskItem child : children) {
             String name = child.name().toLowerCase();
             if (child.dir() && name.equals("mods")) {
@@ -248,6 +253,9 @@ public class YandexDiskBuildApi implements LauncherServerApi {
                 hasConfigs = true;
             } else if (!child.dir() && name.endsWith(".jar")) {
                 hasMods = true;
+            } else if (!child.dir() && (name.equals("icon.png")
+                    || name.equals("icon.jpg"))) {
+                iconPath = folderLogical + "/" + child.name();
             }
         }
         if (!hasMods && !hasConfigs) {
@@ -257,15 +265,21 @@ public class YandexDiskBuildApi implements LauncherServerApi {
         // пути из ответа API: у публичных папок он относительный
         // и ненадёжный, а folderLogical всегда корректен.
         return readManifest(session, folderLogical, folder.name(),
-                modifiedVersion(folder.modified()));
+                modifiedVersion(folder.modified()), iconPath);
     }
 
     /**
      * {@code build.json} в папке имеет приоритет, если есть; иначе
      * описание синтезируется из имени папки и времени.
+     *
+     * @param iconPath логический путь icon.png/icon.jpg в корне папки
+     *                 сборки либо null, если иконки там нет
      */
-    private BuildSummary readManifest(ServerSession session, String folderPath,
-                                      String folderName, String fallbackVersion)
+    private BuildSummary readManifest(ServerSession session,
+                                      String folderPath,
+                                      String folderName,
+                                      String fallbackVersion,
+                                      String iconPath)
             throws IOException {
         String manifestPath = folderPath + "/build.json";
         if (resourceExists(manifestPath, headers(session))) {
@@ -273,17 +287,20 @@ public class YandexDiskBuildApi implements LauncherServerApi {
                 String href = downloadUrl(manifestPath, headers(session));
                 String json = fetcher.fetchText(href, TIMEOUT,
                         headers(session));
-                JsonObject root = gson.fromJson(json, JsonObject.class);
+                JsonObject root = parseManifestJson(json);
                 JsonObject summary = root != null
                         && root.has("summary")
                         && root.get("summary").isJsonObject()
                         ? root.getAsJsonObject("summary") : root;
                 if (summary != null) {
                     return parseManifestSummary(summary, folderName,
-                            fallbackVersion);
+                            fallbackVersion, iconUrl(session, iconPath));
                 }
             } catch (RuntimeException e) {
-                // откат к синтезированному описанию
+                // откат к синтезированному описанию, но причину
+                // (обычно сломанный JSON) пишем в лог, чтобы её видно
+                LOG.warning("Ignoring broken build.json in folder "
+                        + folderName + ": " + e.getMessage());
             }
         }
         String minecraft = parseMinecraftVersion(folderName);
@@ -291,12 +308,49 @@ public class YandexDiskBuildApi implements LauncherServerApi {
             minecraft = "unknown";
         }
         return new BuildSummary(folderName, fallbackVersion, folderName,
-                "Yandex Disk build", ModLoaderType.VANILLA, minecraft, "");
+                "Yandex Disk build", ModLoaderType.VANILLA, minecraft, "",
+                iconUrl(session, iconPath));
+    }
+
+    /**
+     * Прямая ссылка на иконку сборки; null, если иконки нет или Диск
+     * не отдал ссылку — обложка тогда рисуется с названием сборки.
+     */
+    private String iconUrl(ServerSession session, String iconPath) {
+        if (iconPath == null) {
+            return null;
+        }
+        try {
+            return downloadUrl(iconPath, headers(session));
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Разбор манифеста с исправлением типичных ошибок ручного
+     * редактирования (см. {@link LenientJson#sanitize}); при
+     * неисправимой ошибке возвращает null — сборка получит
+     * синтезированное описание, а причина попадёт в лог.
+     */
+    private JsonObject parseManifestJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return gson.fromJson(LenientJson.sanitize(json),
+                    JsonObject.class);
+        } catch (RuntimeException e) {
+            LOG.warning("build.json не прочитан (используется "
+                    + "синтезированное описание): " + e.getMessage());
+            return null;
+        }
     }
 
     private BuildSummary parseManifestSummary(JsonObject summary,
                                               String folderName,
-                                              String fallbackVersion) {
+                                              String fallbackVersion,
+                                              String iconUrl) {
         String id = optional(summary, "id");
         if (id == null) {
             id = folderName;
@@ -311,11 +365,15 @@ public class YandexDiskBuildApi implements LauncherServerApi {
         }
         ModLoaderType loaderType = ModLoaderType.VANILLA;
         String loaderRaw = optional(summary, "loaderType");
-        if (loaderRaw != null) {
+        if (loaderRaw != null && !loaderRaw.isBlank()) {
             try {
-                loaderType = ModLoaderType.valueOf(loaderRaw);
-            } catch (IllegalArgumentException ignored) {
-                // оставить значение VANILLA по умолчанию
+                loaderType = ModLoaderType.valueOf(
+                        loaderRaw.trim().toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                // Неизвестный загрузчик — не молчим: админ увидит в логе
+                LOG.warning("Unknown loaderType \"" + loaderRaw
+                        + "\" in build.json of " + folderName
+                        + " — используется VANILLA");
             }
         }
         String minecraft = optional(summary, "minecraftVersion");
@@ -325,9 +383,12 @@ public class YandexDiskBuildApi implements LauncherServerApi {
         if (minecraft == null) {
             minecraft = "unknown";
         }
+        // Иконка из манифеста имеет приоритет над найденной в папке
+        String manifestIcon = optional(summary, "iconUrl");
         return new BuildSummary(id, version, displayName,
                 optional(summary, "description"), loaderType, minecraft,
-                optional(summary, "loaderVersion"));
+                optional(summary, "loaderVersion"),
+                manifestIcon != null ? manifestIcon : iconUrl);
     }
 
     /** Версия MC из имени папки по лучшему усилию, напр. «Pack 1.20.1». */

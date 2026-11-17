@@ -36,10 +36,10 @@ tasks.withType<JavaCompile> {
 }
 
 // Готовая к запуску с рабочего стола сборка: installDist + jpackage
-// app-image (PACKCRAFT.exe с иконкой, без консоли). WiX не нужен.
+// app-image (MDD.exe с иконкой, без консоли). WiX не нужен.
 tasks.register("desktopPackage") {
     group = "distribution"
-    description = "Собирает приложение PACKCRAFT.exe (app-image) с иконкой"
+    description = "Собирает приложение MDD.exe (app-image) с иконкой"
     dependsOn(tasks.named("installDist"))
     doLast {
         val install = layout.buildDirectory.dir("install/MinecraftLauncher")
@@ -80,14 +80,14 @@ tasks.register("desktopPackage") {
         }
 
         // jpackage отказывается перезаписывать существующий образ
-        File(dest, "PACKCRAFT").deleteRecursively()
+        File(dest, "MDD").deleteRecursively()
         exec {
             commandLine(jpackage.absolutePath,
                 "--type", "app-image",
-                "--name", "PACKCRAFT",
+                "--name", "MDD",
                 "--app-version", "1.0.0",
-                "--vendor", "PACKCRAFT",
-                "--icon", layout.projectDirectory.file("packcraft.ico").asFile.absolutePath,
+                "--vendor", "MDD",
+                "--icon", layout.projectDirectory.file("mdd.ico").asFile.absolutePath,
                 "--input", libDir.absolutePath,
                 "--runtime-image", runtimeDir.absolutePath,
                 "--main-jar", mainJar.name,

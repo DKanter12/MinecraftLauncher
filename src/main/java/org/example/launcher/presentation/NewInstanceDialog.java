@@ -44,34 +44,34 @@ import org.example.launcher.domain.model.VersionType;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальный диалог создания нового игрового инстанса — один простой экран,
- * всё выбирается из списков (ввод с клавиатуры не требуется):
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі СЃРѕР·РґР°РЅРёСЏ РЅРѕРІРѕРіРѕ РёРіСЂРѕРІРѕРіРѕ РёРЅСЃС‚Р°РЅСЃР° вЂ” РѕРґРёРЅ РїСЂРѕСЃС‚РѕР№ СЌРєСЂР°РЅ,
+ * РІСЃС‘ РІС‹Р±РёСЂР°РµС‚СЃСЏ РёР· СЃРїРёСЃРєРѕРІ (РІРІРѕРґ СЃ РєР»Р°РІРёР°С‚СѓСЂС‹ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ):
  * <ol>
- *   <li><b>Загрузчик</b> — чипы: Vanilla, Fabric, Forge, NeoForge, Quilt.</li>
- *   <li><b>Тип версии</b> — чипы (Release, Snapshot, Old Beta, Old
- *       Alpha), предлагаются только для Vanilla — модовые загрузчики
- *       работают на релизах.</li>
- *   <li><b>Версия</b> — список подходящих версий, сначала новые
- *       (например, {@code 1.21.4}, {@code 25w14a}).</li>
- *   <li><b>Версия загрузчика</b> — для модовых загрузчиков, загружается
- *       асинхронно от провайдера загрузчика (все записи
- *       гарантированно совместимы с выбранной версией).</li>
+ *   <li><b>Р—Р°РіСЂСѓР·С‡РёРє</b> вЂ” С‡РёРїС‹: Vanilla, Fabric, Forge, NeoForge, Quilt.</li>
+ *   <li><b>РўРёРї РІРµСЂСЃРёРё</b> вЂ” С‡РёРїС‹ (Release, Snapshot, Old Beta, Old
+ *       Alpha), РїСЂРµРґР»Р°РіР°СЋС‚СЃСЏ С‚РѕР»СЊРєРѕ РґР»СЏ Vanilla вЂ” РјРѕРґРѕРІС‹Рµ Р·Р°РіСЂСѓР·С‡РёРєРё
+ *       СЂР°Р±РѕС‚Р°СЋС‚ РЅР° СЂРµР»РёР·Р°С….</li>
+ *   <li><b>Р’РµСЂСЃРёСЏ</b> вЂ” СЃРїРёСЃРѕРє РїРѕРґС…РѕРґСЏС‰РёС… РІРµСЂСЃРёР№, СЃРЅР°С‡Р°Р»Р° РЅРѕРІС‹Рµ
+ *       (РЅР°РїСЂРёРјРµСЂ, {@code 1.21.4}, {@code 25w14a}).</li>
+ *   <li><b>Р’РµСЂСЃРёСЏ Р·Р°РіСЂСѓР·С‡РёРєР°</b> вЂ” РґР»СЏ РјРѕРґРѕРІС‹С… Р·Р°РіСЂСѓР·С‡РёРєРѕРІ, Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ
+ *       Р°СЃРёРЅС…СЂРѕРЅРЅРѕ РѕС‚ РїСЂРѕРІР°Р№РґРµСЂР° Р·Р°РіСЂСѓР·С‡РёРєР° (РІСЃРµ Р·Р°РїРёСЃРё
+ *       РіР°СЂР°РЅС‚РёСЂРѕРІР°РЅРЅРѕ СЃРѕРІРјРµСЃС‚РёРјС‹ СЃ РІС‹Р±СЂР°РЅРЅРѕР№ РІРµСЂСЃРёРµР№).</li>
  * </ol>
- * Можно указать дополнительные JVM-аргументы (например, {@code -Xmx4G});
- * имя инстанса вводится свободно и по умолчанию состоит из загрузчика
- * и версии Minecraft, если оставлено пустым.
+ * РњРѕР¶РЅРѕ СѓРєР°Р·Р°С‚СЊ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ JVM-Р°СЂРіСѓРјРµРЅС‚С‹ (РЅР°РїСЂРёРјРµСЂ, {@code -Xmx4G});
+ * РёРјСЏ РёРЅСЃС‚Р°РЅСЃР° РІРІРѕРґРёС‚СЃСЏ СЃРІРѕР±РѕРґРЅРѕ Рё РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СЃРѕСЃС‚РѕРёС‚ РёР· Р·Р°РіСЂСѓР·С‡РёРєР°
+ * Рё РІРµСЂСЃРёРё Minecraft, РµСЃР»Рё РѕСЃС‚Р°РІР»РµРЅРѕ РїСѓСЃС‚С‹Рј.
  */
 public class NewInstanceDialog extends Stage {
 
     /**
-     * Параметры созданного инстанса.
+     * РџР°СЂР°РјРµС‚СЂС‹ СЃРѕР·РґР°РЅРЅРѕРіРѕ РёРЅСЃС‚Р°РЅСЃР°.
      *
-     * @param type      ванилла или семейство модового загрузчика
-     * @param mcVersion целевая версия Minecraft
-     * @param loader    выбранная версия загрузчика ({@code null}
-     *                  для ваниллы)
-     * @param name      отображаемое имя инстанса (пустое означает
-     *                  автоматическое имя «Загрузчик МК»)
+     * @param type      РІР°РЅРёР»Р»Р° РёР»Рё СЃРµРјРµР№СЃС‚РІРѕ РјРѕРґРѕРІРѕРіРѕ Р·Р°РіСЂСѓР·С‡РёРєР°
+     * @param mcVersion С†РµР»РµРІР°СЏ РІРµСЂСЃРёСЏ Minecraft
+     * @param loader    РІС‹Р±СЂР°РЅРЅР°СЏ РІРµСЂСЃРёСЏ Р·Р°РіСЂСѓР·С‡РёРєР° ({@code null}
+     *                  РґР»СЏ РІР°РЅРёР»Р»С‹)
+     * @param name      РѕС‚РѕР±СЂР°Р¶Р°РµРјРѕРµ РёРјСЏ РёРЅСЃС‚Р°РЅСЃР° (РїСѓСЃС‚РѕРµ РѕР·РЅР°С‡Р°РµС‚
+     *                  Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРµ РёРјСЏ В«Р—Р°РіСЂСѓР·С‡РёРє РњРљВ»)
      */
     public record Result(ModLoaderType type,
                          MinecraftVersion mcVersion,
@@ -85,8 +85,8 @@ public class NewInstanceDialog extends Stage {
     private final List<MinecraftVersion> manifestVersions;
 
     private final ToggleGroup loaderGroup = new ToggleGroup();
-    // Чипы в FlowPane: при нехватке ширины переносятся на следующую
-    // строку, а не обрезаются до «F...»
+    // Р§РёРїС‹ РІ FlowPane: РїСЂРё РЅРµС…РІР°С‚РєРµ С€РёСЂРёРЅС‹ РїРµСЂРµРЅРѕСЃСЏС‚СЃСЏ РЅР° СЃР»РµРґСѓСЋС‰СѓСЋ
+    // СЃС‚СЂРѕРєСѓ, Р° РЅРµ РѕР±СЂРµР·Р°СЋС‚СЃСЏ РґРѕ В«F...В»
     private final FlowPane loaderChips = new FlowPane(6, 6);
     private final ToggleGroup categoryGroup = new ToggleGroup();
     private final FlowPane categoryChips = new FlowPane(6, 6);
@@ -102,13 +102,13 @@ public class NewInstanceDialog extends Stage {
     private final VBox versionListBox;
     private final VBox loaderBox;
 
-    /** Последний запрошенный список версий загрузчика (защита от дублей). */
+    /** РџРѕСЃР»РµРґРЅРёР№ Р·Р°РїСЂРѕС€РµРЅРЅС‹Р№ СЃРїРёСЃРѕРє РІРµСЂСЃРёР№ Р·Р°РіСЂСѓР·С‡РёРєР° (Р·Р°С‰РёС‚Р° РѕС‚ РґСѓР±Р»РµР№). */
     private ModLoaderType fetchedLoader;
     private String fetchedMcId;
 
     /**
-     * Полный режим выбора: чипы загрузчиков, чипы типов версий, список
-     * версий и список версий загрузчика.
+     * РџРѕР»РЅС‹Р№ СЂРµР¶РёРј РІС‹Р±РѕСЂР°: С‡РёРїС‹ Р·Р°РіСЂСѓР·С‡РёРєРѕРІ, С‡РёРїС‹ С‚РёРїРѕРІ РІРµСЂСЃРёР№, СЃРїРёСЃРѕРє
+     * РІРµСЂСЃРёР№ Рё СЃРїРёСЃРѕРє РІРµСЂСЃРёР№ Р·Р°РіСЂСѓР·С‡РёРєР°.
      */
     public NewInstanceDialog(Stage owner,
                              ModLoaderRegistry registry,
@@ -117,8 +117,8 @@ public class NewInstanceDialog extends Stage {
         this.registry = registry;
         this.manifestVersions = manifestVersions;
 
-        // Transparent stage: окно рисуется само (overlay + карточка),
-        // «backdrop-filter» эмулируется размытым снапшотом главного окна
+        // Transparent stage: РѕРєРЅРѕ СЂРёСЃСѓРµС‚СЃСЏ СЃР°РјРѕ (overlay + РєР°СЂС‚РѕС‡РєР°),
+        // В«backdrop-filterВ» СЌРјСѓР»РёСЂСѓРµС‚СЃСЏ СЂР°Р·РјС‹С‚С‹Рј СЃРЅР°РїС€РѕС‚РѕРј РіР»Р°РІРЅРѕРіРѕ РѕРєРЅР°
         initStyle(StageStyle.TRANSPARENT);
         initModality(Modality.APPLICATION_MODAL);
         initOwner(owner);
@@ -135,7 +135,7 @@ public class NewInstanceDialog extends Stage {
         setTitle(Lang.tr("new.title")
                 + (shownVersion != null ? ": " + shownVersion.id() : ""));
 
-        // -- 0. Имя инстанса (необязательно — при пустом подставится автоматически) --
+        // -- 0. РРјСЏ РёРЅСЃС‚Р°РЅСЃР° (РЅРµРѕР±СЏР·Р°С‚РµР»СЊРЅРѕ вЂ” РїСЂРё РїСѓСЃС‚РѕРј РїРѕРґСЃС‚Р°РІРёС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё) --
         Label nameTitle = new Label(Lang.tr("new.name"));
         nameTitle.getStyleClass().add("section-title");
         nameField.setPromptText(Lang.tr("new.name.prompt"));
@@ -143,7 +143,7 @@ public class NewInstanceDialog extends Stage {
         nameField.setMaxWidth(Double.MAX_VALUE);
         VBox nameBox = new VBox(4, nameTitle, nameField);
 
-        // -- 1. Чипы загрузчиков --
+        // -- 1. Р§РёРїС‹ Р·Р°РіСЂСѓР·С‡РёРєРѕРІ --
         Label loaderTitle = new Label(Lang.tr("new.loader"));
         loaderTitle.getStyleClass().add("section-title");
         List<ModLoaderType> loaders = new ArrayList<>();
@@ -176,7 +176,7 @@ public class NewInstanceDialog extends Stage {
         });
         loaderChipsBox = new VBox(4, loaderTitle, loaderChips);
 
-        // -- 2. Чипы типов версий (только ванилла) --
+        // -- 2. Р§РёРїС‹ С‚РёРїРѕРІ РІРµСЂСЃРёР№ (С‚РѕР»СЊРєРѕ РІР°РЅРёР»Р»Р°) --
         Label categoryTitle = new Label(Lang.tr("new.category"));
         categoryTitle.getStyleClass().add("section-title");
         for (VersionType type : List.of(VersionType.RELEASE,
@@ -202,7 +202,7 @@ public class NewInstanceDialog extends Stage {
         });
         categoryBox = new VBox(4, categoryTitle, categoryChips);
 
-        // -- 3. Список версий --
+        // -- 3. РЎРїРёСЃРѕРє РІРµСЂСЃРёР№ --
         Label versionTitle = new Label(Lang.tr("new.version"));
         versionTitle.getStyleClass().add("section-title");
         versionList.getStyleClass().add("profile-list");
@@ -233,7 +233,7 @@ public class NewInstanceDialog extends Stage {
                 (obs, old, val) -> onInputsChanged());
         versionListBox = new VBox(4, versionTitle, versionList);
 
-        // -- 4. Версия загрузчика (только для модовых) --
+        // -- 4. Р’РµСЂСЃРёСЏ Р·Р°РіСЂСѓР·С‡РёРєР° (С‚РѕР»СЊРєРѕ РґР»СЏ РјРѕРґРѕРІС‹С…) --
         Label loaderVersionTitle = new Label(Lang.tr("new.loaderversion"));
         loaderVersionTitle.getStyleClass().add("section-title");
         loaderCombo.setMaxWidth(Double.MAX_VALUE);
@@ -260,7 +260,7 @@ public class NewInstanceDialog extends Stage {
         loaderBox = new VBox(4, loaderVersionTitle, loaderCombo,
                 loaderStatusRow);
 
-        // -- Кнопки --
+        // -- РљРЅРѕРїРєРё --
         createButton.getStyleClass().add("modal-button-primary");
         createButton.setDefaultButton(true);
         createButton.setText(Lang.tr("button.create"));
@@ -271,8 +271,8 @@ public class NewInstanceDialog extends Stage {
                     ? null : loaderCombo.getValue();
             if (mc == null || (type != ModLoaderType.VANILLA
                     && !isConsistent(type, mc, loaderVersion))) {
-                // Клик в момент перезагрузки списка версий загрузчика —
-                // не создаём пару, которая не пройдёт валидацию BuildRequest
+                // РљР»РёРє РІ РјРѕРјРµРЅС‚ РїРµСЂРµР·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РІРµСЂСЃРёР№ Р·Р°РіСЂСѓР·С‡РёРєР° вЂ”
+                // РЅРµ СЃРѕР·РґР°С‘Рј РїР°СЂСѓ, РєРѕС‚РѕСЂР°СЏ РЅРµ РїСЂРѕР№РґС‘С‚ РІР°Р»РёРґР°С†РёСЋ BuildRequest
                 updateCreateButtonState();
                 return;
             }
@@ -291,13 +291,13 @@ public class NewInstanceDialog extends Stage {
         buttons.setAlignment(Pos.CENTER_RIGHT);
         buttons.setPadding(new Insets(16, 0, 0, 0));
 
-        // -- Начальное состояние: новейший релиз предвыбран --
+        // -- РќР°С‡Р°Р»СЊРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ: РЅРѕРІРµР№С€РёР№ СЂРµР»РёР· РїСЂРµРґРІС‹Р±СЂР°РЅ --
         refreshVersionList();
         if (versionList.getSelectionModel().getSelectedItem() == null) {
             onInputsChanged();
         }
 
-        // -- Шапка модального окна: заголовок + круглый крестик --
+        // -- РЁР°РїРєР° РјРѕРґР°Р»СЊРЅРѕРіРѕ РѕРєРЅР°: Р·Р°РіРѕР»РѕРІРѕРє + РєСЂСѓРіР»С‹Р№ РєСЂРµСЃС‚РёРє --
         Label headerTitle = new Label(Lang.tr("new.title"));
         headerTitle.getStyleClass().add("modal-title");
         Button closeButton = new Button("\u2715");
@@ -323,8 +323,8 @@ public class NewInstanceDialog extends Stage {
         card.getStyleClass().add("modal-card");
         card.setMaxWidth(480);
 
-        // -- Glassmorphism backdrop: размытый снапшот главного окна
-        // + полупрозрачное затемнение rgba(10,12,16,0.75) --
+        // -- Glassmorphism backdrop: СЂР°Р·РјС‹С‚С‹Р№ СЃРЅР°РїС€РѕС‚ РіР»Р°РІРЅРѕРіРѕ РѕРєРЅР°
+        // + РїРѕР»СѓРїСЂРѕР·СЂР°С‡РЅРѕРµ Р·Р°С‚РµРјРЅРµРЅРёРµ rgba(10,12,16,0.75) --
         StackPane overlay = new StackPane();
         addBlurBackdrop(overlay, owner);
         HBox centered = new HBox(card);
@@ -333,27 +333,24 @@ public class NewInstanceDialog extends Stage {
 
         Scene scene = new Scene(overlay);
         scene.setFill(Color.TRANSPARENT);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
 
-        // Предвыбор загрузчика (например, из «умного бандла») — строго
-        // после сборки всех узлов: onLoaderChanged() управляет
-        // видимостью чипов категорий, списка версий и выпадающего
-        // списка версий загрузчика, созданных выше.
+        // РџСЂРµРґРІС‹Р±РѕСЂ Р·Р°РіСЂСѓР·С‡РёРєР° (РЅР°РїСЂРёРјРµСЂ, РёР· В«СѓРјРЅРѕРіРѕ Р±Р°РЅРґР»Р°В») вЂ” СЃС‚СЂРѕРіРѕ
+        // РїРѕСЃР»Рµ СЃР±РѕСЂРєРё РІСЃРµС… СѓР·Р»РѕРІ: onLoaderChanged() СѓРїСЂР°РІР»СЏРµС‚
+        // РІРёРґРёРјРѕСЃС‚СЊСЋ С‡РёРїРѕРІ РєР°С‚РµРіРѕСЂРёР№, СЃРїРёСЃРєР° РІРµСЂСЃРёР№ Рё РІС‹РїР°РґР°СЋС‰РµРіРѕ
+        // СЃРїРёСЃРєР° РІРµСЂСЃРёР№ Р·Р°РіСЂСѓР·С‡РёРєР°, СЃРѕР·РґР°РЅРЅС‹С… РІС‹С€Рµ.
         if (initialLoader != null) {
             selectLoaderChip(initialLoader);
         }
     }
 
     /**
-     * Накладывает на {@code overlay} фоновые слои: размытый снапшот
-     * сцены владельца (имитация {@code backdrop-filter: blur(10px)})
-     * и полупрозрачное затемнение. При неудаче остаётся только
-     * затемнение.
+     * РќР°РєР»Р°РґС‹РІР°РµС‚ РЅР° {@code overlay} С„РѕРЅРѕРІС‹Рµ СЃР»РѕРё: СЂР°Р·РјС‹С‚С‹Р№ СЃРЅР°РїС€РѕС‚
+     * СЃС†РµРЅС‹ РІР»Р°РґРµР»СЊС†Р° (РёРјРёС‚Р°С†РёСЏ {@code backdrop-filter: blur(10px)})
+     * Рё РїРѕР»СѓРїСЂРѕР·СЂР°С‡РЅРѕРµ Р·Р°С‚РµРјРЅРµРЅРёРµ. РџСЂРё РЅРµСѓРґР°С‡Рµ РѕСЃС‚Р°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ
+     * Р·Р°С‚РµРјРЅРµРЅРёРµ.
      */
     static void addBlurBackdrop(StackPane overlay, Stage owner) {
         ImageView blurred = null;
@@ -375,7 +372,7 @@ public class NewInstanceDialog extends Stage {
                 blurred = null;
             }
         }
-        // Слои идут под карточкой, поверх — затемнение
+        // РЎР»РѕРё РёРґСѓС‚ РїРѕРґ РєР°СЂС‚РѕС‡РєРѕР№, РїРѕРІРµСЂС… вЂ” Р·Р°С‚РµРјРЅРµРЅРёРµ
         if (blurred != null) {
             blurred.setEffect(new GaussianBlur(10));
             overlay.getChildren().add(0, blurred);
@@ -387,7 +384,7 @@ public class NewInstanceDialog extends Stage {
         overlay.getChildren().add(1, dim);
     }
 
-    /** Иконка загрузчика 16px для чипса (официальные PNG из ресурсов). */
+    /** РРєРѕРЅРєР° Р·Р°РіСЂСѓР·С‡РёРєР° 16px РґР»СЏ С‡РёРїСЃР° (РѕС„РёС†РёР°Р»СЊРЅС‹Рµ PNG РёР· СЂРµСЃСѓСЂСЃРѕРІ). */
     private static javafx.scene.Node chipIcon(ModLoaderType type) {
         String name = switch (type) {
             case VANILLA -> "vanilla";
@@ -408,7 +405,7 @@ public class NewInstanceDialog extends Stage {
         return icon;
     }
 
-    /** Локализованная подпись чипа типа версии. */
+    /** Р›РѕРєР°Р»РёР·РѕРІР°РЅРЅР°СЏ РїРѕРґРїРёСЃСЊ С‡РёРїР° С‚РёРїР° РІРµСЂСЃРёРё. */
     private static String categoryLabel(VersionType type) {
         if (type == VersionType.RELEASE) {
             return Lang.tr("new.type.release");
@@ -423,8 +420,8 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Программная предвыборка чипа загрузчика: срабатывает как обычный
-     * клик — скрывает чипы типов версий и грузит версии загрузчика.
+     * РџСЂРѕРіСЂР°РјРјРЅР°СЏ РїСЂРµРґРІС‹Р±РѕСЂРєР° С‡РёРїР° Р·Р°РіСЂСѓР·С‡РёРєР°: СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ РєР°Рє РѕР±С‹С‡РЅС‹Р№
+     * РєР»РёРє вЂ” СЃРєСЂС‹РІР°РµС‚ С‡РёРїС‹ С‚РёРїРѕРІ РІРµСЂСЃРёР№ Рё РіСЂСѓР·РёС‚ РІРµСЂСЃРёРё Р·Р°РіСЂСѓР·С‡РёРєР°.
      */
     private void selectLoaderChip(ModLoaderType type) {
         for (var node : loaderChips.getChildren()) {
@@ -438,7 +435,7 @@ public class NewInstanceDialog extends Stage {
         onLoaderChanged();
     }
 
-    /** Текущее выбранное семейство загрузчиков (по умолчанию Vanilla). */
+    /** РўРµРєСѓС‰РµРµ РІС‹Р±СЂР°РЅРЅРѕРµ СЃРµРјРµР№СЃС‚РІРѕ Р·Р°РіСЂСѓР·С‡РёРєРѕРІ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ Vanilla). */
     private ModLoaderType selectedLoader() {
         var selected = loaderGroup.getSelectedToggle();
         if (selected instanceof ToggleButton btn
@@ -448,15 +445,15 @@ public class NewInstanceDialog extends Stage {
         return ModLoaderType.VANILLA;
     }
 
-    /** Версия МК создаваемого инстанса. */
+    /** Р’РµСЂСЃРёСЏ РњРљ СЃРѕР·РґР°РІР°РµРјРѕРіРѕ РёРЅСЃС‚Р°РЅСЃР°. */
     private MinecraftVersion effectiveVersion() {
         return versionList.getSelectionModel().getSelectedItem();
     }
 
     /**
-     * Переключение загрузчика: модовые работают только на релизах (чипы типов
-     * версий скрываются и принудительно выбирается Release); ванилла предлагает
-     * все типы версий.
+     * РџРµСЂРµРєР»СЋС‡РµРЅРёРµ Р·Р°РіСЂСѓР·С‡РёРєР°: РјРѕРґРѕРІС‹Рµ СЂР°Р±РѕС‚Р°СЋС‚ С‚РѕР»СЊРєРѕ РЅР° СЂРµР»РёР·Р°С… (С‡РёРїС‹ С‚РёРїРѕРІ
+     * РІРµСЂСЃРёР№ СЃРєСЂС‹РІР°СЋС‚СЃСЏ Рё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ РІС‹Р±РёСЂР°РµС‚СЃСЏ Release); РІР°РЅРёР»Р»Р° РїСЂРµРґР»Р°РіР°РµС‚
+     * РІСЃРµ С‚РёРїС‹ РІРµСЂСЃРёР№.
      */
     private void onLoaderChanged() {
         boolean modded = selectedLoader() != ModLoaderType.VANILLA;
@@ -485,9 +482,9 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Перестраивает список версий под активные загрузчик + категорию,
-     * сохраняя текущий выбор, если он подходит, и выбирая новейшую версию
-     * в противном случае.
+     * РџРµСЂРµСЃС‚СЂР°РёРІР°РµС‚ СЃРїРёСЃРѕРє РІРµСЂСЃРёР№ РїРѕРґ Р°РєС‚РёРІРЅС‹Рµ Р·Р°РіСЂСѓР·С‡РёРє + РєР°С‚РµРіРѕСЂРёСЋ,
+     * СЃРѕС…СЂР°РЅСЏСЏ С‚РµРєСѓС‰РёР№ РІС‹Р±РѕСЂ, РµСЃР»Рё РѕРЅ РїРѕРґС…РѕРґРёС‚, Рё РІС‹Р±РёСЂР°СЏ РЅРѕРІРµР№С€СѓСЋ РІРµСЂСЃРёСЋ
+     * РІ РїСЂРѕС‚РёРІРЅРѕРј СЃР»СѓС‡Р°Рµ.
      */
     private void refreshVersionList() {
         boolean modded = selectedLoader() != ModLoaderType.VANILLA;
@@ -513,15 +510,15 @@ public class NewInstanceDialog extends Stage {
                 }
             }
         }
-        // Сначала новые (манифест уже отсортирован от новых к старым)
+        // РЎРЅР°С‡Р°Р»Р° РЅРѕРІС‹Рµ (РјР°РЅРёС„РµСЃС‚ СѓР¶Рµ РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅ РѕС‚ РЅРѕРІС‹С… Рє СЃС‚Р°СЂС‹Рј)
         versionList.getSelectionModel().selectFirst();
     }
 
     /**
-     * Реакция на смену загрузчика/версии: строка версии загрузчика
-     * показывается только для модовых, их версии подгружаются асинхронно
-     * (с дедупликацией по паре загрузчик + версия), кнопка создания
-     * держится в актуальном состоянии.
+     * Р РµР°РєС†РёСЏ РЅР° СЃРјРµРЅСѓ Р·Р°РіСЂСѓР·С‡РёРєР°/РІРµСЂСЃРёРё: СЃС‚СЂРѕРєР° РІРµСЂСЃРёРё Р·Р°РіСЂСѓР·С‡РёРєР°
+     * РїРѕРєР°Р·С‹РІР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ РґР»СЏ РјРѕРґРѕРІС‹С…, РёС… РІРµСЂСЃРёРё РїРѕРґРіСЂСѓР¶Р°СЋС‚СЃСЏ Р°СЃРёРЅС…СЂРѕРЅРЅРѕ
+     * (СЃ РґРµРґСѓРїР»РёРєР°С†РёРµР№ РїРѕ РїР°СЂРµ Р·Р°РіСЂСѓР·С‡РёРє + РІРµСЂСЃРёСЏ), РєРЅРѕРїРєР° СЃРѕР·РґР°РЅРёСЏ
+     * РґРµСЂР¶РёС‚СЃСЏ РІ Р°РєС‚СѓР°Р»СЊРЅРѕРј СЃРѕСЃС‚РѕСЏРЅРёРё.
      */
     private void onInputsChanged() {
         ModLoaderType loader = selectedLoader();
@@ -541,16 +538,16 @@ public class NewInstanceDialog extends Stage {
             return;
         }
 
-        // Тот же загрузчик + версия: элементы уже загружены или запрос
-        // в пути — повторный запрос не нужен
+        // РўРѕС‚ Р¶Рµ Р·Р°РіСЂСѓР·С‡РёРє + РІРµСЂСЃРёСЏ: СЌР»РµРјРµРЅС‚С‹ СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅС‹ РёР»Рё Р·Р°РїСЂРѕСЃ
+        // РІ РїСѓС‚Рё вЂ” РїРѕРІС‚РѕСЂРЅС‹Р№ Р·Р°РїСЂРѕСЃ РЅРµ РЅСѓР¶РµРЅ
         if (loader == fetchedLoader && mc.id().equals(fetchedMcId)) {
             loaderCombo.setDisable(loaderCombo.getItems().isEmpty());
             return;
         }
 
-        // Загрузчик или версия игры сменились: прежний список версий
-        // загрузчика не соответствует новой паре (MC, загрузчик) —
-        // очистка не даёт создать сборку с уводившимся значением
+        // Р—Р°РіСЂСѓР·С‡РёРє РёР»Рё РІРµСЂСЃРёСЏ РёРіСЂС‹ СЃРјРµРЅРёР»РёСЃСЊ: РїСЂРµР¶РЅРёР№ СЃРїРёСЃРѕРє РІРµСЂСЃРёР№
+        // Р·Р°РіСЂСѓР·С‡РёРєР° РЅРµ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ РЅРѕРІРѕР№ РїР°СЂРµ (MC, Р·Р°РіСЂСѓР·С‡РёРє) вЂ”
+        // РѕС‡РёСЃС‚РєР° РЅРµ РґР°С‘С‚ СЃРѕР·РґР°С‚СЊ СЃР±РѕСЂРєСѓ СЃ СѓРІРѕРґРёРІС€РёРјСЃСЏ Р·РЅР°С‡РµРЅРёРµРј
         loaderCombo.getItems().clear();
         loaderCombo.setValue(null);
 
@@ -588,7 +585,7 @@ public class NewInstanceDialog extends Stage {
             }
             Platform.runLater(() -> {
                 if (selectedLoader() != loader || !isCurrent(mc)) {
-                    return; // выбор тем временем изменился
+                    return; // РІС‹Р±РѕСЂ С‚РµРј РІСЂРµРјРµРЅРµРј РёР·РјРµРЅРёР»СЃСЏ
                 }
                 loaderProgress.setVisible(false);
                 if (versions.isEmpty()) {
@@ -608,7 +605,7 @@ public class NewInstanceDialog extends Stage {
         fetch.start();
     }
 
-    /** True, если {@code mc} — версия, которая будет создана сейчас. */
+    /** True, РµСЃР»Рё {@code mc} вЂ” РІРµСЂСЃРёСЏ, РєРѕС‚РѕСЂР°СЏ Р±СѓРґРµС‚ СЃРѕР·РґР°РЅР° СЃРµР№С‡Р°СЃ. */
     private boolean isCurrent(MinecraftVersion mc) {
         MinecraftVersion current = effectiveVersion();
         return current != null && current.id().equals(mc.id());
@@ -624,8 +621,8 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Версия загрузчика относится к текущей паре (MC, загрузчик):
-     * защита от гонок и от выбора из устаревшего списка.
+     * Р’РµСЂСЃРёСЏ Р·Р°РіСЂСѓР·С‡РёРєР° РѕС‚РЅРѕСЃРёС‚СЃСЏ Рє С‚РµРєСѓС‰РµР№ РїР°СЂРµ (MC, Р·Р°РіСЂСѓР·С‡РёРє):
+     * Р·Р°С‰РёС‚Р° РѕС‚ РіРѕРЅРѕРє Рё РѕС‚ РІС‹Р±РѕСЂР° РёР· СѓСЃС‚Р°СЂРµРІС€РµРіРѕ СЃРїРёСЃРєР°.
      */
     private static boolean isConsistent(ModLoaderType loader,
                                         MinecraftVersion mc,
@@ -654,8 +651,8 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Показывает диалог и возвращает параметры создания, либо
-     * {@code null}, если он был отменён.
+     * РџРѕРєР°Р·С‹РІР°РµС‚ РґРёР°Р»РѕРі Рё РІРѕР·РІСЂР°С‰Р°РµС‚ РїР°СЂР°РјРµС‚СЂС‹ СЃРѕР·РґР°РЅРёСЏ, Р»РёР±Рѕ
+     * {@code null}, РµСЃР»Рё РѕРЅ Р±С‹Р» РѕС‚РјРµРЅС‘РЅ.
      */
     public static Result show(Stage owner,
                               ModLoaderRegistry registry,
@@ -664,8 +661,8 @@ public class NewInstanceDialog extends Stage {
     }
 
     /**
-     * Как {@link #show(Stage, ModLoaderRegistry, List)}, но с
-     * предвыбранным загрузчиком (из «умного бандла»).
+     * РљР°Рє {@link #show(Stage, ModLoaderRegistry, List)}, РЅРѕ СЃ
+     * РїСЂРµРґРІС‹Р±СЂР°РЅРЅС‹Рј Р·Р°РіСЂСѓР·С‡РёРєРѕРј (РёР· В«СѓРјРЅРѕРіРѕ Р±Р°РЅРґР»Р°В»).
      */
     public static Result show(Stage owner,
                               ModLoaderRegistry registry,

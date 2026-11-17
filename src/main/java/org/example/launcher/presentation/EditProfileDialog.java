@@ -21,18 +21,18 @@ import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальный диалог редактирования игрового инстанса: отображаемое имя,
- * лимит выделенной памяти (ОЗУ) и дополнительные аргументы запуска JVM.
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РёРіСЂРѕРІРѕРіРѕ РёРЅСЃС‚Р°РЅСЃР°: РѕС‚РѕР±СЂР°Р¶Р°РµРјРѕРµ РёРјСЏ,
+ * Р»РёРјРёС‚ РІС‹РґРµР»РµРЅРЅРѕР№ РїР°РјСЏС‚Рё (РћР—РЈ) Рё РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ Р°СЂРіСѓРјРµРЅС‚С‹ Р·Р°РїСѓСЃРєР° JVM.
  * <p>
- * Переименование также переименовывает папку инстанса, чтобы она всегда
- * совпадала с именем в лаунчере (моды, сохранения и сборки переезжают вместе).
- * Версии загрузчика/Minecraft — фиксированные свойства инстанса.
+ * РџРµСЂРµРёРјРµРЅРѕРІР°РЅРёРµ С‚Р°РєР¶Рµ РїРµСЂРµРёРјРµРЅРѕРІС‹РІР°РµС‚ РїР°РїРєСѓ РёРЅСЃС‚Р°РЅСЃР°, С‡С‚РѕР±С‹ РѕРЅР° РІСЃРµРіРґР°
+ * СЃРѕРІРїР°РґР°Р»Р° СЃ РёРјРµРЅРµРј РІ Р»Р°СѓРЅС‡РµСЂРµ (РјРѕРґС‹, СЃРѕС…СЂР°РЅРµРЅРёСЏ Рё СЃР±РѕСЂРєРё РїРµСЂРµРµР·Р¶Р°СЋС‚ РІРјРµСЃС‚Рµ).
+ * Р’РµСЂСЃРёРё Р·Р°РіСЂСѓР·С‡РёРєР°/Minecraft вЂ” С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рµ СЃРІРѕР№СЃС‚РІР° РёРЅСЃС‚Р°РЅСЃР°.
  */
 public class EditProfileDialog extends Stage {
 
     /**
-     * Отредактированные значения. Лимит памяти — в мегабайтах
-     * ({@code 0} означает автоматический).
+     * РћС‚СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ. Р›РёРјРёС‚ РїР°РјСЏС‚Рё вЂ” РІ РјРµРіР°Р±Р°Р№С‚Р°С…
+     * ({@code 0} РѕР·РЅР°С‡Р°РµС‚ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№).
      */
     public record Result(String name, int memoryMb) {
     }
@@ -68,7 +68,7 @@ public class EditProfileDialog extends Stage {
         memoryLabel.getStyleClass().add("section-title");
         memoryChips.setHgap(8);
         memoryChips.setVgap(8);
-        // Компактный ряд пресетов — 2 / 4 / 8 и т.д. без многоточия (FlowPane не даёт схлопнуться в «2...»)
+        // РљРѕРјРїР°РєС‚РЅС‹Р№ СЂСЏРґ РїСЂРµСЃРµС‚РѕРІ вЂ” 2 / 4 / 8 Рё С‚.Рґ. Р±РµР· РјРЅРѕРіРѕС‚РѕС‡РёСЏ (FlowPane РЅРµ РґР°С‘С‚ СЃС…Р»РѕРїРЅСѓС‚СЊСЃСЏ РІ В«2...В»)
         addMemoryChip(Lang.tr("common.auto"), 0);
         addMemoryChip("2 " + Lang.tr("unit.gb"), 2048);
         addMemoryChip("4 " + Lang.tr("unit.gb"), 4096);
@@ -119,10 +119,7 @@ public class EditProfileDialog extends Stage {
         content.setPrefWidth(440);
 
         Scene scene = new Scene(content);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
         syncMemoryChips();
@@ -132,7 +129,7 @@ public class EditProfileDialog extends Stage {
     private void addMemoryChip(String text, int megabytes) {
         ToggleButton chip = new ToggleButton(text);
         chip.getStyleClass().add("filter-button");
-        // Текст не должен схлопываться в «2...» — сохраняем естественную ширину
+        // РўРµРєСЃС‚ РЅРµ РґРѕР»Р¶РµРЅ СЃС…Р»РѕРїС‹РІР°С‚СЊСЃСЏ РІ В«2...В» вЂ” СЃРѕС…СЂР°РЅСЏРµРј РµСЃС‚РµСЃС‚РІРµРЅРЅСѓСЋ С€РёСЂРёРЅСѓ
         chip.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         chip.setMaxWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         chip.setToggleGroup(memoryGroup);
@@ -147,7 +144,7 @@ public class EditProfileDialog extends Stage {
         memoryChips.getChildren().add(chip);
     }
 
-    /** Подсвечивает пресет, совпадающий с полем (для произвольного — ни один). */
+    /** РџРѕРґСЃРІРµС‡РёРІР°РµС‚ РїСЂРµСЃРµС‚, СЃРѕРІРїР°РґР°СЋС‰РёР№ СЃ РїРѕР»РµРј (РґР»СЏ РїСЂРѕРёР·РІРѕР»СЊРЅРѕРіРѕ вЂ” РЅРё РѕРґРёРЅ). */
     private void syncMemoryChips() {
         int current = parseLenient(memoryField.getText());
         for (var node : memoryChips.getChildren()) {
@@ -174,8 +171,8 @@ public class EditProfileDialog extends Stage {
     }
 
     /**
-     * Разбирает поле памяти: пустое означает автоматический режим ({@code 0}),
-     * иначе мегабайты; {@code -1} при некорректном вводе.
+     * Р Р°Р·Р±РёСЂР°РµС‚ РїРѕР»Рµ РїР°РјСЏС‚Рё: РїСѓСЃС‚РѕРµ РѕР·РЅР°С‡Р°РµС‚ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ СЂРµР¶РёРј ({@code 0}),
+     * РёРЅР°С‡Рµ РјРµРіР°Р±Р°Р№С‚С‹; {@code -1} РїСЂРё РЅРµРєРѕСЂСЂРµРєС‚РЅРѕРј РІРІРѕРґРµ.
      */
     private static int parseMemory(String text) {
         int value = parseLenient(text);
@@ -185,7 +182,7 @@ public class EditProfileDialog extends Stage {
         return value < 256 ? -1 : value;
     }
 
-    /** Мягкий разбор для синхронизации чипов: пустое — 0, мусор — -1. */
+    /** РњСЏРіРєРёР№ СЂР°Р·Р±РѕСЂ РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё С‡РёРїРѕРІ: РїСѓСЃС‚РѕРµ вЂ” 0, РјСѓСЃРѕСЂ вЂ” -1. */
     private static int parseLenient(String text) {
         if (text == null || text.isBlank()) {
             return 0;
@@ -198,8 +195,8 @@ public class EditProfileDialog extends Stage {
     }
 
     /**
-     * Показывает диалог и возвращает отредактированные значения, либо {@code null},
-     * если диалог был отменён.
+     * РџРѕРєР°Р·С‹РІР°РµС‚ РґРёР°Р»РѕРі Рё РІРѕР·РІСЂР°С‰Р°РµС‚ РѕС‚СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ, Р»РёР±Рѕ {@code null},
+     * РµСЃР»Рё РґРёР°Р»РѕРі Р±С‹Р» РѕС‚РјРµРЅС‘РЅ.
      */
     public static Result show(Stage owner, ModdedProfile profile) {
         EditProfileDialog dialog = new EditProfileDialog(owner, profile);

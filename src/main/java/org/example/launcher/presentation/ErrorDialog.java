@@ -17,7 +17,7 @@ import javafx.stage.StageStyle;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальный диалог с текстом ошибки запуска и кнопкой копирования.
+ * РњРѕРґР°Р»СЊРЅС‹Р№ РґРёР°Р»РѕРі СЃ С‚РµРєСЃС‚РѕРј РѕС€РёР±РєРё Р·Р°РїСѓСЃРєР° Рё РєРЅРѕРїРєРѕР№ РєРѕРїРёСЂРѕРІР°РЅРёСЏ.
  */
 public class ErrorDialog extends Stage {
 
@@ -58,10 +58,7 @@ public class ErrorDialog extends Stage {
         VBox.setVgrow(textArea, Priority.ALWAYS);
 
         Scene scene = new Scene(content, 620, 340);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
     }

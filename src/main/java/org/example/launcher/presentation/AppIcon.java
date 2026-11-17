@@ -4,8 +4,8 @@ import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 /**
- * Иконка приложения PACKCRAFT: один ресурс {@code /icon.png}
- * (градиентный брикет с литерой P), применяется ко всем окнам
+ * Иконка приложения MDD: один ресурс {@code /icon.png}
+ * (градиентный брикет с литерой M), применяется ко всем окнам
  * лаунчера — главному и диалогам.
  */
 public final class AppIcon {

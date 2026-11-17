@@ -149,7 +149,8 @@ public class GitHubBuildApi implements LauncherServerApi {
 
     private JsonObject parseObject(String json, String what) throws IOException {
         try {
-            JsonObject root = gson.fromJson(json, JsonObject.class);
+            JsonObject root = gson.fromJson(LenientJson.sanitize(json),
+                    JsonObject.class);
             if (root == null) {
                 throw new IOException("Empty " + what);
             }
@@ -174,7 +175,8 @@ public class GitHubBuildApi implements LauncherServerApi {
                 optional(obj, "description"),
                 loaderType,
                 required(obj, "minecraftVersion"),
-                optional(obj, "loaderVersion"));
+                optional(obj, "loaderVersion"),
+                optional(obj, "iconUrl"));
     }
 
     private BuildFileEntry parseFile(JsonObject obj) {

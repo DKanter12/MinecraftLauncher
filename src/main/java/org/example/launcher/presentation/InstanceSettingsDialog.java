@@ -30,15 +30,15 @@ import org.example.launcher.domain.model.ModdedProfile;
 import org.example.launcher.i18n.Lang;
 
 /**
- * Модальная панель настроек игрового инстанса (Prism/GDLauncher-стиль):
- * вкладки «Общие», «Моды», «Java/Память», «Снимки/Бэкапы». В нижнем углу
- * — кнопка «Удалить сборку» с подтверждением; сохранение возвращает
- * {@link Result}. Длинные системные пути в сетке библиотеки больше не
- * показываются — вся настройка живёт здесь.
+ * РњРѕРґР°Р»СЊРЅР°СЏ РїР°РЅРµР»СЊ РЅР°СЃС‚СЂРѕРµРє РёРіСЂРѕРІРѕРіРѕ РёРЅСЃС‚Р°РЅСЃР° (Prism/GDLauncher-СЃС‚РёР»СЊ):
+ * РІРєР»Р°РґРєРё В«РћР±С‰РёРµВ», В«РњРѕРґС‹В», В«Java/РџР°РјСЏС‚СЊВ», В«РЎРЅРёРјРєРё/Р‘СЌРєР°РїС‹В». Р’ РЅРёР¶РЅРµРј СѓРіР»Сѓ
+ * вЂ” РєРЅРѕРїРєР° В«РЈРґР°Р»РёС‚СЊ СЃР±РѕСЂРєСѓВ» СЃ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµРј; СЃРѕС…СЂР°РЅРµРЅРёРµ РІРѕР·РІСЂР°С‰Р°РµС‚
+ * {@link Result}. Р”Р»РёРЅРЅС‹Рµ СЃРёСЃС‚РµРјРЅС‹Рµ РїСѓС‚Рё РІ СЃРµС‚РєРµ Р±РёР±Р»РёРѕС‚РµРєРё Р±РѕР»СЊС€Рµ РЅРµ
+ * РїРѕРєР°Р·С‹РІР°СЋС‚СЃСЏ вЂ” РІСЃСЏ РЅР°СЃС‚СЂРѕР№РєР° Р¶РёРІС‘С‚ Р·РґРµСЃСЊ.
  */
 public final class InstanceSettingsDialog extends Stage {
 
-    /** Отредактированные значения: имя, память (МБ) и JVM-аргументы. */
+    /** РћС‚СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ: РёРјСЏ, РїР°РјСЏС‚СЊ (РњР‘) Рё JVM-Р°СЂРіСѓРјРµРЅС‚С‹. */
     public record Result(String name, int memoryMb, List<String> jvmArgs) {
     }
 
@@ -68,7 +68,7 @@ public final class InstanceSettingsDialog extends Stage {
         setResizable(false);
         setTitle(Lang.tr("settings.instance.title", profile.name()));
 
-        // --- Вкладки ---
+        // --- Р’РєР»Р°РґРєРё ---
         ToggleGroup tabGroup = new ToggleGroup();
         ToggleButton generalTab = tabButton(tabGroup, "settings.tabs.general");
         ToggleButton modsTab = tabButton(tabGroup, "settings.tabs.mods");
@@ -85,7 +85,7 @@ public final class InstanceSettingsDialog extends Stage {
         StackPane tabContent = new StackPane(generalPane, modsPane,
                 javaPane);
 
-        // Синхронизация видимости вкладок
+        // РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РІРёРґРёРјРѕСЃС‚Рё РІРєР»Р°РґРѕРє
         List<ToggleButton> tabs = List.of(generalTab, modsTab, javaTab);
         List<VBox> panes = List.of(generalPane, modsPane, javaPane);
         for (int i = 0; i < tabs.size(); i++) {
@@ -106,7 +106,7 @@ public final class InstanceSettingsDialog extends Stage {
             });
         }
 
-        // --- Нижняя строка: удаление слева, отмена/сохранение справа ---
+        // --- РќРёР¶РЅСЏСЏ СЃС‚СЂРѕРєР°: СѓРґР°Р»РµРЅРёРµ СЃР»РµРІР°, РѕС‚РјРµРЅР°/СЃРѕС…СЂР°РЅРµРЅРёРµ СЃРїСЂР°РІР° ---
         Button delete = new Button(Lang.tr("settings.instance.delete"));
         delete.getStyleClass().add("card-danger-button");
         delete.setOnAction(e -> confirmDelete(profile));
@@ -145,19 +145,16 @@ public final class InstanceSettingsDialog extends Stage {
         content.setPrefWidth(480);
 
         Scene scene = new Scene(content);
-        var css = getClass().getResource("/styles.css");
-        if (css != null) {
-            scene.getStylesheets().add(css.toExternalForm());
-        }
+        ThemeManager.apply(scene);
         setScene(scene);
         AppIcon.apply(this);
         validateSave(saveButton);
     }
 
     /**
-     * Открывает модальное окно настроек. Возвращает изменения или
-     * {@code null} (отмена либо сработавшее подтверждение удаления —
-     * удаление выполняется через колбэк {@code onDeleteRequest}).
+     * РћС‚РєСЂС‹РІР°РµС‚ РјРѕРґР°Р»СЊРЅРѕРµ РѕРєРЅРѕ РЅР°СЃС‚СЂРѕРµРє. Р’РѕР·РІСЂР°С‰Р°РµС‚ РёР·РјРµРЅРµРЅРёСЏ РёР»Рё
+     * {@code null} (РѕС‚РјРµРЅР° Р»РёР±Рѕ СЃСЂР°Р±РѕС‚Р°РІС€РµРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ СѓРґР°Р»РµРЅРёСЏ вЂ”
+     * СѓРґР°Р»РµРЅРёРµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ С‡РµСЂРµР· РєРѕР»Р±СЌРє {@code onDeleteRequest}).
      */
     public static Result show(Stage owner,
                               ModdedProfile profile,
@@ -171,7 +168,7 @@ public final class InstanceSettingsDialog extends Stage {
     }
 
     // ------------------------------------------------------------------
-    //  Вкладки
+    //  Р’РєР»Р°РґРєРё
     // ------------------------------------------------------------------
 
     private VBox buildGeneralPane() {
@@ -249,7 +246,7 @@ public final class InstanceSettingsDialog extends Stage {
     }
 
     // ------------------------------------------------------------------
-    //  Вспомогательное
+    //  Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅРѕРµ
     // ------------------------------------------------------------------
 
     private static ToggleButton tabButton(ToggleGroup group, String key) {
@@ -260,9 +257,9 @@ public final class InstanceSettingsDialog extends Stage {
     }
 
     /**
-     * Удаление: делегирует колбэку onDeleteRequest (в MainView это
-     * onDeleteProfile с его модальным подтверждением) и закрывает окно
-     * без сохранения.
+     * РЈРґР°Р»РµРЅРёРµ: РґРµР»РµРіРёСЂСѓРµС‚ РєРѕР»Р±СЌРєСѓ onDeleteRequest (РІ MainView СЌС‚Рѕ
+     * onDeleteProfile СЃ РµРіРѕ РјРѕРґР°Р»СЊРЅС‹Рј РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµРј) Рё Р·Р°РєСЂС‹РІР°РµС‚ РѕРєРЅРѕ
+     * Р±РµР· СЃРѕС…СЂР°РЅРµРЅРёСЏ.
      */
     private void confirmDelete(ModdedProfile profileToConfirm) {
         deleteRequested = true;
@@ -276,7 +273,7 @@ public final class InstanceSettingsDialog extends Stage {
         saveButton.setDisable(!valid);
     }
 
-    /** Мягкий разбор JVM-аргументов: позволяем кавычки, разделяем пробелом. */
+    /** РњСЏРіРєРёР№ СЂР°Р·Р±РѕСЂ JVM-Р°СЂРіСѓРјРµРЅС‚РѕРІ: РїРѕР·РІРѕР»СЏРµРј РєР°РІС‹С‡РєРё, СЂР°Р·РґРµР»СЏРµРј РїСЂРѕР±РµР»РѕРј. */
     private static List<String> parseJvmArgs(String text) {
         if (text == null) {
             return List.of();
@@ -286,7 +283,7 @@ public final class InstanceSettingsDialog extends Stage {
                 : List.of(trimmed.split(" "));
     }
 
-    /** Список модов (jar и jar.disabled) из каталога mods. */
+    /** РЎРїРёСЃРѕРє РјРѕРґРѕРІ (jar Рё jar.disabled) РёР· РєР°С‚Р°Р»РѕРіР° mods. */
     private static List<String> listMods(Path gameDir) {
         List<String> names = new ArrayList<>();
         if (gameDir == null) {
@@ -317,8 +314,8 @@ public final class InstanceSettingsDialog extends Stage {
     }
 
     /**
-     * Пресеты памяти: кнопки той же логики, что в EditProfileDialog
-     * (Авто / 2 / 4 / 8 / 12 / 16 / 32 ГБ) + ручной ввод в поле.
+     * РџСЂРµСЃРµС‚С‹ РїР°РјСЏС‚Рё: РєРЅРѕРїРєРё С‚РѕР№ Р¶Рµ Р»РѕРіРёРєРё, С‡С‚Рѕ РІ EditProfileDialog
+     * (РђРІС‚Рѕ / 2 / 4 / 8 / 12 / 16 / 32 Р“Р‘) + СЂСѓС‡РЅРѕР№ РІРІРѕРґ РІ РїРѕР»Рµ.
      */
     private static final class MemoryChips {
         private final TextField field;
@@ -337,7 +334,7 @@ public final class InstanceSettingsDialog extends Stage {
             add("12 " + Lang.tr("unit.gb"), 12288);
             add("16 " + Lang.tr("unit.gb"), 16384);
             add("32 " + Lang.tr("unit.gb"), 32768);
-            // Ручной ввод подсвечивает совпавший пресет
+            // Р СѓС‡РЅРѕР№ РІРІРѕРґ РїРѕРґСЃРІРµС‡РёРІР°РµС‚ СЃРѕРІРїР°РІС€РёР№ РїСЂРµСЃРµС‚
             field.textProperty().addListener((obs, old, val) -> {
                 int mb = parse();
                 for (var node : chips.getChildren()) {
@@ -372,7 +369,7 @@ public final class InstanceSettingsDialog extends Stage {
             chips.getChildren().add(chip);
         }
 
-        /** Подсвечивает пресет по заданному лимиту. */
+        /** РџРѕРґСЃРІРµС‡РёРІР°РµС‚ РїСЂРµСЃРµС‚ РїРѕ Р·Р°РґР°РЅРЅРѕРјСѓ Р»РёРјРёС‚Сѓ. */
         void sync(int currentMb) {
             field.setText(currentMb > 0 ? String.valueOf(currentMb) : "");
             int flag = currentMb > 0 ? currentMb : 0;
@@ -389,8 +386,8 @@ public final class InstanceSettingsDialog extends Stage {
         }
 
         /**
-         * Разбор поля: пустое — авто ({@code 0}); мусор/меньше 256 МБ
-         * — {@code -1} (некорректно).
+         * Р Р°Р·Р±РѕСЂ РїРѕР»СЏ: РїСѓСЃС‚РѕРµ вЂ” Р°РІС‚Рѕ ({@code 0}); РјСѓСЃРѕСЂ/РјРµРЅСЊС€Рµ 256 РњР‘
+         * вЂ” {@code -1} (РЅРµРєРѕСЂСЂРµРєС‚РЅРѕ).
          */
         int parse() {
             String text = field.getText();
