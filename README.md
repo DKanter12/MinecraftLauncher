@@ -37,6 +37,28 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
   `launcher_preferences.json`: `theme`, `customThemeBg`,
   `customThemeAccent`).
 
+## Выпуск обновления
+
+1. Поднимите `version` в `launcher-version.json`.
+2. Соберите пакет:
+
+   ```powershell
+   $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
+   .\gradlew.bat launcherUpdatePackage
+   ```
+
+   Готовый ZIP: `build\updates\launcher-<version>.zip`; задача печатает
+   его SHA-256 и размер.
+3. Скопируйте ZIP в `updates\launcher-<version>.zip`.
+4. В `launcher-version.json` укажите URL вида
+   `https://raw.githubusercontent.com/DKanter12/MinecraftLauncher/refs/heads/main/updates/launcher-<version>.zip`,
+   а также `package.sha256` и `package.size` из вывода задачи.
+5. Закоммитьте и запушьте `launcher-version.json` и ZIP.
+
+Для raw-ссылок на новые ZIP используйте форму `refs/heads/main`:
+короткий путь `.../main/...` для только что загруженных больших файлов
+может временно отдавать 404.
+
 ## Запуск в режиме разработки
 
 ```powershell
