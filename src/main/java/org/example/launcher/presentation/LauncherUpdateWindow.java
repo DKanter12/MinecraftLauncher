@@ -139,6 +139,7 @@ public class LauncherUpdateWindow extends Stage {
         card.getStyleClass().add("modal-card");
         card.setPrefWidth(540);
         card.setMaxWidth(540);
+        card.setMaxHeight(Region.USE_PREF_SIZE);
 
         StackPane overlay = new StackPane();
         NewInstanceDialog.addBlurBackdrop(overlay, owner);
