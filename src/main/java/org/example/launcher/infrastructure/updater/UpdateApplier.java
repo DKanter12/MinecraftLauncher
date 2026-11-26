@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -95,7 +96,20 @@ public final class UpdateApplier {
                 .start();
     }
 
-    private static Optional<List<String>> restartCommand(Path appHome) {
+    static Optional<List<String>> restartCommand(Path appHome) {
+        // jpackage app-image: в домашнем каталоге лежит MDD.exe.
+        try (var stream = Files.list(appHome)) {
+            List<Path> exes = stream
+                    .filter(p -> Files.isRegularFile(p)
+                            && p.getFileName().toString()
+                                    .toLowerCase(Locale.ROOT).endsWith(".exe"))
+                    .sorted().toList();
+            if (!exes.isEmpty()) {
+                return Optional.of(List.of(exes.get(0).toString()));
+            }
+        } catch (IOException ignored) {
+            // откат к bin/ или jar
+        }
         Path bin = appHome.resolve("bin");
         if (Files.isDirectory(bin)) {
             Path preferred = bin.resolve("MinecraftLauncher.bat");

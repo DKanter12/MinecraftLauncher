@@ -209,6 +209,28 @@ class UpdateApplierTest {
     }
 
     @Test
+    void restartCommandPrefersAppImageExe() throws IOException {
+        Path home = tempDir.resolve("MDD");
+        Files.createDirectories(home);
+        Files.writeString(home.resolve("MDD.exe"), "exe");
+
+        assertEquals(java.util.List.of(home.resolve("MDD.exe").toString()),
+                UpdateApplier.restartCommand(home).orElseThrow());
+    }
+
+    @Test
+    void restartCommandUsesBinScript() throws IOException {
+        Path home = tempDir.resolve("install");
+        Files.createDirectories(home.resolve("bin"));
+        Files.writeString(home.resolve("bin").resolve("MinecraftLauncher.bat"),
+                "run");
+
+        assertEquals(java.util.List.of(home.resolve("bin")
+                        .resolve("MinecraftLauncher.bat").toString()),
+                UpdateApplier.restartCommand(home).orElseThrow());
+    }
+
+    @Test
     void writeUpdaterRendersScript() throws IOException {
         Path storage = tempDir.resolve("storage");
         UpdateService service = new UpdateService(

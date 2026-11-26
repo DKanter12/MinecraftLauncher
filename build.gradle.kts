@@ -1,7 +1,18 @@
+import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
 plugins {
     id("java")
     id("application")
     id("org.openjfx.javafxplugin") version "0.1.0"
+}
+
+/** Версия лаунчера из манифеста (используется для ZIP и version.txt). */
+fun readLauncherVersion(manifest: File): String {
+    if (!manifest.isFile) return "dev"
+    return Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
+        .find(manifest.readText())?.groupValues?.get(1) ?: "dev"
 }
 
 group = "org.example"
@@ -33,6 +44,55 @@ tasks.test {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-Xlint:deprecation")
+}
+
+// ZIP для самообновления: содержимое app-image MDD кладётся в корень
+// архива, чтобы апдейтер скопировал его поверх домашнего каталога.
+// Запуск: .\gradlew.bat launcherUpdatePackage
+tasks.register("launcherUpdatePackage") {
+    group = "distribution"
+    description = "Собирает ZIP обновления и печатает SHA-256 и размер"
+    dependsOn(tasks.named("desktopPackage"))
+    doLast {
+        val dist = layout.buildDirectory.dir("dist/MDD").get().asFile
+        require(dist.isDirectory) { "App image not found: $dist" }
+        val manifest = layout.projectDirectory.file("launcher-version.json").asFile
+        val version = readLauncherVersion(manifest)
+        val outDir = layout.buildDirectory.dir("updates").get().asFile
+        outDir.mkdirs()
+        val zipFile = File(outDir, "launcher-$version.zip")
+        zipFile.delete()
+        ZipOutputStream(zipFile.outputStream().buffered()).use { zip ->
+            dist.walkTopDown()
+                .filter { it.isFile }
+                .filter { file ->
+                    val name = file.relativeTo(dist).invariantSeparatorsPath
+                    // Только файлы лаунчера: код в app/ и маркер версии.
+                    // runtime/ и MDD.exe остаются от установленной сборки.
+                    name == "version.txt" || name.startsWith("app/")
+                }
+                .sortedBy { it.path }
+                .forEach { file ->
+                    val name = file.relativeTo(dist).invariantSeparatorsPath
+                    zip.putNextEntry(ZipEntry(name))
+                    file.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        zipFile.inputStream().use { input ->
+            val buffer = ByteArray(65536)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        val sha = digest.digest().joinToString("") { String.format("%02x", it.toInt() and 0xff) }
+        println("Update package: ${zipFile.absolutePath}")
+        println("Size: ${zipFile.length()}")
+        println("SHA-256: $sha")
+    }
 }
 
 // Готовая к запуску с рабочего стола сборка: installDist + jpackage
@@ -85,7 +145,7 @@ tasks.register("desktopPackage") {
             commandLine(jpackage.absolutePath,
                 "--type", "app-image",
                 "--name", "MDD",
-                "--app-version", "1.0.0",
+                "--app-version", "1.1.0",
                 "--vendor", "MDD",
                 "--icon", layout.projectDirectory.file("mdd.ico").asFile.absolutePath,
                 "--input", libDir.absolutePath,
@@ -94,5 +154,11 @@ tasks.register("desktopPackage") {
                 "--main-class", "org.example.launcher.app.DesktopLauncher",
                 "--dest", dest.absolutePath)
         }
+
+        // Установленная версия читается из version.txt рядом с MDD.exe.
+        // Для dev-запусков (IDE/Gradle) остаётся AppVersion.BUILT_IN.
+        val version = readLauncherVersion(
+            layout.projectDirectory.file("launcher-version.json").asFile)
+        File(dest, "MDD/version.txt").writeText(version)
     }
 }

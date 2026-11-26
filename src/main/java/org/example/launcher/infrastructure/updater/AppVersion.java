@@ -1,8 +1,10 @@
 package org.example.launcher.infrastructure.updater;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 
 /**
  * Собственная версия лаунчера: что сейчас запущено и как она
@@ -14,7 +16,11 @@ import java.nio.file.Paths;
  */
 public final class AppVersion {
 
-    /** Версия, вшитая в эту сборку. */
+    /**
+     * Версия для запусков из IDE/Gradle, когда рядом с приложением нет
+     * version.txt. В установленной сборке актуальная версия пишется в
+     * version.txt (её обновляет и апдейтер).
+     */
     public static final String BUILT_IN = "v1.0";
 
     private AppVersion() {
@@ -49,8 +55,20 @@ public final class AppVersion {
                     .getCodeSource().getLocation().toURI());
             if (Files.isRegularFile(code)) {
                 Path dir = code.getParent();
-                if (dir != null
-                        && "lib".equals(dir.getFileName().toString())
+                if (dir == null) {
+                    return null;
+                }
+                // jpackage app-image: <home>/app/<jar>, <home>/runtime,
+                // <home>/MDD.exe. Домашним каталогом считается <home>,
+                // иначе апдейтер копировал бы файлы внутрь app/.
+                if ("app".equals(dir.getFileName().toString())) {
+                    Path home = dir.getParent();
+                    if (home != null && looksLikeAppImage(home)) {
+                        return home;
+                    }
+                }
+                // installDist: <home>/lib/<jar> + <home>/bin/*.bat
+                if ("lib".equals(dir.getFileName().toString())
                         && dir.getParent() != null
                         && Files.isDirectory(dir.getParent().resolve("bin"))) {
                     return dir.getParent();
@@ -60,6 +78,20 @@ public final class AppVersion {
             return null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /** jpackage app-image: рядом есть runtime/ и хотя бы один .exe. */
+    private static boolean looksLikeAppImage(Path home) {
+        if (Files.isDirectory(home.resolve("runtime"))) {
+            return true;
+        }
+        try (var stream = Files.list(home)) {
+            return stream.anyMatch(path -> Files.isRegularFile(path)
+                    && path.getFileName().toString().toLowerCase(Locale.ROOT)
+                            .endsWith(".exe"));
+        } catch (IOException e) {
+            return false;
         }
     }
 

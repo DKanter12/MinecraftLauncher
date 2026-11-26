@@ -2184,6 +2184,77 @@
     -fx-opacity: 0.45;
 }
 
+/* ============================ Update modal ============================ */
+
+.update-version-row {
+    -fx-background-color: #15191F;
+    -fx-background-radius: 10;
+    -fx-border-color: #20262F;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 10 14 10 14;
+}
+
+.update-version-label {
+    -fx-text-fill: #929BAA;
+    -fx-font-size: 12px;
+}
+
+.update-version-value {
+    -fx-text-fill: #F0F3F6;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.update-version-new {
+    -fx-text-fill: #10C58B;
+}
+
+.update-version-arrow {
+    -fx-text-fill: #626C7A;
+    -fx-font-size: 13px;
+}
+
+.update-notes {
+    -fx-background-color: transparent;
+    -fx-control-inner-background: #15191F;
+    -fx-text-fill: #C9D1DB;
+    -fx-font-size: 13px;
+    -fx-background-radius: 10;
+    -fx-border-color: #20262F;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 0;
+}
+
+.update-notes .content {
+    -fx-background-color: #15191F;
+    -fx-background-radius: 10;
+}
+
+.update-notes .scroll-pane,
+.update-notes .scroll-pane .viewport,
+.update-notes .scroll-pane .content {
+    -fx-background-color: transparent;
+}
+
+.update-notes:focused {
+    -fx-border-color: #2B323D;
+}
+
+.update-status {
+    -fx-text-fill: #929BAA;
+    -fx-font-size: 12px;
+}
+
+.update-status-error {
+    -fx-text-fill: #FF4A6E;
+}
+
+.update-progress {
+    -fx-pref-height: 8px;
+}
+
 /* ============================ Add Account modal ============================ */
 
 /* Карточки-выбора типа аккаунта (Radio Cards) */
