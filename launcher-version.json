@@ -2,7 +2,7 @@
   "version": "1.1",
   "notes": "Улучшение визуала лаунчера и добавление функционала",
   "package": {
-    "url": "https://raw.githubusercontent.com/DKanter12/MinecraftLauncher/main/updates/launcher-1.1.zip",
+    "url": "https://raw.githubusercontent.com/DKanter12/MinecraftLauncher/refs/heads/main/updates/launcher-1.1.zip",
     "sha256": "175b241a20ecb9ad472b9e20067ab2011f5d4331ba1cd0d27d8b0438e3ed62b5",
     "size": 9220102
   }
